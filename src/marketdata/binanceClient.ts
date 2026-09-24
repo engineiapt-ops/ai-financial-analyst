@@ -207,6 +207,17 @@ export class ReconnectingKlineWebSocket extends WebSocket {
   }
 
   /**
+   * Força a destruição do socket TCP subjacente sem marcar fechamento manual,
+   * reproduzindo de forma fidedigna uma perda abrupta de conexão de rede (código 1006).
+   */
+  public simulateNetworkDrop(): void {
+    const rawSocket = (this._activeWs as any)?._socket ?? (this as any)?._socket;
+    if (rawSocket && typeof rawSocket.destroy === "function") {
+      rawSocket.destroy(new Error("Simulated network drop"));
+    }
+  }
+
+  /**
    * Processa o payload bruto de mensagem do stream da Binance.
    * Dispara onCandleUpdate (se configurado) e onClosedCandle estritamente quando k.x === true.
    */

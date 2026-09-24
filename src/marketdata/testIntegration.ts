@@ -174,10 +174,17 @@ async function runValidation() {
     testWs.terminate();
   }
 
-  // 8. Validação de Reconexão Automática com Backoff Progressivo
-  console.log("\n8. Validando Reconexão Automática com Backoff Progressivo:");
+  // 8. Validação do Ciclo Real de Reconexão Automática com a Binance
+  console.log("\n8. Validando Ciclo Real de Reconexão Automática com a Binance:");
   await new Promise<void>((resolve, reject) => {
-    let reconnectFired = false;
+    let initialConnected = false;
+    let reconnectScheduled = false;
+    let reconnectedLiveMessage = false;
+
+    const timeout = setTimeout(() => {
+      reconnectWs.terminate();
+      reject(new Error("Timeout: Ciclo completo de reconexão não concluiu a tempo"));
+    }, 12000);
 
     const reconnectWs = subscribeKlineStream(
       "BTCUSDT",
@@ -185,41 +192,48 @@ async function runValidation() {
       () => {},
       {
         autoReconnect: true,
-        initialBackoffMs: 200, // backoff rápido para teste unitário
-        maxBackoffMs: 1000,
+        initialBackoffMs: 300,
+        maxBackoffMs: 1500,
         maxReconnectAttempts: 3,
         onOpen: () => {
-          // Força fechamento abrupto para disparar reconexão
-          setTimeout(() => {
-            console.log("   - Simulando queda inesperada de conexão...");
-            reconnectWs.activeSocket.emit("close", 1006, Buffer.from("Abnormal Closure"));
-          }, 300);
+          if (!initialConnected) {
+            initialConnected = true;
+            console.log("   - Conexão inicial estabelecida com o stream da Binance");
+            // Provoca queda real destruindo o socket TCP subjacente (código 1006 real do Node)
+            setTimeout(() => {
+              console.log("   - Provocando desconexão TCP real na camada de transporte...");
+              reconnectWs.simulateNetworkDrop();
+            }, 300);
+          } else {
+            console.log("   - Nova conexão WebSocket reestabelecida com sucesso na Binance!");
+          }
+        },
+        onClose: () => {
+          console.log("   - Evento close real capturado pelo cliente");
         },
         onReconnect: (attempt, delayMs) => {
-          reconnectFired = true;
-          console.log(`   - Evento de reconexão disparado: Tentativa ${attempt}, Delay: ${delayMs}ms`);
-          if (attempt === 1 && delayMs >= 200) {
-            console.log("   - Backoff progressivo inicial confirmado");
+          reconnectScheduled = true;
+          console.log(`   - Agendamento de reconexão acionado: Tentativa ${attempt}, Delay: ${delayMs}ms`);
+        },
+        onCandleUpdate: (candle) => {
+          if (reconnectScheduled && !reconnectedLiveMessage) {
+            reconnectedLiveMessage = true;
+            console.log(
+              `   - Dados de mercado live recebidos na NOVA conexão reestabelecida! Preço: ${candle.close}`
+            );
+            clearTimeout(timeout);
+            reconnectWs.terminate();
+            if (reconnectWs.isManualClose) {
+              console.log("   - Encerramento manual limpo verificado (isManualClose = true)");
+            }
+            resolve();
           }
-          // Encerra teste com sucesso
-          reconnectWs.terminate();
-          if (reconnectWs.isManualClose) {
-            console.log("   - Encerramento limpo verificado (isManualClose = true, timers limpos)");
-          }
-          resolve();
         },
         onError: () => {},
       }
     );
-
-    setTimeout(() => {
-      if (!reconnectFired) {
-        reconnectWs.terminate();
-        reject(new Error("Timeout: Reconexão automática não foi acionada"));
-      }
-    }, 5000);
   });
-  console.log("   - Reconexão com Backoff: PASS");
+  console.log("   - Ciclo Real de Reconexão: PASS");
 
   console.log("\n=== FAIXA 03 — VALIDAÇÃO COMPLETA: TODOS OS TESTES PASSARAM COM SUCESSO ===");
 }
