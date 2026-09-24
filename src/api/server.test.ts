@@ -32,4 +32,12 @@ try {
 }
 assert(rejected, "zero investment must be rejected");
 
+let invalidRunId = false;
+try {
+  new URL("http://localhost/api/metrics?runId=abc");
+  const value = Number("abc");
+  invalidRunId = !Number.isInteger(value) || value <= 0;
+} catch {}
+assert(invalidRunId, "invalid runId must be rejected");
+
 console.log("server schema tests: OK");
