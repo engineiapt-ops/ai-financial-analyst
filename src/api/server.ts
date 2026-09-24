@@ -94,9 +94,14 @@ export const AnalyzeSchema = z.object({
 });
 
 
-app.get("/api/metrics", async (_req, res) => {
+app.get("/api/metrics", async (req, res) => {
   try {
-    const metrics = await getMetricsByOrigem();
+    const rawRunId = req.query.runId;
+    const runId = rawRunId === undefined ? undefined : Number(rawRunId);
+    if (runId !== undefined && (!Number.isInteger(runId) || runId <= 0)) {
+      return res.status(400).json({ status: "error", error: "runId must be a positive integer" });
+    }
+    const metrics = await getMetricsByOrigem(runId);
     res.json({ status: "ok", metrics });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
