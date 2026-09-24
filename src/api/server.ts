@@ -7,9 +7,10 @@ import {
   getServerTime,
   ping as pingBinance,
 } from "../marketdata/binanceClient.js";
+import { analyzeMarket } from "./analyze.js";
 import type { Timeframe } from "../types.js";
 
-const app = express();
+export const app = express();
 app.use(express.json());
 
 app.get("/", (_req, res) => {
@@ -81,19 +82,30 @@ app.get("/api/market/klines", async (req, res) => {
   }
 });
 
-const AnalyzeSchema = z.object({
-  ativo: z.string().default("BTCUSDT"),
+export const AnalyzeSchema = z.object({
+  ativo: z.string().min(1).default("BTCUSDT"),
   timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+  valorInvestimento: z.coerce.number().positive().default(100),
+  engine: z.enum(["baseline", "jev"]).default("baseline"),
+  news: z.boolean().default(true),
 });
 
-app.post("/api/analyze", async (_req, res) => {
+app.post("/api/analyze", async (req, res) => {
   try {
-    const parsed = AnalyzeSchema.parse(_req.body);
-    res.json({ status: "foundation-ready", input: parsed });
+    const parsed = AnalyzeSchema.parse(req.body);
+    const result = await analyzeMarket(parsed);
+    res.json({ status: "ok", ...result });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
   }
 });
 
 const port = Number(process.env.PORT ?? 3000);
-app.listen(port, "0.0.0.0", () => console.log(`AI Financial Analyst API rodando na porta ${port}`));
+
+if (process.env.NODE_ENV !== "test") {
+  app.listen(port, "0.0.0.0", () =>
+    console.log(`AI Financial Analyst API rodando na porta ${port}`),
+  );
+}
