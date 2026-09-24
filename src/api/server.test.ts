@@ -1,6 +1,6 @@
 process.env.NODE_ENV = "test";
 
-import { AnalyzeSchema } from "./server.js";
+const { AnalyzeSchema } = await import("./server.js");
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
