@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS market_data (
   id BIGSERIAL PRIMARY KEY,
   ativo TEXT NOT NULL,
-  timeframe TEXT NOT NULL,
+  timeframe TEXT NOT NULL CHECK (timeframe IN ('1h', '4h', '1d')),
   open_time TIMESTAMPTZ NOT NULL,
   open NUMERIC NOT NULL,
   high NUMERIC NOT NULL,
@@ -15,11 +15,17 @@ CREATE TABLE IF NOT EXISTS market_data (
 CREATE TABLE IF NOT EXISTS signals (
   id BIGSERIAL PRIMARY KEY,
   ts TIMESTAMPTZ NOT NULL DEFAULT now(),
-  ativo TEXT NOT NULL, timeframe TEXT NOT NULL,
-  entrada NUMERIC, stop NUMERIC, alvo NUMERIC,
+  ativo TEXT NOT NULL,
+  timeframe TEXT NOT NULL CHECK (timeframe IN ('1h', '4h', '1d')),
+  entrada NUMERIC,
+  stop NUMERIC,
+  alvo NUMERIC,
   origem TEXT NOT NULL CHECK (origem IN ('jev', 'baseline')),
-  jev_choice TEXT, jev_probs JSONB, jev_model_version TEXT,
-  quality_score NUMERIC, risco_elevado BOOLEAN,
+  jev_choice TEXT,
+  jev_probs JSONB,
+  jev_model_version TEXT,
+  quality_score NUMERIC,
+  risco_elevado BOOLEAN,
   recomendacao TEXT NOT NULL CHECK (recomendacao IN ('BUY', 'WAIT', 'SELL')),
   tamanho_posicao_pct NUMERIC NOT NULL CHECK (tamanho_posicao_pct >= 0 AND tamanho_posicao_pct <= 100),
   observacao TEXT
@@ -28,18 +34,21 @@ CREATE TABLE IF NOT EXISTS signals (
 CREATE TABLE IF NOT EXISTS paper_trades (
   id BIGSERIAL PRIMARY KEY,
   signal_id BIGINT NOT NULL REFERENCES signals(id) ON DELETE CASCADE,
-  entry_price NUMERIC NOT NULL, exit_price NUMERIC,
-  outcome TEXT CHECK (outcome IN ('win', 'loss', 'open')),
-  profit_percent NUMERIC, drawdown NUMERIC,
-  opened_at TIMESTAMPTZ NOT NULL DEFAULT now(), closed_at TIMESTAMPTZ
+  entry_price NUMERIC NOT NULL,
+  exit_price NUMERIC,
+  outcome TEXT NOT NULL CHECK (outcome IN ('win', 'loss', 'open')),
+  profit_percent NUMERIC NOT NULL,
+  drawdown NUMERIC,
+  opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS config (
   user_id TEXT PRIMARY KEY,
-  ativo_pref TEXT NOT NULL DEFAULT 'BTCUSD',
+  ativo_pref TEXT NOT NULL DEFAULT 'BTCUSDT',
   valor_invest NUMERIC NOT NULL DEFAULT 100,
-  horizon_default TEXT NOT NULL DEFAULT '1h',
-  fixed_position_pct NUMERIC NOT NULL DEFAULT 2.0,
+  horizon_default TEXT NOT NULL DEFAULT '1h' CHECK (horizon_default IN ('1h', '4h', '1d')),
+  fixed_position_pct NUMERIC NOT NULL DEFAULT 2.0 CHECK (fixed_position_pct >= 0 AND fixed_position_pct <= 100),
   thresholds_congelados_em TIMESTAMPTZ
 );
 
