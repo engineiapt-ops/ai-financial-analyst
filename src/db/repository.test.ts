@@ -42,7 +42,20 @@ const decision: DecisionResult = {
   jevModelVersion: "jev-1.13",
 };
 
+const runId = await repo.createBacktestRun({
+  engine: "baseline",
+  mode: "oos",
+  ativo: "BTCUSDT",
+  timeframe: "1h",
+  periodoInicio: new Date("2026-01-01T00:00:00Z"),
+  periodoFim: new Date("2026-01-10T00:00:00Z"),
+  oosStartRatio: 0.7,
+  thresholdsCongeladosEm: new Date("2026-01-10T00:00:00Z"),
+});
+assert.equal(runId, 7);
+
 const signalId = await repo.saveSignal({
+  backtestRunId: runId,
   ativo: "BTCUSDT",
   timeframe: "1h",
   decision,
@@ -51,7 +64,7 @@ const signalId = await repo.saveSignal({
   alvo: 104000,
 });
 assert.equal(signalId, 7);
-assert.match(db.queries[0], /entrada, stop, alvo/);
+assert.match(db.queries.find((q) => q.includes("INSERT INTO signals")) ?? "", /backtest_run_id/);
 
 const tradeId = await repo.saveTrade({
   signalId,
@@ -65,6 +78,10 @@ assert.equal(tradeId, 7);
 
 await repo.freezeConfigThresholds("user-1");
 assert.match(db.queries.find((q) => q.includes("INSERT INTO config")) ?? "", /ON CONFLICT/);
+
+assert.deepEqual(await repo.getMetricsByOrigem(runId), [
+  { origem: "jev", total: 2, win_rate: 50, profit_factor: 1.25 },
+]);
 
 const saved = await repo.saveMarketData("BTCUSDT", "1h", [{
   openTime: new Date("2026-01-01T00:00:00Z"),
