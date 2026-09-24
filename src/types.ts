@@ -11,11 +11,11 @@ export interface Kline {
 }
 
 export interface Indicators {
-  vwap: number;
-  ema9: number;
-  ema21: number;
-  rsi: number;
-  atr: number;
+  vwap: number | null;
+  ema9: number | null;
+  ema21: number | null;
+  rsi: number | null;
+  atr: number | null;
 }
 
 export interface MarketState {
