@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS backtest_runs (
   periodo_fim TIMESTAMPTZ NOT NULL,
   oos_start_ratio NUMERIC,
   thresholds_congelados_em TIMESTAMPTZ,
+  candles_total INT,
+  dataset_hash TEXT,
   criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

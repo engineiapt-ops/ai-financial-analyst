@@ -6,9 +6,17 @@ import { computeIndicatorsSeries } from "../features/indicators.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
 import { evaluateBaseline } from "../decision/baselineEngine.js";
 import { simulateTrade } from "../papertrading/simulator.js";
-import { createBacktestRun, saveSignal, saveTrade } from "../db/repository.js";
+import {
+  createBacktestRun,
+  getBacktestRun,
+  getMarketDataRange,
+  saveMarketData,
+  saveSignal,
+  saveTrade,
+} from "../db/repository.js";
+import { computeDatasetHash } from "../marketdata/dataset.js";
 import { freezeThresholds } from "../config/thresholds.js";
-import type { MarketState, Timeframe, DecisionResult } from "../types.js";
+import type { MarketState, Timeframe, DecisionResult, Kline } from "../types.js";
 
 const ATIVO = "BTCUSDT";
 const TIMEFRAME: Timeframe = "1h";
@@ -25,6 +33,15 @@ function getEngine(): Engine {
   return "both";
 }
 
+function getFromRunId(): number | null {
+  const index = process.argv.indexOf("--from-run");
+  if (index !== -1 && process.argv[index + 1]) {
+    const parsed = Number(process.argv[index + 1]);
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
 function getLevels(entryPrice: number, side: "BUY" | "SELL") {
   const direction = side === "BUY" ? 1 : -1;
   return {
@@ -37,13 +54,34 @@ function getLevels(entryPrice: number, side: "BUY" | "SELL") {
 async function run() {
   const mode = process.argv.includes("--oos") ? "oos" : "dev";
   const engine = getEngine();
+  const fromRunId = getFromRunId();
 
   // OOS começa somente depois de congelar os thresholds.
   if (mode === "oos") {
     freezeThresholds();
   }
 
-  const klines = await fetchKlines(ATIVO, TIMEFRAME, 1000);
+  let klines: Kline[];
+  if (fromRunId) {
+    const runRecord = await getBacktestRun(fromRunId);
+    if (!runRecord) {
+      throw new Error(`Run ${fromRunId} não encontrado no banco de dados`);
+    }
+    klines = await getMarketDataRange(
+      runRecord.ativo,
+      runRecord.timeframe,
+      runRecord.periodoInicio,
+      runRecord.periodoFim,
+    );
+    if (klines.length === 0) {
+      throw new Error(`Nenhum candle encontrado no market_data para reproduzir o run ${fromRunId}`);
+    }
+  } else {
+    klines = await fetchKlines(ATIVO, TIMEFRAME, 1000);
+    await saveMarketData(ATIVO, TIMEFRAME, klines);
+  }
+
+  const datasetHash = computeDatasetHash(klines);
   const indicatorsSeries = computeIndicatorsSeries(klines);
   const evaluationStart = mode === "oos"
     ? Math.floor(klines.length * OOS_START_RATIO)
@@ -57,11 +95,15 @@ async function run() {
     periodoFim: klines[klines.length - 1].openTime,
     oosStartRatio: mode === "oos" ? OOS_START_RATIO : null,
     thresholdsCongeladosEm: mode === "oos" ? new Date() : null,
+    candlesTotal: klines.length,
+    datasetHash,
   });
 
   let processed = 0;
   let skippedWarmup = 0;
   let savedTrades = 0;
+  let closedTrades = 0;
+  let openTrades = 0;
 
   for (let i = evaluationStart; i < klines.length - 1; i++) {
     const signalCandle = klines[i];
@@ -117,13 +159,18 @@ async function run() {
         trade.profitPercent,
         { openedAt: signalCandle.openTime },
       );
+      if (trade.outcome === "open") {
+        openTrades++;
+      } else {
+        closedTrades++;
+      }
       savedTrades++;
     }
     processed++;
   }
 
   console.log(
-    `Backtest concluído (runId=${runId}, modo=${mode}, engine=${engine}). Candles processados: ${processed}, pulados por aquecimento: ${skippedWarmup}, trades salvos: ${savedTrades}.`,
+    `Backtest concluído (runId=${runId}, modo=${mode}, engine=${engine}). Dataset hash: ${datasetHash} (${klines.length} candles). Candles processados: ${processed}, pulados por aquecimento: ${skippedWarmup}, posições geradas: ${savedTrades}, fechadas: ${closedTrades}, abertas: ${openTrades}.`,
   );
   console.log(`Consulte GET /api/metrics?runId=${runId} para os resultados desta execução.`);
 }

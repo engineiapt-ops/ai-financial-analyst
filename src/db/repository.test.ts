@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createRepository, type RepositoryPool } from "./repository.js";
+import { computeDatasetHash } from "../marketdata/dataset.js";
 import type { DecisionResult } from "../types.js";
 
 class FakeClient {
@@ -19,8 +20,48 @@ class FakeDb implements RepositoryPool {
   async query<T = any>(text: string, _values?: unknown[]): Promise<{ rows: T[] }> {
     this.queries.push(text);
     if (text.includes("SELECT 1")) return { rows: [] };
+    if (text.includes("FROM backtest_runs") && text.includes("WHERE id = $1")) {
+      return {
+        rows: [{
+          id: 7,
+          engine: "baseline",
+          mode: "oos",
+          ativo: "BTCUSDT",
+          timeframe: "1h",
+          periodo_inicio: new Date("2026-01-01T00:00:00Z"),
+          periodo_fim: new Date("2026-01-10T00:00:00Z"),
+          oos_start_ratio: 0.7,
+          thresholds_congelados_em: new Date("2026-01-10T00:00:00Z"),
+          candles_total: 1000,
+          dataset_hash: "abcd1234ef",
+          criado_em: new Date("2026-01-10T00:00:00Z"),
+        }],
+      } as { rows: T[] };
+    }
+    if (text.includes("WHERE ativo = $1 AND timeframe = $2 AND open_time >=")) {
+      return {
+        rows: [{
+          openTime: new Date("2026-01-01T00:00:00Z"),
+          open: 100,
+          high: 110,
+          low: 90,
+          close: 105,
+          volume: 10,
+        }],
+      } as { rows: T[] };
+    }
     if (text.includes("GROUP BY s.origem")) {
-      return { rows: [{ origem: "jev", total: 2, win_rate: 50, profit_factor: 1.25 }] } as { rows: T[] };
+      return {
+        rows: [{
+          origem: "jev",
+          total: 2,
+          total_trades: 3,
+          closed_trades: 2,
+          open_trades: 1,
+          win_rate: 50,
+          profit_factor: 1.25,
+        }],
+      } as { rows: T[] };
     }
     if (text.includes("INSERT INTO config")) return { rows: [] };
     return { rows: [{ id: 7 }] } as { rows: T[] };
@@ -42,6 +83,26 @@ const decision: DecisionResult = {
   jevModelVersion: "jev-1.13",
 };
 
+// 1. Dataset Hash Tests
+const sampleKlines = [
+  { openTime: new Date("2026-01-01T00:00:00Z"), open: 100, high: 110, low: 90, close: 105, volume: 10 },
+  { openTime: new Date("2026-01-01T01:00:00Z"), open: 105, high: 115, low: 100, close: 112, volume: 12 },
+];
+const hash1 = computeDatasetHash(sampleKlines);
+const hash2 = computeDatasetHash(sampleKlines);
+assert.equal(hash1, hash2, "Dataset hash must be deterministic");
+assert.equal(typeof hash1, "string");
+assert.equal(hash1.length, 64, "SHA-256 hex length must be 64");
+
+// Sensitivity check
+const modifiedKlines = [
+  { openTime: new Date("2026-01-01T00:00:00Z"), open: 100, high: 110, low: 90, close: 105.1, volume: 10 },
+  { openTime: new Date("2026-01-01T01:00:00Z"), open: 105, high: 115, low: 100, close: 112, volume: 12 },
+];
+const hashModified = computeDatasetHash(modifiedKlines);
+assert.notEqual(hash1, hashModified, "Changing candle close price must change dataset hash");
+
+// 2. Create and Read Backtest Run with Dataset Hash
 const runId = await repo.createBacktestRun({
   engine: "baseline",
   mode: "oos",
@@ -51,8 +112,17 @@ const runId = await repo.createBacktestRun({
   periodoFim: new Date("2026-01-10T00:00:00Z"),
   oosStartRatio: 0.7,
   thresholdsCongeladosEm: new Date("2026-01-10T00:00:00Z"),
+  candlesTotal: 1000,
+  datasetHash: hash1,
 });
 assert.equal(runId, 7);
+assert.match(db.queries.find((q) => q.includes("candles_total")) ?? "", /dataset_hash/);
+
+const runRecord = await repo.getBacktestRun(runId);
+assert.ok(runRecord);
+assert.equal(runRecord?.id, 7);
+assert.equal(runRecord?.candlesTotal, 1000);
+assert.equal(runRecord?.datasetHash, "abcd1234ef");
 
 const signalId = await repo.saveSignal({
   backtestRunId: runId,
@@ -79,9 +149,25 @@ assert.equal(tradeId, 7);
 await repo.freezeConfigThresholds("user-1");
 assert.match(db.queries.find((q) => q.includes("INSERT INTO config")) ?? "", /ON CONFLICT/);
 
-assert.deepEqual(await repo.getMetricsByOrigem(runId), [
-  { origem: "jev", total: 2, win_rate: 50, profit_factor: 1.25 },
-]);
+const expectedMetrics = [
+  {
+    origem: "jev",
+    total: 2,
+    total_trades: 3,
+    closed_trades: 2,
+    open_trades: 1,
+    win_rate: 50,
+    profit_factor: 1.25,
+  },
+];
+
+const metricsWithRunId = await repo.getMetricsByOrigem(runId);
+assert.deepEqual(metricsWithRunId, expectedMetrics);
+assert.equal(metricsWithRunId[0].total_trades, metricsWithRunId[0].closed_trades + metricsWithRunId[0].open_trades);
+assert.equal(metricsWithRunId[0].closed_trades, 2);
+assert.equal(metricsWithRunId[0].open_trades, 1);
+assert.equal(metricsWithRunId[0].win_rate, 50);
+assert.equal(metricsWithRunId[0].profit_factor, 1.25);
 
 const saved = await repo.saveMarketData("BTCUSDT", "1h", [{
   openTime: new Date("2026-01-01T00:00:00Z"),
@@ -92,9 +178,17 @@ const saved = await repo.saveMarketData("BTCUSDT", "1h", [{
   volume: 10,
 }]);
 assert.equal(saved, 1);
-assert.deepEqual(await repo.getMetricsByOrigem(), [
-  { origem: "jev", total: 2, win_rate: 50, profit_factor: 1.25 },
-]);
+assert.deepEqual(await repo.getMetricsByOrigem(), expectedMetrics);
+
+const rangeKlines = await repo.getMarketDataRange(
+  "BTCUSDT",
+  "1h",
+  new Date("2026-01-01T00:00:00Z"),
+  new Date("2026-01-10T00:00:00Z"),
+);
+assert.equal(rangeKlines.length, 1);
+assert.equal(rangeKlines[0].close, 105);
+
 assert.equal(await repo.health(), true);
 
 const invalid = repo.getMarketData("BTCUSDT", "1h", 0);
