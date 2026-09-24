@@ -69,7 +69,7 @@ export function runBaselineTests() {
 
   {
     process.stdout.write("6. Preço inválido -> WAIT... ");
-    const result = evaluateBaseline(market(), 0);
+    const result = evaluateBaseline(market({}, 0));
     assert(result.recomendacao === "WAIT", "preço zero deve bloquear");
     console.log("PASS");
   }
