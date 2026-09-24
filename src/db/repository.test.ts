@@ -60,6 +60,10 @@ class FakeDb implements RepositoryPool {
           open_trades: 1,
           win_rate: 50,
           profit_factor: 1.25,
+          total_profit_percent: 1.5,
+          avg_profit_percent: 0.75,
+          expectancy_percent: 0.75,
+          max_drawdown_percent: 0.5,
         }],
       } as { rows: T[] };
     }
@@ -158,6 +162,10 @@ const expectedMetrics = [
     open_trades: 1,
     win_rate: 50,
     profit_factor: 1.25,
+    total_profit_percent: 1.5,
+    avg_profit_percent: 0.75,
+    expectancy_percent: 0.75,
+    max_drawdown_percent: 0.5,
   },
 ];
 
