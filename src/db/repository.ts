@@ -77,8 +77,8 @@ function validateLimit(limit: number): number {
 export function createRepository(db: RepositoryPool) {
   return {
     async createBacktestRun(input: BacktestRunInput): Promise<number> {
-      if (!Number.isInteger(input.oosStartRatio === null || input.oosStartRatio === undefined ? 0 : Math.round(input.oosStartRatio * 100)) ||
-          (input.oosStartRatio !== null && input.oosStartRatio !== undefined && (input.oosStartRatio < 0 || input.oosStartRatio > 1))) {
+      if (input.oosStartRatio !== null && input.oosStartRatio !== undefined &&
+          (!Number.isFinite(input.oosStartRatio) || input.oosStartRatio < 0 || input.oosStartRatio > 1)) {
         throw new Error("oosStartRatio must be between 0 and 1");
       }
       const { rows } = await db.query<{ id: number }>(
