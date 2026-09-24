@@ -41,7 +41,14 @@ function requireDatabaseUrl(): string {
   return value;
 }
 
-const defaultPool: Pool = new pg.Pool({ connectionString: requireDatabaseUrl() });
+let defaultPool: Pool | null = null;
+
+function getDefaultPool(): Pool {
+  if (!defaultPool) {
+    defaultPool = new pg.Pool({ connectionString: requireDatabaseUrl() });
+  }
+  return defaultPool;
+}
 
 function asFinite(value: number, field: string): number {
   if (!Number.isFinite(value)) throw new Error(`${field} must be finite`);
@@ -218,14 +225,12 @@ export function createRepository(db: RepositoryPool) {
   };
 }
 
-const repository = createRepository(defaultPool);
-
 export const saveSignal = (
   ativo: string,
   timeframe: Timeframe,
   decision: DecisionResult,
   levels?: Pick<SaveSignalInput, "entrada" | "stop" | "alvo">,
-) => repository.saveSignal({ ativo, timeframe, decision, ...levels });
+) => createRepository(getDefaultPool()).saveSignal({ ativo, timeframe, decision, ...levels });
 
 export const saveTrade = (
   signalId: number,
@@ -234,15 +239,15 @@ export const saveTrade = (
   outcome: "win" | "loss" | "open",
   profitPercent: number,
   options?: Pick<SaveTradeInput, "drawdown" | "openedAt" | "closedAt">,
-) => repository.saveTrade({
+) => createRepository(getDefaultPool()).saveTrade({
   signalId, entryPrice, exitPrice, outcome, profitPercent, ...options,
 });
 
-export const getMetricsByOrigem = () => repository.getMetricsByOrigem();
-export const freezeConfigThresholds = (userId: string) => repository.freezeConfigThresholds(userId);
+export const getMetricsByOrigem = () => createRepository(getDefaultPool()).getMetricsByOrigem();
+export const freezeConfigThresholds = (userId: string) => createRepository(getDefaultPool()).freezeConfigThresholds(userId);
 export const saveMarketData = (ativo: string, timeframe: Timeframe, klines: Kline[]) =>
-  repository.saveMarketData(ativo, timeframe, klines);
+  createRepository(getDefaultPool()).saveMarketData(ativo, timeframe, klines);
 export const getMarketData = (ativo: string, timeframe: Timeframe, limit = 500) =>
-  repository.getMarketData(ativo, timeframe, limit);
-export const healthDatabase = () => repository.health();
-export { defaultPool as pool };
+  createRepository(getDefaultPool()).getMarketData(ativo, timeframe, limit);
+export const healthDatabase = () => createRepository(getDefaultPool()).health();
+export { getDefaultPool as getPool };
