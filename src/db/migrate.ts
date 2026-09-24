@@ -25,7 +25,7 @@ async function main(): Promise<void> {
     `);
 
     const files = (await fs.readdir(migrationsDir))
-      .filter((file) => /^\\d+_.+\\.sql$/.test(file))
+      .filter((file) => /^\d+_.+\.sql$/.test(file))
       .sort();
 
     for (const filename of files) {
