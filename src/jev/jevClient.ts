@@ -1,7 +1,8 @@
 import { JEV_MODEL_VERSION } from "../config/thresholds.js";
 import type { MarketState } from "../types.js";
 
-const BASE_URL = process.env.TYPESAFE_BASE_URL ?? "https://api.typesafe.ai";
+const BASE_URL = (process.env.TYPESAFE_BASE_URL ?? "https://api.typesafe.ai").replace(/\/$/, "");
+const REQUEST_TIMEOUT_MS = 12_000;
 const API_KEY = process.env.TYPESAFE_API_KEY ?? "";
 
 export interface JevAnswer<T> {
@@ -29,7 +30,8 @@ export function buildState(market: MarketState): Record<string, unknown> {
 }
 
 export async function callJev(market: MarketState): Promise<JevResponse> {
-  if (JEV_MODEL_VERSION.includes("latest")) throw new Error("JEV_MODEL_VERSION não pode ser 'latest'.");
+  if (!JEV_MODEL_VERSION || JEV_MODEL_VERSION.includes("latest")) throw new Error("JEV_MODEL_VERSION deve estar definido e não pode ser latest.");
+  if (!API_KEY) throw new Error("TYPESAFE_API_KEY não configurada.");
   const res = await fetch(`${BASE_URL}/v1/systemone`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
