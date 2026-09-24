@@ -29,9 +29,31 @@ export function buildState(market: MarketState): Record<string, unknown> {
   };
 }
 
+function validateJevResponse(value: any): JevResponse {
+  if (!value?.direcao || !value?.risco_elevado || !value?.qualidade) {
+    throw new Error("Jev retornou campos obrigatórios ausentes.");
+  }
+  if (!Number.isFinite(value.direcao.confidence)) {
+    throw new Error("Jev retornou confidence inválido.");
+  }
+  if (!["ALTA", "BAIXA", "AGUARDAR"].includes(value.direcao.choice)) {
+    throw new Error("Jev retornou choice de direção inválida.");
+  }
+  if (!Number.isFinite(Number(value.risco_elevado.noul))) {
+    throw new Error("Jev retornou risco_elevado inválido.");
+  }
+  if (!Number.isFinite(Number(value.qualidade.score))) {
+    throw new Error("Jev retornou qualidade inválida.");
+  }
+  return value as JevResponse;
+}
+
 export async function callJev(market: MarketState): Promise<JevResponse> {
   if (!JEV_MODEL_VERSION || JEV_MODEL_VERSION.includes("latest")) throw new Error("JEV_MODEL_VERSION deve estar definido e não pode ser latest.");
   if (!API_KEY) throw new Error("TYPESAFE_API_KEY não configurada.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
   const res = await fetch(`${BASE_URL}/v1/systemone`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
@@ -52,5 +74,9 @@ export async function callJev(market: MarketState): Promise<JevResponse> {
     })
   });
   if (!res.ok) throw new Error(`Jev API error: ${res.status} ${res.statusText}`);
-  return await res.json() as JevResponse;
+  const data = await res.json();
+  return validateJevResponse(data);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
