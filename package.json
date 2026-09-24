@@ -8,7 +8,10 @@
     "backtest": "tsx src/backtest/run.ts",
     "build": "tsc -p .",
     "lint": "tsc --noEmit",
-    "start": "node dist/api/server.js"
+    "start": "node dist/api/server.js",
+    "test:indicators": "tsx src/features/indicators.test.ts",
+    "test:sentiment": "tsx src/features/sentimentPipeline.test.ts",
+    "test": "npm run test:indicators && npm run test:sentiment"
   },
   "dependencies": {
     "express": "^4.19.2",
