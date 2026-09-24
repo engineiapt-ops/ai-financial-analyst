@@ -1,5 +1,5 @@
 import pg from "pg";
-import type { DecisionResult, Timeframe } from "../types.js";
+import type { DecisionResult, Kline, Timeframe } from "../types.js";
 
 let pool: any;
 try {
@@ -19,6 +19,7 @@ try {
 let mockSignalId = 1;
 const inMemorySignals = new Map<number, any>();
 const inMemoryTrades = new Map<number, any>();
+const inMemoryMarketData = new Map<string, any>();
 
 export async function saveSignal(ativo: string, timeframe: Timeframe, decision: DecisionResult): Promise<number> {
   try {
@@ -105,4 +106,80 @@ export async function freezeConfigThresholds(userId: string): Promise<void> {
     console.warn("[AI Studio] Database query failed:", err);
   }
 }
+
+export async function saveMarketData(ativo: string, timeframe: Timeframe, klines: Kline[]): Promise<number> {
+  let count = 0;
+  try {
+    if (process.env.DATABASE_URL) {
+      for (const k of klines) {
+        await pool.query(
+          `INSERT INTO market_data (ativo, timeframe, open_time, open, high, low, close, volume)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (ativo, timeframe, open_time)
+           DO UPDATE SET
+             open = EXCLUDED.open,
+             high = EXCLUDED.high,
+             low = EXCLUDED.low,
+             close = EXCLUDED.close,
+             volume = EXCLUDED.volume`,
+          [ativo, timeframe, k.openTime, k.open, k.high, k.low, k.close, k.volume]
+        );
+        count++;
+      }
+      return count;
+    }
+  } catch (err) {
+    console.warn("[AI Studio] Database query failed, saving to in-memory store:", err);
+  }
+
+  for (const k of klines) {
+    const key = `${ativo}:${timeframe}:${k.openTime.getTime()}`;
+    inMemoryMarketData.set(key, { ativo, timeframe, ...k });
+    count++;
+  }
+  return count;
+}
+
+export async function getMarketData(ativo: string, timeframe: Timeframe, limit = 500): Promise<Kline[]> {
+  try {
+    if (process.env.DATABASE_URL) {
+      const { rows } = await pool.query(
+        `SELECT open_time as "openTime", open, high, low, close, volume
+         FROM market_data
+         WHERE ativo = $1 AND timeframe = $2
+         ORDER BY open_time DESC LIMIT $3`,
+        [ativo, timeframe, limit]
+      );
+      return rows
+        .map((r: any) => ({
+          openTime: new Date(r.openTime),
+          open: Number(r.open),
+          high: Number(r.high),
+          low: Number(r.low),
+          close: Number(r.close),
+          volume: Number(r.volume),
+        }))
+        .reverse();
+    }
+  } catch (err) {
+    console.warn("[AI Studio] Database query failed, reading from in-memory store:", err);
+  }
+
+  const list: Kline[] = [];
+  for (const item of inMemoryMarketData.values()) {
+    if (item.ativo === ativo && item.timeframe === timeframe) {
+      list.push({
+        openTime: item.openTime,
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        close: item.close,
+        volume: item.volume,
+      });
+    }
+  }
+  list.sort((a, b) => a.openTime.getTime() - b.openTime.getTime());
+  return list.slice(-limit);
+}
+
 export { pool };

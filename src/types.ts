@@ -7,6 +7,7 @@ export interface Kline {
   low: number;
   close: number;
   volume: number;
+  closeTime?: Date;
 }
 
 export interface Indicators {
