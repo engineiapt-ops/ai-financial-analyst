@@ -12,9 +12,23 @@ CREATE TABLE IF NOT EXISTS market_data (
   UNIQUE (ativo, timeframe, open_time)
 );
 
+CREATE TABLE IF NOT EXISTS backtest_runs (
+  id BIGSERIAL PRIMARY KEY,
+  engine TEXT NOT NULL CHECK (engine IN ('both', 'baseline', 'jev')),
+  mode TEXT NOT NULL CHECK (mode IN ('dev', 'oos')),
+  ativo TEXT NOT NULL,
+  timeframe TEXT NOT NULL CHECK (timeframe IN ('1h', '4h', '1d')),
+  periodo_inicio TIMESTAMPTZ NOT NULL,
+  periodo_fim TIMESTAMPTZ NOT NULL,
+  oos_start_ratio NUMERIC,
+  thresholds_congelados_em TIMESTAMPTZ,
+  criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS signals (
   id BIGSERIAL PRIMARY KEY,
   ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+  backtest_run_id BIGINT REFERENCES backtest_runs(id) ON DELETE SET NULL,
   ativo TEXT NOT NULL,
   timeframe TEXT NOT NULL CHECK (timeframe IN ('1h', '4h', '1d')),
   entrada NUMERIC,
@@ -60,6 +74,8 @@ CREATE TABLE IF NOT EXISTS logs (
   mensagem TEXT NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_backtest_runs_created ON backtest_runs(criado_em);
+CREATE INDEX IF NOT EXISTS idx_signals_backtest_run ON signals(backtest_run_id);
 CREATE INDEX IF NOT EXISTS idx_signals_origem ON signals(origem);
 CREATE INDEX IF NOT EXISTS idx_signals_ts ON signals(ts);
 CREATE INDEX IF NOT EXISTS idx_signals_ativo_tf ON signals(ativo, timeframe);
