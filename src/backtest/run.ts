@@ -6,7 +6,7 @@ import { computeIndicatorsSeries } from "../features/indicators.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
 import { evaluateBaseline } from "../decision/baselineEngine.js";
 import { simulateTrade } from "../papertrading/simulator.js";
-import { saveSignal, saveTrade } from "../db/repository.js";
+import { createBacktestRun, saveSignal, saveTrade } from "../db/repository.js";
 import { freezeThresholds } from "../config/thresholds.js";
 import type { MarketState, Timeframe, DecisionResult } from "../types.js";
 
@@ -48,6 +48,16 @@ async function run() {
   const evaluationStart = mode === "oos"
     ? Math.floor(klines.length * OOS_START_RATIO)
     : 0;
+  const runId = await createBacktestRun({
+    engine,
+    mode,
+    ativo: ATIVO,
+    timeframe: TIMEFRAME,
+    periodoInicio: klines[0].openTime,
+    periodoFim: klines[klines.length - 1].openTime,
+    oosStartRatio: mode === "oos" ? OOS_START_RATIO : null,
+    thresholdsCongeladosEm: mode === "oos" ? new Date() : null,
+  });
 
   let processed = 0;
   let skippedWarmup = 0;
@@ -98,7 +108,7 @@ async function run() {
         STOP_PCT,
       );
       const levels = getLevels(trade.entryPrice, decision.recomendacao);
-      const signalId = await saveSignal(ATIVO, TIMEFRAME, decision, levels);
+      const signalId = await saveSignal(ATIVO, TIMEFRAME, decision, levels, runId);
       await saveTrade(
         signalId,
         trade.entryPrice,
@@ -113,9 +123,9 @@ async function run() {
   }
 
   console.log(
-    `Backtest concluído (modo=${mode}, engine=${engine}). Candles processados: ${processed}, pulados por aquecimento: ${skippedWarmup}, trades salvos: ${savedTrades}.`,
+    `Backtest concluído (runId=${runId}, modo=${mode}, engine=${engine}). Candles processados: ${processed}, pulados por aquecimento: ${skippedWarmup}, trades salvos: ${savedTrades}.`,
   );
-  console.log("Consulte GET /api/metrics para o comparativo Jev vs. baseline.");
+  console.log(`Consulte GET /api/metrics?runId=${runId} para os resultados desta execução.`);
 }
 
 run().catch((err) => {
