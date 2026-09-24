@@ -6,7 +6,19 @@ export interface RepositoryPool {
   connect(): Promise<PoolClient>;
 }
 
+export interface BacktestRunInput {
+  engine: "both" | "baseline" | "jev";
+  mode: "dev" | "oos";
+  ativo: string;
+  timeframe: Timeframe;
+  periodoInicio: Date;
+  periodoFim: Date;
+  oosStartRatio?: number | null;
+  thresholdsCongeladosEm?: Date | null;
+}
+
 export interface SaveSignalInput {
+  backtestRunId?: number | null;
   ativo: string;
   timeframe: Timeframe;
   decision: DecisionResult;
@@ -64,16 +76,35 @@ function validateLimit(limit: number): number {
 
 export function createRepository(db: RepositoryPool) {
   return {
+    async createBacktestRun(input: BacktestRunInput): Promise<number> {
+      if (!Number.isInteger(input.oosStartRatio === null || input.oosStartRatio === undefined ? 0 : Math.round(input.oosStartRatio * 100)) ||
+          (input.oosStartRatio !== null && input.oosStartRatio !== undefined && (input.oosStartRatio < 0 || input.oosStartRatio > 1))) {
+        throw new Error("oosStartRatio must be between 0 and 1");
+      }
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO backtest_runs
+          (engine, mode, ativo, timeframe, periodo_inicio, periodo_fim, oos_start_ratio, thresholds_congelados_em)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         RETURNING id`,
+        [input.engine, input.mode, input.ativo, input.timeframe, input.periodoInicio, input.periodoFim,
+          input.oosStartRatio ?? null, input.thresholdsCongeladosEm ?? null],
+      );
+      const id = Number(rows[0]?.id);
+      if (!Number.isInteger(id) || id <= 0) throw new Error("Database did not return a valid backtest run id");
+      return id;
+    },
+
     async saveSignal(input: SaveSignalInput): Promise<number> {
       const { ativo, timeframe, decision } = input;
       const { rows } = await db.query<{ id: number }>(
         `INSERT INTO signals
-          (ativo, timeframe, entrada, stop, alvo, origem, jev_choice, jev_probs,
+          (backtest_run_id, ativo, timeframe, entrada, stop, alvo, origem, jev_choice, jev_probs,
            jev_model_version, quality_score, risco_elevado, recomendacao,
            tamanho_posicao_pct, observacao)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          RETURNING id`,
         [
+          input.backtestRunId ?? null,
           ativo,
           timeframe,
           input.entrada ?? null,
@@ -127,7 +158,7 @@ export function createRepository(db: RepositoryPool) {
       return id;
     },
 
-    async getMetricsByOrigem(): Promise<MetricsByOrigem[]> {
+    async getMetricsByOrigem(backtestRunId?: number): Promise<MetricsByOrigem[]> {
       const { rows } = await db.query<MetricsByOrigem>(`
         SELECT
           s.origem,
@@ -141,9 +172,10 @@ export function createRepository(db: RepositoryPool) {
         FROM signals s
         INNER JOIN paper_trades t ON t.signal_id = s.id
         WHERE t.outcome IN ('win', 'loss')
+          AND ($1::bigint IS NULL OR s.backtest_run_id = $1)
         GROUP BY s.origem
         ORDER BY s.origem
-      `);
+      `, [backtestRunId ?? null]);
       return rows.map((row) => ({
         origem: row.origem,
         total: Number(row.total),
@@ -225,12 +257,16 @@ export function createRepository(db: RepositoryPool) {
   };
 }
 
+export const createBacktestRun = (input: BacktestRunInput) =>
+  createRepository(getDefaultPool()).createBacktestRun(input);
+
 export const saveSignal = (
   ativo: string,
   timeframe: Timeframe,
   decision: DecisionResult,
   levels?: Pick<SaveSignalInput, "entrada" | "stop" | "alvo">,
-) => createRepository(getDefaultPool()).saveSignal({ ativo, timeframe, decision, ...levels });
+  backtestRunId?: number | null,
+) => createRepository(getDefaultPool()).saveSignal({ ativo, timeframe, decision, ...levels, backtestRunId });
 
 export const saveTrade = (
   signalId: number,
@@ -243,7 +279,7 @@ export const saveTrade = (
   signalId, entryPrice, exitPrice, outcome, profitPercent, ...options,
 });
 
-export const getMetricsByOrigem = () => createRepository(getDefaultPool()).getMetricsByOrigem();
+export const getMetricsByOrigem = (backtestRunId?: number) => createRepository(getDefaultPool()).getMetricsByOrigem(backtestRunId);
 export const freezeConfigThresholds = (userId: string) => createRepository(getDefaultPool()).freezeConfigThresholds(userId);
 export const saveMarketData = (ativo: string, timeframe: Timeframe, klines: Kline[]) =>
   createRepository(getDefaultPool()).saveMarketData(ativo, timeframe, klines);
