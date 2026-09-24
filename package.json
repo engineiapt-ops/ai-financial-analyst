@@ -11,7 +11,8 @@
     "start": "node dist/api/server.js",
     "test:indicators": "tsx src/features/indicators.test.ts",
     "test:sentiment": "tsx src/features/sentimentPipeline.test.ts",
-    "test": "npm run test:indicators && npm run test:sentiment"
+    "test": "npm run test:indicators && npm run test:sentiment && npm run test:decision",
+    "test:decision": "tsx src/decision/decisionEngine.test.ts"
   },
   "dependencies": {
     "express": "^4.19.2",
