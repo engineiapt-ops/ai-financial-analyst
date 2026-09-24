@@ -7,12 +7,14 @@ import {
 import { callJev, type JevResponse } from "../jev/jevClient.js";
 import type { DecisionResult, MarketState, Recomendacao } from "../types.js";
 
+const CHOICE_TO_RECOMENDACAO: Record<"ALTA" | "BAIXA" | "AGUARDAR", Recomendacao> = {
+  ALTA: "BUY",
+  BAIXA: "SELL",
+  AGUARDAR: "WAIT",
+};
+
 function choiceToRecomendacao(choice: "ALTA" | "BAIXA" | "AGUARDAR"): Recomendacao {
-  return {
-    ALTA: "BUY",
-    BAIXA: "SELL",
-    AGUARDAR: "WAIT",
-  }[choice];
+  return CHOICE_TO_RECOMENDACAO[choice];
 }
 
 function probabilityForChoice(
