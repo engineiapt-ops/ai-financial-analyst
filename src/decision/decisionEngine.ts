@@ -3,7 +3,12 @@ import { callJev } from "../jev/jevClient.js";
 import type { DecisionResult, MarketState, Recomendacao } from "../types.js";
 
 function choiceToRecomendacao(choice: "ALTA" | "BAIXA" | "AGUARDAR"): Recomendacao {
-  return { ALTA: "BUY", BAIXA: "SELL", AGUARDAR: "WAIT" }[choice];
+  const map: Record<"ALTA" | "BAIXA" | "AGUARDAR", Recomendacao> = {
+    ALTA: "BUY",
+    BAIXA: "SELL",
+    AGUARDAR: "WAIT",
+  };
+  return map[choice];
 }
 
 export async function decideWithJev(market: MarketState, mode: "dev" | "oos" = "dev"): Promise<DecisionResult> {

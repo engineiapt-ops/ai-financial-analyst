@@ -5,6 +5,10 @@ import { z } from "zod";
 const app = express();
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+  res.json({ status: "ok", service: "ai-financial-analyst-api", endpoints: ["/health", "/api/analyze"] });
+});
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "ai-financial-analyst-api" });
 });
@@ -24,4 +28,4 @@ app.post("/api/analyze", async (_req, res) => {
 });
 
 const port = Number(process.env.PORT ?? 3000);
-app.listen(port, () => console.log(`AI Financial Analyst API rodando na porta ${port}`));
+app.listen(port, "0.0.0.0", () => console.log(`AI Financial Analyst API rodando na porta ${port}`));

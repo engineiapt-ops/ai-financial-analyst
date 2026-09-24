@@ -1,0 +1,8 @@
+{
+  "name": "AI Financial Analyst",
+  "description": "AI-assisted financial analysis and decision engine for crypto assets.",
+  "prompt": "AI Financial Analyst API and trading decision engine",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

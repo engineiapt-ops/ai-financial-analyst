@@ -21,12 +21,13 @@ CREATE TABLE IF NOT EXISTS signals (
   jev_choice TEXT, jev_probs JSONB, jev_model_version TEXT,
   quality_score NUMERIC, risco_elevado BOOLEAN,
   recomendacao TEXT NOT NULL CHECK (recomendacao IN ('BUY', 'WAIT', 'SELL')),
-  tamanho_posicao_pct NUMERIC NOT NULL, observacao TEXT
+  tamanho_posicao_pct NUMERIC NOT NULL CHECK (tamanho_posicao_pct >= 0 AND tamanho_posicao_pct <= 100),
+  observacao TEXT
 );
 
 CREATE TABLE IF NOT EXISTS paper_trades (
   id BIGSERIAL PRIMARY KEY,
-  signal_id BIGINT NOT NULL REFERENCES signals(id),
+  signal_id BIGINT NOT NULL REFERENCES signals(id) ON DELETE CASCADE,
   entry_price NUMERIC NOT NULL, exit_price NUMERIC,
   outcome TEXT CHECK (outcome IN ('win', 'loss', 'open')),
   profit_percent NUMERIC, drawdown NUMERIC,
@@ -52,4 +53,8 @@ CREATE TABLE IF NOT EXISTS logs (
 
 CREATE INDEX IF NOT EXISTS idx_signals_origem ON signals(origem);
 CREATE INDEX IF NOT EXISTS idx_signals_ts ON signals(ts);
+CREATE INDEX IF NOT EXISTS idx_signals_ativo_tf ON signals(ativo, timeframe);
 CREATE INDEX IF NOT EXISTS idx_market_data_lookup ON market_data(ativo, timeframe, open_time);
+CREATE INDEX IF NOT EXISTS idx_paper_trades_signal_id ON paper_trades(signal_id);
+CREATE INDEX IF NOT EXISTS idx_paper_trades_outcome ON paper_trades(outcome);
+CREATE INDEX IF NOT EXISTS idx_logs_ts ON logs(ts);
