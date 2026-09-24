@@ -9,6 +9,8 @@ import {
 } from "../marketdata/binanceClient.js";
 import { analyzeMarket } from "./analyze.js";
 import type { Timeframe } from "../types.js";
+import { getMetricsByOrigem } from "../db/repository.js";
+
 
 export const app = express();
 app.use(express.json());
@@ -20,6 +22,7 @@ app.get("/", (_req, res) => {
     endpoints: [
       "/health",
       "/api/analyze",
+      "/api/metrics",
       "/api/market/ping",
       "/api/market/time",
       "/api/market/info",
@@ -88,6 +91,18 @@ export const AnalyzeSchema = z.object({
   valorInvestimento: z.coerce.number().positive().default(100),
   engine: z.enum(["baseline", "jev"]).default("baseline"),
   news: z.boolean().default(true),
+});
+
+
+app.get("/api/metrics", async (_req, res) => {
+  try {
+    const metrics = await getMetricsByOrigem();
+    res.json({ status: "ok", metrics });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
 });
 
 app.post("/api/analyze", async (req, res) => {
