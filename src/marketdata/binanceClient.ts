@@ -21,10 +21,15 @@ export interface SymbolInfo {
 }
 
 export interface StreamOptions {
+  autoReconnect?: boolean;
+  maxReconnectAttempts?: number;
+  initialBackoffMs?: number;
+  maxBackoffMs?: number;
   onCandleUpdate?: (candle: Kline, isClosed: boolean) => void;
   onError?: (err: Error) => void;
   onOpen?: () => void;
   onClose?: () => void;
+  onReconnect?: (attempt: number, delayMs: number) => void;
 }
 
 /**
@@ -154,29 +159,62 @@ export async function fetchKlines(
 }
 
 /**
- * Assina o stream de Klines da Binance via WebSocket (<symbol>@kline_<interval>).
- * Dispara onClosedCandle apenas quando o candle estiver fechado (k.x === true).
+ * Subclasse de WebSocket que adiciona reconexão automática com backoff progressivo,
+ * prevenção de múltiplas conexões simultâneas e encerramento limpo.
  */
-export function subscribeKlineStream(
-  symbol: string,
-  timeframe: Timeframe,
-  onClosedCandle: (candle: Kline) => void,
-  options: StreamOptions = {}
-): WebSocket {
-  const cleanSymbol = symbol.trim().toLowerCase();
-  const interval = tfToInterval(timeframe);
-  const stream = `${cleanSymbol}@kline_${interval}`;
-  const ws = new WebSocket(`${WS_BASE}/${stream}`);
+export class ReconnectingKlineWebSocket extends WebSocket {
+  private _symbol: string;
+  private _timeframe: Timeframe;
+  private _onClosedCandle: (candle: Kline) => void;
+  private _options: StreamOptions;
+  private _isManualClose = false;
+  private _reconnectAttempts = 0;
+  private _reconnectTimer: NodeJS.Timeout | null = null;
+  private _activeWs: WebSocket | null = null;
 
-  ws.on("open", () => {
-    options.onOpen?.();
-  });
+  constructor(
+    symbol: string,
+    timeframe: Timeframe,
+    onClosedCandle: (candle: Kline) => void,
+    options: StreamOptions = {}
+  ) {
+    const cleanSymbol = symbol.trim().toLowerCase();
+    const interval = tfToInterval(timeframe);
+    const stream = `${cleanSymbol}@kline_${interval}`;
+    const url = `${WS_BASE}/${stream}`;
 
-  ws.on("message", (raw) => {
+    super(url);
+
+    this._symbol = symbol;
+    this._timeframe = timeframe;
+    this._onClosedCandle = onClosedCandle;
+    this._options = options;
+    this._activeWs = this;
+
+    this._attachSocketListeners(this);
+  }
+
+  public get isManualClose(): boolean {
+    return this._isManualClose;
+  }
+
+  public get reconnectAttempts(): number {
+    return this._reconnectAttempts;
+  }
+
+  public get activeSocket(): WebSocket {
+    return this._activeWs ?? this;
+  }
+
+  /**
+   * Processa o payload bruto de mensagem do stream da Binance.
+   * Dispara onCandleUpdate (se configurado) e onClosedCandle estritamente quando k.x === true.
+   */
+  public processMessagePayload(rawString: string): { candle: Kline; isClosed: boolean } | null {
     try {
-      const msg = JSON.parse(raw.toString());
+      const msg = JSON.parse(rawString);
       const k = msg.k;
-      if (!k) return;
+      if (!k) return null;
 
       const candle: Kline = {
         openTime: new Date(Number(k.t)),
@@ -189,24 +227,132 @@ export function subscribeKlineStream(
       };
 
       const isClosed = Boolean(k.x);
-      options.onCandleUpdate?.(candle, isClosed);
+      this._options.onCandleUpdate?.(candle, isClosed);
 
       if (isClosed) {
-        onClosedCandle(candle);
+        this._onClosedCandle(candle);
       }
+
+      return { candle, isClosed };
     } catch (parseErr: any) {
-      options.onError?.(new Error(`Falha no parse da mensagem WS Binance: ${parseErr.message}`));
+      const err = new Error(`Falha no parse da mensagem WS Binance: ${parseErr.message}`);
+      this._options.onError?.(err);
+      this.emit("error", err);
+      return null;
     }
-  });
+  }
 
-  ws.on("error", (err) => {
-    console.error(`[binance-ws:${symbol}:${timeframe}]`, err);
-    options.onError?.(err);
-  });
+  private _attachSocketListeners(target: WebSocket): void {
+    target.on("open", () => {
+      this._reconnectAttempts = 0;
+      this._options.onOpen?.();
+      if (target !== this) {
+        this.emit("open");
+      }
+    });
 
-  ws.on("close", () => {
-    options.onClose?.();
-  });
+    target.on("message", (raw: WebSocket.RawData) => {
+      this.processMessagePayload(raw.toString());
+      if (target !== this) {
+        this.emit("message", raw);
+      }
+    });
 
-  return ws;
+    target.on("error", (err: Error) => {
+      console.error(`[binance-ws:${this._symbol}:${this._timeframe}]`, err.message);
+      this._options.onError?.(err);
+      if (target !== this) {
+        this.emit("error", err);
+      }
+    });
+
+    target.on("close", (code: number, reason: Buffer) => {
+      this._options.onClose?.();
+      if (target !== this) {
+        this.emit("close", code, reason);
+      }
+      this._scheduleReconnect();
+    });
+  }
+
+  private _scheduleReconnect(): void {
+    if (this._isManualClose) return;
+    const autoReconnect = this._options.autoReconnect ?? true;
+    if (!autoReconnect) return;
+
+    const maxAttempts = this._options.maxReconnectAttempts ?? 10;
+    if (this._reconnectAttempts >= maxAttempts) {
+      console.warn(`[binance-ws:${this._symbol}:${this._timeframe}] Limite de ${maxAttempts} tentativas de reconexão atingido.`);
+      return;
+    }
+
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+
+    this._reconnectAttempts++;
+    // Backoff progressivo: 1s, 2s, 4s, 8s, 16s... com teto configurável (default 30s)
+    const initialBackoff = this._options.initialBackoffMs ?? 1000;
+    const maxBackoff = this._options.maxBackoffMs ?? 30000;
+    const delayMs = Math.min(initialBackoff * Math.pow(2, this._reconnectAttempts - 1), maxBackoff);
+
+    this._options.onReconnect?.(this._reconnectAttempts, delayMs);
+
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
+      if (this._isManualClose) return;
+
+      const cleanSymbol = this._symbol.trim().toLowerCase();
+      const interval = tfToInterval(this._timeframe);
+      const stream = `${cleanSymbol}@kline_${interval}`;
+      const url = `${WS_BASE}/${stream}`;
+
+      const newWs = new WebSocket(url);
+      this._activeWs = newWs;
+      this._attachSocketListeners(newWs);
+    }, delayMs);
+  }
+
+  public override terminate(): void {
+    this._isManualClose = true;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+    if (this._activeWs && this._activeWs !== this) {
+      try {
+        this._activeWs.terminate();
+      } catch {}
+    }
+    super.terminate();
+  }
+
+  public override close(code?: number, data?: string | Buffer): void {
+    this._isManualClose = true;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+    if (this._activeWs && this._activeWs !== this) {
+      try {
+        this._activeWs.close(code, data);
+      } catch {}
+    }
+    super.close(code, data);
+  }
+}
+
+/**
+ * Assina o stream de Klines da Binance via WebSocket (<symbol>@kline_<interval>).
+ * Retorna uma instância de ReconnectingKlineWebSocket (subclasse de WebSocket),
+ * garantindo compatibilidade de tipos e reconexão automática com backoff.
+ */
+export function subscribeKlineStream(
+  symbol: string,
+  timeframe: Timeframe,
+  onClosedCandle: (candle: Kline) => void,
+  options: StreamOptions = {}
+): ReconnectingKlineWebSocket {
+  return new ReconnectingKlineWebSocket(symbol, timeframe, onClosedCandle, options);
 }
