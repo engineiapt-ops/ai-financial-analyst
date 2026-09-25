@@ -1,8 +1,17 @@
 import WebSocket from "ws";
 import type { Kline, Timeframe } from "../types.js";
 
-const REST_BASE = process.env.BINANCE_REST_BASE ?? "https://api.binance.com";
-const WS_BASE = process.env.BINANCE_WS_BASE ?? "wss://stream.binance.com:9443/ws";
+const configuredRestBase = process.env.BINANCE_REST_BASE?.trim();
+const configuredWsBase = process.env.BINANCE_WS_BASE?.trim();
+
+// Vercel can expose an unset/empty environment variable as an empty string.
+// Never build an absolute fetch URL from a relative/empty base.
+const REST_BASE = configuredRestBase?.startsWith("http")
+  ? configuredRestBase.replace(/\/$/, "")
+  : "https://api.binance.com";
+const WS_BASE = configuredWsBase?.startsWith("ws")
+  ? configuredWsBase.replace(/\/$/, "")
+  : "wss://stream.binance.com:9443/ws";
 
 export const SUPPORTED_TIMEFRAMES: readonly Timeframe[] = ["1h", "4h", "1d"] as const;
 
