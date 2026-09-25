@@ -1,9 +1,9 @@
-import { JEV_MODEL_VERSION } from "../config/thresholds.js";
 import type { MarketState } from "../types.js";
 
-const BASE_URL = (process.env.TYPESAFE_BASE_URL ?? "https://api.typesafe.ai").replace(/\/$/, "");
+const BASE_URL = (process.env.JEV_BASE_URL ?? "https://ai-gateway.vercel.sh/typesafe").replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 12_000;
-const API_KEY = process.env.TYPESAFE_API_KEY ?? "";
+const API_KEY = process.env.AI_GATEWAY_API_KEY ?? "";
+const JEV_MODEL = "typesafe-ai/jev";
 
 export interface JevAnswer<T> {
   choice?: T;
@@ -50,28 +50,7 @@ function validateJevResponse(value: any): JevResponse {
 
 export async function callJev(market: MarketState): Promise<JevResponse> {
   if (!API_KEY) {
-    console.warn("[AI Studio] TYPESAFE_API_KEY not configured — using simulated Jev response");
-    const isBullish =
-      market.indicators.ema9 !== null &&
-      market.indicators.ema21 !== null &&
-      market.indicators.ema9 > market.indicators.ema21;
-    const choice: "ALTA" | "BAIXA" | "AGUARDAR" = isBullish ? "ALTA" : "BAIXA";
-    return {
-      direcao: {
-        choice,
-        confidence: 0.85,
-        probabilities: {
-          ALTA: isBullish ? 0.8 : 0.1,
-          BAIXA: isBullish ? 0.1 : 0.8,
-          AGUARDAR: 0.1,
-        },
-      },
-      risco_elevado: { noul: 0.1, probabilities: [0.9, 0.1], confidence: 0.9 },
-      qualidade: { score: 0.8, probabilities: [0.1, 0.2, 0.7], confidence: 0.8 },
-    };
-  }
-  if (!JEV_MODEL_VERSION || JEV_MODEL_VERSION.includes("latest")) {
-    throw new Error("JEV_MODEL_VERSION deve estar definido e não pode ser latest.");
+    throw new Error("AI_GATEWAY_API_KEY não configurada.");
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -80,7 +59,7 @@ export async function callJev(market: MarketState): Promise<JevResponse> {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
     body: JSON.stringify({
-      model: JEV_MODEL_VERSION, state: buildState(market),
+      model: JEV_MODEL, state: buildState(market),
       questions: {
         direcao: {
           type: "choice",
