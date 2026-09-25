@@ -7,8 +7,9 @@ const STATIC_API_KEY = process.env.AI_GATEWAY_API_KEY ?? "";
 
 async function getGatewayCredential(): Promise<string> {
   if (STATIC_API_KEY) return STATIC_API_KEY;
-  if (process.env.VERCEL) return getVercelOidcToken();
-  return process.env.VERCEL_OIDC_TOKEN ?? "";
+  if (process.env.VERCEL_OIDC_TOKEN) return process.env.VERCEL_OIDC_TOKEN;
+  if (process.env.VERCEL) return (await getVercelOidcToken()) ?? "";
+  return "";
 }
 const JEV_MODEL = "typesafe-ai/jev";
 
