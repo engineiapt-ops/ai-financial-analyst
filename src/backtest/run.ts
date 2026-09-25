@@ -14,7 +14,7 @@ import {
   saveSignal,
   saveTrade,
 } from "../db/repository.js";
-import { computeDatasetHash } from "../marketdata/dataset.js";
+import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { freezeThresholds } from "../config/thresholds.js";
 import type { MarketState, Timeframe, DecisionResult, Kline } from "../types.js";
 
@@ -67,6 +67,11 @@ async function run() {
     if (!runRecord) {
       throw new Error(`Run ${fromRunId} não encontrado no banco de dados`);
     }
+    if (runRecord.ativo !== ATIVO || runRecord.timeframe !== TIMEFRAME) {
+      throw new Error(
+        `Run ${fromRunId} não é compatível com o dataset suportado pelo runner: ${runRecord.ativo}/${runRecord.timeframe}`,
+      );
+    }
     klines = await getMarketDataRange(
       runRecord.ativo,
       runRecord.timeframe,
@@ -76,6 +81,7 @@ async function run() {
     if (klines.length === 0) {
       throw new Error(`Nenhum candle encontrado no market_data para reproduzir o run ${fromRunId}`);
     }
+    assertDatasetMatchesMetadata(klines, runRecord.candlesTotal, runRecord.datasetHash);
   } else {
     klines = await fetchKlines(ATIVO, TIMEFRAME, 1000);
     await saveMarketData(ATIVO, TIMEFRAME, klines);

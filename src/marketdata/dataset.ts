@@ -14,3 +14,28 @@ export function computeDatasetHash(klines: Kline[]): string {
   }
   return hash.digest("hex");
 }
+
+export function assertDatasetMatchesMetadata(
+  klines: Kline[],
+  expectedCount: number | null,
+  expectedHash: string | null,
+): string {
+  if (expectedCount === null || expectedHash === null || expectedHash === "") {
+    throw new Error("Backtest run does not contain complete dataset metadata; reproducibility cannot be verified");
+  }
+
+  if (klines.length !== expectedCount) {
+    throw new Error(
+      `Dataset candle count mismatch: expected ${expectedCount}, received ${klines.length}`,
+    );
+  }
+
+  const actualHash = computeDatasetHash(klines);
+  if (actualHash !== expectedHash) {
+    throw new Error(
+      `Dataset hash mismatch: expected ${expectedHash}, received ${actualHash}`,
+    );
+  }
+
+  return actualHash;
+}
