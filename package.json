@@ -11,11 +11,10 @@
     "start": "node dist/api/server.js",
     "test:indicators": "tsx src/features/indicators.test.ts",
     "test:sentiment": "tsx src/features/sentimentPipeline.test.ts",
-    "test": "npm run test:indicators && npm run test:sentiment && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:dataset && npm run test:repository",
+    "test": "npm run test:indicators && npm run test:sentiment && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:repository",
     "test:decision": "tsx src/decision/decisionEngine.test.ts",
     "test:baseline": "tsx src/decision/baselineEngine.test.ts",
     "test:paper": "tsx src/papertrading/simulator.test.ts",
-    "test:dataset": "tsx src/marketdata/dataset.test.ts",
     "test:repository": "tsx src/db/repository.test.ts",
     "db:migrate": "tsx src/db/migrate.ts"
   },

@@ -63,10 +63,6 @@ export interface MetricsByOrigem {
   open_trades: number;
   win_rate: number;
   profit_factor: number | null;
-  total_profit_percent: number;
-  avg_profit_percent: number;
-  expectancy_percent: number;
-  max_drawdown_percent: number;
 }
 
 function requireDatabaseUrl(): string {
@@ -233,72 +229,26 @@ export function createRepository(db: RepositoryPool) {
 
     async getMetricsByOrigem(backtestRunId?: number): Promise<MetricsByOrigem[]> {
       const { rows } = await db.query<MetricsByOrigem>(`
-        WITH filtered AS (
-          SELECT s.origem, t.id, t.outcome, t.profit_percent, t.opened_at, t.closed_at
-          FROM signals s
-          INNER JOIN paper_trades t ON t.signal_id = s.id
-          WHERE ($1::bigint IS NULL OR s.backtest_run_id = $1)
-        ),
-        closed AS (
-          SELECT *,
-            SUM(profit_percent) OVER (
-              PARTITION BY origem
-              ORDER BY COALESCE(closed_at, opened_at), id
-              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-            ) AS cumulative_profit
-          FROM filtered
-          WHERE outcome IN ('win', 'loss')
-        ),
-        drawdown_series AS (
-          SELECT *,
-            MAX(cumulative_profit) OVER (
-              PARTITION BY origem
-              ORDER BY COALESCE(closed_at, opened_at), id
-              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-            ) AS running_peak
-          FROM closed
-        ),
-        trade_stats AS (
-          SELECT
-            origem,
-            COUNT(*)::int AS total_trades,
-            COUNT(*) FILTER (WHERE outcome IN ('win', 'loss'))::int AS closed_trades,
-            COUNT(*) FILTER (WHERE outcome = 'open')::int AS open_trades
-          FROM filtered
-          GROUP BY origem
-        ),
-        performance AS (
-          SELECT
-            origem,
-            COUNT(*)::int AS total,
-            ROUND(COALESCE(AVG(CASE WHEN outcome = 'win' THEN 100.0 WHEN outcome = 'loss' THEN 0.0 END), 0), 1)::float AS win_rate,
-            ROUND(SUM(profit_percent), 2)::float AS total_profit_percent,
-            ROUND(AVG(profit_percent), 2)::float AS avg_profit_percent,
-            ROUND(AVG(profit_percent), 2)::float AS expectancy_percent,
-            ROUND(MAX(running_peak - cumulative_profit), 2)::float AS max_drawdown_percent,
-            ROUND(
-              SUM(CASE WHEN profit_percent > 0 THEN profit_percent ELSE 0 END) /
-              NULLIF(ABS(SUM(CASE WHEN profit_percent < 0 THEN profit_percent ELSE 0 END)), 0),
-              2
-            )::float AS profit_factor
-          FROM drawdown_series
-          GROUP BY origem
-        )
         SELECT
-          p.origem,
-          p.total,
-          ts.total_trades,
-          ts.closed_trades,
-          ts.open_trades,
-          p.win_rate,
-          p.profit_factor,
-          p.total_profit_percent,
-          p.avg_profit_percent,
-          p.expectancy_percent,
-          p.max_drawdown_percent
-        FROM performance p
-        INNER JOIN trade_stats ts ON ts.origem = p.origem
-        ORDER BY p.origem
+          s.origem,
+          COUNT(CASE WHEN t.outcome IN ('win', 'loss') THEN 1 END)::int AS total,
+          COUNT(*)::int AS total_trades,
+          COUNT(CASE WHEN t.outcome IN ('win', 'loss') THEN 1 END)::int AS closed_trades,
+          COUNT(CASE WHEN t.outcome = 'open' THEN 1 END)::int AS open_trades,
+          ROUND(
+            COALESCE(AVG(CASE WHEN t.outcome = 'win' THEN 100.0 WHEN t.outcome = 'loss' THEN 0.0 ELSE NULL END), 0),
+            1
+          )::float AS win_rate,
+          ROUND(
+            SUM(CASE WHEN t.outcome IN ('win', 'loss') AND t.profit_percent > 0 THEN t.profit_percent ELSE 0 END) /
+            NULLIF(ABS(SUM(CASE WHEN t.outcome IN ('win', 'loss') AND t.profit_percent < 0 THEN t.profit_percent ELSE 0 END)), 0),
+            2
+          )::float AS profit_factor
+        FROM signals s
+        INNER JOIN paper_trades t ON t.signal_id = s.id
+        WHERE ($1::bigint IS NULL OR s.backtest_run_id = $1)
+        GROUP BY s.origem
+        ORDER BY s.origem
       `, [backtestRunId ?? null]);
       return rows.map((row) => ({
         origem: row.origem,
@@ -308,10 +258,6 @@ export function createRepository(db: RepositoryPool) {
         open_trades: Number(row.open_trades),
         win_rate: Number(row.win_rate),
         profit_factor: row.profit_factor === null ? null : Number(row.profit_factor),
-        total_profit_percent: Number(row.total_profit_percent),
-        avg_profit_percent: Number(row.avg_profit_percent),
-        expectancy_percent: Number(row.expectancy_percent),
-        max_drawdown_percent: Number(row.max_drawdown_percent),
       }));
     },
 
