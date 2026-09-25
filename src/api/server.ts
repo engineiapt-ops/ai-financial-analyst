@@ -482,7 +482,7 @@ app.get("/api/jev/test", async (_req, res) => {
     const jev = await callJev(market);
     res.json({ status: "ok", provider: "vercel-ai-gateway", model: "typesafe-ai/jev", versionPinned: false, market: { ativo: market.ativo, timeframe: market.timeframe, precoAtual: market.precoAtual }, jev });
   } catch (err: any) {
-    res.status(502).json({ status: "error", error: err instanceof Error ? err.message : String(err) });
+    res.status(502).json({ status: "error", error: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined });
   }
 });
 
