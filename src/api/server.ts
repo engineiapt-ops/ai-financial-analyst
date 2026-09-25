@@ -466,6 +466,27 @@ app.get("/api/metrics", async (req, res) => {
 
 
 
+
+// Temporary one-shot Jev connectivity diagnostic. Remove after validation.
+app.get("/api/jev/test", async (_req, res) => {
+  try {
+    const klines = await fetchKlines("BTCUSDT", "1h", 100);
+    const last = klines[klines.length - 1];
+    const market = {
+      ativo: "BTCUSDT" as const,
+      timeframe: "1h" as const,
+      timestamp: last.closeTime?.getTime() ?? last.openTime.getTime(),
+      precoAtual: last.close,
+      indicators: computeIndicators(klines),
+      noticiaSentimento: 0,
+    };
+    const jev = await callJev(market);
+    res.json({ status: "ok", provider: "vercel-ai-gateway", model: "typesafe-ai/jev", versionPinned: false, jev });
+  } catch (err) {
+    res.status(502).json({ status: "error", error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.post("/api/analyze", async (req, res) => {
   try {
     const parsed = AnalyzeSchema.parse(req.body);
