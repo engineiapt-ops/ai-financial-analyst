@@ -1,4 +1,4 @@
-export const JEV_MODEL_VERSION = process.env.JEV_MODEL_VERSION ?? "jev-1.13";
+export const JEV_MODEL_VERSION = process.env.JEV_MODEL_VERSION ?? "gateway-managed";
 
 export interface DecisionThresholds {
   readonly minConfidence: number;
