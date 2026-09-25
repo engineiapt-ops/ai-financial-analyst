@@ -2,7 +2,7 @@ import type { MarketState } from "../types.js";
 
 const BASE_URL = (process.env.JEV_BASE_URL ?? "https://ai-gateway.vercel.sh/typesafe").replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 12_000;
-const API_KEY = process.env.AI_GATEWAY_API_KEY ?? "";
+const API_KEY = process.env.VERCEL_OIDC_TOKEN ?? process.env.AI_GATEWAY_API_KEY ?? "";
 const JEV_MODEL = "typesafe-ai/jev";
 
 export interface JevAnswer<T> {
@@ -74,7 +74,7 @@ export async function callJev(market: MarketState): Promise<JevResponse> {
       }
     })
   });
-  if (!res.ok) throw new Error(`Jev API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) {\n    const body = await res.text().catch(() => "");\n    throw new Error(`Jev API error: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 500)}` : ""}`);\n  }
   const data = await res.json();
   return validateJevResponse(data);
   } finally {
