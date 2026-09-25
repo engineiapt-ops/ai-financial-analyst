@@ -476,7 +476,7 @@ app.post("/api/analyze", async (req, res) => {
 
 const port = Number(process.env.PORT ?? 3000);
 
-if (process.env.NODE_ENV !== "test") {
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
   app.listen(port, "0.0.0.0", () =>
     console.log(`AI Financial Analyst API rodando na porta ${port}`),
   );
