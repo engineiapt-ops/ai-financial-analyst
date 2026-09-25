@@ -63,348 +63,25 @@ export interface MetricsByOrigem {
   open_trades: number;
   win_rate: number;
   profit_factor: number | null;
+  total_profit_percent: number;
+  avg_profit_percent: number;
+  expectancy_percent: number;
+  max_drawdown_percent: number;
 }
 
-function requireDatabaseUrl(): string | undefined {
-  return process.env.DATABASE_URL?.trim() || undefined;
-}
-
-export function createInMemoryPool(): RepositoryPool {
-  let nextRunId = 1;
-  let nextSignalId = 1;
-  let nextTradeId = 1;
-
-  const runs = new Map<number, any>();
-  const signals = new Map<number, any>();
-  const trades = new Map<number, any>();
-  const marketData = new Map<string, any>();
-  const config = new Map<string, any>();
-
-  const queryHandler = async <T extends QueryResultRow = any>(
-    text: string,
-    values: unknown[] = [],
-  ): Promise<{ rows: T[] }> => {
-    const trimmed = text.trim();
-
-    if (trimmed.startsWith("SELECT 1")) {
-      return { rows: [{ "?column?": 1 } as unknown as T] };
-    }
-
-    if (trimmed.includes("INSERT INTO backtest_runs")) {
-      const id = nextRunId++;
-      const [
-        engine,
-        mode,
-        ativo,
-        timeframe,
-        periodo_inicio,
-        periodo_fim,
-        oos_start_ratio,
-        thresholds_congelados_em,
-        candles_total,
-        dataset_hash,
-      ] = values;
-      runs.set(id, {
-        id,
-        engine,
-        mode,
-        ativo,
-        timeframe,
-        periodo_inicio,
-        periodo_fim,
-        oos_start_ratio,
-        thresholds_congelados_em,
-        candles_total,
-        dataset_hash,
-        criado_em: new Date(),
-      });
-      return { rows: [{ id } as unknown as T] };
-    }
-
-    if (trimmed.includes("FROM backtest_runs") && trimmed.includes("WHERE id = $1")) {
-      const id = Number(values[0]);
-      const run = runs.get(id);
-      return { rows: run ? [run as T] : [] };
-    }
-
-    if (trimmed.includes("INSERT INTO signals")) {
-      const id = nextSignalId++;
-      const [
-        backtest_run_id,
-        ativo,
-        timeframe,
-        entrada,
-        stop,
-        alvo,
-        origem,
-        jev_choice,
-        jev_probs,
-        jev_model_version,
-        quality_score,
-        risco_elevado,
-        recomendacao,
-        tamanho_posicao_pct,
-        observacao,
-      ] = values;
-      signals.set(id, {
-        id,
-        backtest_run_id: backtest_run_id ?? null,
-        ativo,
-        timeframe,
-        entrada: entrada ?? null,
-        stop: stop ?? null,
-        alvo: alvo ?? null,
-        origem,
-        jev_choice: jev_choice ?? null,
-        jev_probs: jev_probs ?? null,
-        jev_model_version: jev_model_version ?? null,
-        quality_score: quality_score ?? null,
-        risco_elevado: risco_elevado ?? null,
-        recomendacao,
-        tamanho_posicao_pct,
-        observacao: observacao ?? null,
-      });
-      return { rows: [{ id } as unknown as T] };
-    }
-
-    if (trimmed.includes("INSERT INTO paper_trades")) {
-      const id = nextTradeId++;
-      const [
-        signal_id,
-        entry_price,
-        exit_price,
-        outcome,
-        profit_percent,
-        drawdown,
-        opened_at,
-        closed_at,
-      ] = values;
-      trades.set(id, {
-        id,
-        signal_id: Number(signal_id),
-        entry_price: Number(entry_price),
-        exit_price: exit_price !== null && exit_price !== undefined ? Number(exit_price) : null,
-        outcome,
-        profit_percent: Number(profit_percent),
-        drawdown: drawdown !== null && drawdown !== undefined ? Number(drawdown) : null,
-        opened_at: opened_at ?? new Date(),
-        closed_at: closed_at ?? null,
-      });
-      return { rows: [{ id } as unknown as T] };
-    }
-
-    if (trimmed.includes("GROUP BY s.origem")) {
-      const filterRunId = values[0] !== null && values[0] !== undefined ? Number(values[0]) : null;
-      const groups = new Map<string, {
-        origem: string;
-        total: number;
-        total_trades: number;
-        closed_trades: number;
-        open_trades: number;
-        wins: number;
-        totalClosedForWinRate: number;
-        profitWins: number;
-        lossAbs: number;
-      }>();
-
-      for (const t of trades.values()) {
-        const s = signals.get(t.signal_id);
-        if (!s) continue;
-        if (filterRunId !== null && s.backtest_run_id !== filterRunId) continue;
-
-        let g = groups.get(s.origem);
-        if (!g) {
-          g = {
-            origem: s.origem,
-            total: 0,
-            total_trades: 0,
-            closed_trades: 0,
-            open_trades: 0,
-            wins: 0,
-            totalClosedForWinRate: 0,
-            profitWins: 0,
-            lossAbs: 0,
-          };
-          groups.set(s.origem, g);
-        }
-
-        g.total_trades++;
-        if (t.outcome === "open") {
-          g.open_trades++;
-        } else if (t.outcome === "win" || t.outcome === "loss") {
-          g.total++;
-          g.closed_trades++;
-          g.totalClosedForWinRate++;
-          if (t.outcome === "win") g.wins++;
-          if (t.profit_percent > 0) g.profitWins += t.profit_percent;
-          if (t.profit_percent < 0) g.lossAbs += Math.abs(t.profit_percent);
-        }
-      }
-
-      const rows: any[] = [];
-      const sortedOrigens = Array.from(groups.keys()).sort();
-      for (const origem of sortedOrigens) {
-        const g = groups.get(origem)!;
-        const win_rate = g.totalClosedForWinRate > 0
-          ? Math.round((g.wins / g.totalClosedForWinRate) * 1000) / 10
-          : 0;
-        const profit_factor = g.lossAbs > 0
-          ? Math.round((g.profitWins / g.lossAbs) * 100) / 100
-          : null;
-        rows.push({
-          origem: g.origem,
-          total: g.total,
-          total_trades: g.total_trades,
-          closed_trades: g.closed_trades,
-          open_trades: g.open_trades,
-          win_rate,
-          profit_factor,
-        });
-      }
-
-      return { rows: rows as T[] };
-    }
-
-    if (trimmed.includes("INSERT INTO config")) {
-      const [userId] = values;
-      config.set(String(userId), {
-        userId,
-        thresholds_congelados_em: new Date(),
-      });
-      return { rows: [] };
-    }
-
-    if (trimmed.includes("INSERT INTO market_data")) {
-      const [ativo, timeframe, open_time, open, high, low, close, volume] = values;
-      const key = `${ativo}:${timeframe}:${new Date(open_time as any).getTime()}`;
-      marketData.set(key, {
-        ativo,
-        timeframe,
-        open_time: new Date(open_time as any),
-        open: Number(open),
-        high: Number(high),
-        low: Number(low),
-        close: Number(close),
-        volume: Number(volume),
-      });
-      return { rows: [] };
-    }
-
-    if (trimmed.includes("FROM market_data") && trimmed.includes("ORDER BY open_time DESC")) {
-      const [ativo, timeframe, limit] = values;
-      const filtered: any[] = [];
-      for (const item of marketData.values()) {
-        if (item.ativo === ativo && item.timeframe === timeframe) {
-          filtered.push({
-            openTime: item.open_time,
-            open: item.open,
-            high: item.high,
-            low: item.low,
-            close: item.close,
-            volume: item.volume,
-          });
-        }
-      }
-      filtered.sort((a, b) => b.openTime.getTime() - a.openTime.getTime());
-      return { rows: filtered.slice(0, Number(limit)) as T[] };
-    }
-
-    if (trimmed.includes("FROM market_data") && trimmed.includes("open_time >=")) {
-      const [ativo, timeframe, startTime, endTime] = values;
-      const startMs = new Date(startTime as any).getTime();
-      const endMs = new Date(endTime as any).getTime();
-      const filtered: any[] = [];
-      for (const item of marketData.values()) {
-        const timeMs = item.open_time.getTime();
-        if (item.ativo === ativo && item.timeframe === timeframe && timeMs >= startMs && timeMs <= endMs) {
-          filtered.push({
-            openTime: item.open_time,
-            open: item.open,
-            high: item.high,
-            low: item.low,
-            close: item.close,
-            volume: item.volume,
-          });
-        }
-      }
-      filtered.sort((a, b) => a.openTime.getTime() - b.openTime.getTime());
-      return { rows: filtered as T[] };
-    }
-
-    if (trimmed === "BEGIN" || trimmed === "COMMIT" || trimmed === "ROLLBACK") {
-      return { rows: [] };
-    }
-
-    return { rows: [] };
-  };
-
-  return {
-    query: queryHandler,
-    connect: async () =>
-      ({
-        query: queryHandler as any,
-        release: () => {},
-      } as unknown as PoolClient),
-  };
-}
-
-class ResilientPool implements RepositoryPool {
-  private inMemory: RepositoryPool = createInMemoryPool();
-  private pgPool: Pool | null = null;
-  private warned = false;
-
-  constructor(connectionString?: string) {
-    if (connectionString) {
-      try {
-        this.pgPool = new pg.Pool({ connectionString });
-      } catch {
-        this.pgPool = null;
-      }
-    }
+function requireDatabaseUrl(): string {
+  const value = process.env.DATABASE_URL?.trim();
+  if (!value) {
+    throw new Error("DATABASE_URL is required for repository operations");
   }
-
-  async query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }> {
-    if (this.pgPool) {
-      try {
-        return await this.pgPool.query<T>(text, values);
-      } catch (err: any) {
-        if (!this.warned) {
-          console.warn("[AI Studio] PostgreSQL query failed, switching to in-memory mock repository:", err.message);
-          this.warned = true;
-        }
-        return this.inMemory.query<T>(text, values);
-      }
-    }
-    return this.inMemory.query<T>(text, values);
-  }
-
-  async connect(): Promise<PoolClient> {
-    if (this.pgPool) {
-      try {
-        return await this.pgPool.connect();
-      } catch (err: any) {
-        if (!this.warned) {
-          console.warn("[AI Studio] PostgreSQL connect failed, switching to in-memory mock repository:", err.message);
-          this.warned = true;
-        }
-        return this.inMemory.connect();
-      }
-    }
-    return this.inMemory.connect();
-  }
+  return value;
 }
 
-let defaultPool: RepositoryPool | null = null;
+let defaultPool: Pool | null = null;
 
-function getDefaultPool(): RepositoryPool {
+function getDefaultPool(): Pool {
   if (!defaultPool) {
-    const connStr = requireDatabaseUrl();
-    if (connStr) {
-      defaultPool = new ResilientPool(connStr);
-    } else {
-      console.warn("[AI Studio] DATABASE_URL not set — using in-memory mock repository");
-      defaultPool = createInMemoryPool();
-    }
+    defaultPool = new pg.Pool({ connectionString: requireDatabaseUrl() });
   }
   return defaultPool;
 }
@@ -556,26 +233,72 @@ export function createRepository(db: RepositoryPool) {
 
     async getMetricsByOrigem(backtestRunId?: number): Promise<MetricsByOrigem[]> {
       const { rows } = await db.query<MetricsByOrigem>(`
+        WITH filtered AS (
+          SELECT s.origem, t.id, t.outcome, t.profit_percent, t.opened_at, t.closed_at
+          FROM signals s
+          INNER JOIN paper_trades t ON t.signal_id = s.id
+          WHERE ($1::bigint IS NULL OR s.backtest_run_id = $1)
+        ),
+        closed AS (
+          SELECT *,
+            SUM(profit_percent) OVER (
+              PARTITION BY origem
+              ORDER BY COALESCE(closed_at, opened_at), id
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS cumulative_profit
+          FROM filtered
+          WHERE outcome IN ('win', 'loss')
+        ),
+        drawdown_series AS (
+          SELECT *,
+            MAX(cumulative_profit) OVER (
+              PARTITION BY origem
+              ORDER BY COALESCE(closed_at, opened_at), id
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS running_peak
+          FROM closed
+        ),
+        trade_stats AS (
+          SELECT
+            origem,
+            COUNT(*)::int AS total_trades,
+            COUNT(*) FILTER (WHERE outcome IN ('win', 'loss'))::int AS closed_trades,
+            COUNT(*) FILTER (WHERE outcome = 'open')::int AS open_trades
+          FROM filtered
+          GROUP BY origem
+        ),
+        performance AS (
+          SELECT
+            origem,
+            COUNT(*)::int AS total,
+            ROUND(COALESCE(AVG(CASE WHEN outcome = 'win' THEN 100.0 WHEN outcome = 'loss' THEN 0.0 END), 0), 1)::float AS win_rate,
+            ROUND(SUM(profit_percent), 2)::float AS total_profit_percent,
+            ROUND(AVG(profit_percent), 2)::float AS avg_profit_percent,
+            ROUND(AVG(profit_percent), 2)::float AS expectancy_percent,
+            ROUND(MAX(running_peak - cumulative_profit), 2)::float AS max_drawdown_percent,
+            ROUND(
+              SUM(CASE WHEN profit_percent > 0 THEN profit_percent ELSE 0 END) /
+              NULLIF(ABS(SUM(CASE WHEN profit_percent < 0 THEN profit_percent ELSE 0 END)), 0),
+              2
+            )::float AS profit_factor
+          FROM drawdown_series
+          GROUP BY origem
+        )
         SELECT
-          s.origem,
-          COUNT(CASE WHEN t.outcome IN ('win', 'loss') THEN 1 END)::int AS total,
-          COUNT(*)::int AS total_trades,
-          COUNT(CASE WHEN t.outcome IN ('win', 'loss') THEN 1 END)::int AS closed_trades,
-          COUNT(CASE WHEN t.outcome = 'open' THEN 1 END)::int AS open_trades,
-          ROUND(
-            COALESCE(AVG(CASE WHEN t.outcome = 'win' THEN 100.0 WHEN t.outcome = 'loss' THEN 0.0 ELSE NULL END), 0),
-            1
-          )::float AS win_rate,
-          ROUND(
-            SUM(CASE WHEN t.outcome IN ('win', 'loss') AND t.profit_percent > 0 THEN t.profit_percent ELSE 0 END) /
-            NULLIF(ABS(SUM(CASE WHEN t.outcome IN ('win', 'loss') AND t.profit_percent < 0 THEN t.profit_percent ELSE 0 END)), 0),
-            2
-          )::float AS profit_factor
-        FROM signals s
-        INNER JOIN paper_trades t ON t.signal_id = s.id
-        WHERE ($1::bigint IS NULL OR s.backtest_run_id = $1)
-        GROUP BY s.origem
-        ORDER BY s.origem
+          p.origem,
+          p.total,
+          ts.total_trades,
+          ts.closed_trades,
+          ts.open_trades,
+          p.win_rate,
+          p.profit_factor,
+          p.total_profit_percent,
+          p.avg_profit_percent,
+          p.expectancy_percent,
+          p.max_drawdown_percent
+        FROM performance p
+        INNER JOIN trade_stats ts ON ts.origem = p.origem
+        ORDER BY p.origem
       `, [backtestRunId ?? null]);
       return rows.map((row) => ({
         origem: row.origem,
@@ -585,6 +308,10 @@ export function createRepository(db: RepositoryPool) {
         open_trades: Number(row.open_trades),
         win_rate: Number(row.win_rate),
         profit_factor: row.profit_factor === null ? null : Number(row.profit_factor),
+        total_profit_percent: Number(row.total_profit_percent),
+        avg_profit_percent: Number(row.avg_profit_percent),
+        expectancy_percent: Number(row.expectancy_percent),
+        max_drawdown_percent: Number(row.max_drawdown_percent),
       }));
     },
 
