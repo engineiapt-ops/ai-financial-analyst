@@ -74,7 +74,10 @@ export async function callJev(market: MarketState): Promise<JevResponse> {
       }
     })
   });
-  if (!res.ok) {\n    const body = await res.text().catch(() => "");\n    throw new Error(`Jev API error: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 500)}` : ""}`);\n  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Jev API error: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 500)}` : ""}`);
+  }
   const data = await res.json();
   return validateJevResponse(data);
   } finally {
