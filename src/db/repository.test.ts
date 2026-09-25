@@ -50,7 +50,7 @@ class FakeDb implements RepositoryPool {
         }],
       } as { rows: T[] };
     }
-    if (text.includes("GROUP BY s.origem")) {
+    if (text.includes("GROUP BY origem") || text.includes("GROUP BY s.origem")) {
       return {
         rows: [{
           origem: "jev",
