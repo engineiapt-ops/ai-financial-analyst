@@ -470,6 +470,27 @@ app.get("/api/metrics", async (req, res) => {
 
 
 
+app.get("/api/jev/auth-debug", async (_req, res) => {
+  try {
+    const token = (await getVercelOidcToken()) ?? "";
+    res.json({
+      status: "ok",
+      vercel: Boolean(process.env.VERCEL),
+      hasVercelOidcEnv: Boolean(process.env.VERCEL_OIDC_TOKEN),
+      hasGatewayApiKey: Boolean(process.env.AI_GATEWAY_API_KEY),
+      helperReturnedToken: Boolean(token),
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: "error",
+      vercel: Boolean(process.env.VERCEL),
+      hasVercelOidcEnv: Boolean(process.env.VERCEL_OIDC_TOKEN),
+      hasGatewayApiKey: Boolean(process.env.AI_GATEWAY_API_KEY),
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
 app.get("/api/backtest/jev", async (req, res) => {
   try {
     const rawRunId = req.query.fromRun;
