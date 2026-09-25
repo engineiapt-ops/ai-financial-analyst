@@ -1,8 +1,15 @@
 import type { MarketState } from "../types.js";
+import { getVercelOidcToken } from "@vercel/oidc";
 
 const BASE_URL = (process.env.JEV_BASE_URL ?? "https://ai-gateway.vercel.sh/typesafe").replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 12_000;
-const API_KEY = process.env.VERCEL_OIDC_TOKEN ?? process.env.AI_GATEWAY_API_KEY ?? "";
+const STATIC_API_KEY = process.env.AI_GATEWAY_API_KEY ?? "";
+
+async function getGatewayCredential(): Promise<string> {
+  if (STATIC_API_KEY) return STATIC_API_KEY;
+  if (process.env.VERCEL) return getVercelOidcToken();
+  return process.env.VERCEL_OIDC_TOKEN ?? "";
+}
 const JEV_MODEL = "typesafe-ai/jev";
 
 export interface JevAnswer<T> {
@@ -49,7 +56,8 @@ function validateJevResponse(value: any): JevResponse {
 }
 
 export async function callJev(market: MarketState): Promise<JevResponse> {
-  if (!API_KEY) {
+  const credential = await getGatewayCredential();
+  if (!credential) {
     throw new Error("AI_GATEWAY_API_KEY não configurada.");
   }
   const controller = new AbortController();
@@ -57,7 +65,7 @@ export async function callJev(market: MarketState): Promise<JevResponse> {
   try {
   const res = await fetch(`${BASE_URL}/v1/systemone`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${credential}` },
     body: JSON.stringify({
       model: JEV_MODEL, state: buildState(market),
       questions: {
