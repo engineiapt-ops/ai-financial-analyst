@@ -10,6 +10,8 @@ import {
 import { analyzeMarket } from "./analyze.js";
 import type { Timeframe } from "../types.js";
 import { getMetricsByOrigem } from "../db/repository.js";
+import { computeIndicators } from "../features/indicators.js";
+import { callJev } from "../jev/jevClient.js";
 
 
 export const app = express();
@@ -459,6 +461,34 @@ app.get("/api/metrics", async (req, res) => {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
+  }
+});
+
+
+// Temporary one-shot Jev connectivity diagnostic. Remove after validation.
+app.get("/api/jev/test", async (_req, res) => {
+  try {
+    const klines = await fetchKlines("BTCUSDT", "1h", 100);
+    const last = klines[klines.length - 1];
+    const market = {
+      ativo: "BTCUSDT" as const,
+      timeframe: "1h" as const,
+      timestamp: last.closeTime?.getTime() ?? last.openTime.getTime(),
+      precoAtual: last.close,
+      indicators: computeIndicators(klines),
+      noticiaSentimento: 0,
+    };
+    const jev = await callJev(market);
+    res.json({
+      status: "ok",
+      provider: "vercel-ai-gateway",
+      model: "typesafe-ai/jev",
+      versionPinned: false,
+      market: { ativo: market.ativo, timeframe: market.timeframe, precoAtual: market.precoAtual },
+      jev,
+    });
+  } catch (err: any) {
+    res.status(502).json({ status: "error", error: err instanceof Error ? err.message : String(err) });
   }
 });
 
