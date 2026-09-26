@@ -6,6 +6,7 @@ import {
   getBacktestRun,
   getMarketDataRange,
   saveBenchmarkResult,
+  getBenchmarkResults,
 } from "../db/repository.js";
 import {
   DEFAULT_EXECUTION_COSTS,
@@ -377,5 +378,6 @@ export async function runBenchmarkSuite(
     strategies: ["baseline", "buyhold", "jev"],
     jevStatus,
     candidates: candidates.length,
+    results: await getBenchmarkResults(benchmarkRunId),
   };
 }
