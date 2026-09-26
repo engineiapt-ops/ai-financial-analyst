@@ -425,7 +425,50 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         badge.textContent = analysis.decision.recomendacao;
         badge.className = 'rec-badge rec-' + analysis.decision.recomendacao;
 
-        document.getElementById('resPrice').textContent = '
+        document.getElementById('resPrice').textContent = '$' + Number(analysis.market.precoAtual).toLocaleString();
+        document.getElementById('resPos').textContent = analysis.decision.tamanhoPosicaoPct + '%';
+        document.getElementById('resExposed').textContent = '$' + Number(analysis.valorExposto).toFixed(2);
+
+        const ema9 = analysis.market.indicators.ema9 ? Number(analysis.market.indicators.ema9).toFixed(1) : '-';
+        const ema21 = analysis.market.indicators.ema21 ? Number(analysis.market.indicators.ema21).toFixed(1) : '-';
+        document.getElementById('resEMA').textContent = ema9 + ' / ' + ema21;
+
+        document.getElementById('resRSI').textContent = analysis.market.indicators.rsi ? Number(analysis.market.indicators.rsi).toFixed(1) : '-';
+        document.getElementById('resRisk').textContent = analysis.decision.riscoElevado ? 'YES (High)' : 'Normal';
+        document.getElementById('resObs').textContent = analysis.decision.observacao || '';
+
+        const quality = analysis.marketDataQuality;
+        document.getElementById('resDataAsOf').textContent = new Date(analysis.market.dataAsOf).toLocaleString();
+        document.getElementById('resDataQuality').textContent = quality
+          ? (quality.status + ' · age ' + Math.round(quality.ageMs / 1000) + 's')
+          : '-';
+        document.getElementById('resSnapshot').textContent = data.snapshot
+          ? data.snapshot.snapshotId + ' · ' + data.snapshot.contentHash.slice(0, 16)
+          : '-';
+        document.getElementById('resPacket').textContent = data.packet ? data.packet.packetId : '-';
+
+        const aiBox = document.getElementById('aiBox');
+        if (data.ai && data.ai.narrative) {
+          aiBox.style.display = 'block';
+          document.getElementById('aiTitle').textContent = 'AI Analyst · ' + data.ai.model;
+          document.getElementById('aiSummary').textContent = data.ai.narrative.summary;
+          const renderList = (id, values) => {
+            document.getElementById(id).innerHTML = (values || []).map(value => {
+              const safe = String(value).replace(/[&<>]/g, char =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char])
+              );
+              return '<li>' + safe + '</li>';
+            }).join('');
+          };
+          renderList('aiDrivers', data.ai.narrative.keyDrivers);
+          renderList('aiRisks', data.ai.narrative.riskFlags);
+          renderList('aiWatch', data.ai.narrative.watchItems);
+          document.getElementById('aiConfidence').textContent = data.ai.narrative.confidenceNote;
+        } else {
+          aiBox.style.display = 'none';
+        }
+
+        document.getElementById('resJson').textContent = JSON.stringify(data, null, 2);
 
         resultBox.style.display = 'block';
       } catch (err) {
