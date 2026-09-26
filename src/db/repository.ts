@@ -3,6 +3,8 @@ import type { DecisionResult, Kline, Timeframe } from "../types.js";
 import type { ResearchSnapshot } from "../research/snapshot.js";
 import type { CalibrationObservation } from "../evaluation/calibration.js";
 import type { OosValidationGate } from "../evaluation/oosValidationGate.js";
+import type { OosValidationReport } from "../evaluation/oosValidationReport.js";
+import type { OosRobustnessReport } from "../evaluation/oosRobustness.js";
 
 export interface RepositoryPool {
   query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
@@ -111,10 +113,17 @@ export interface OosValidationGateAuditRecord {
   evidenceHash: string;
   createdAt: Date;
   gate: OosValidationGate;
+  evidence: OosValidationGateAuditEvidence | null;
+}
+
+export interface OosValidationGateAuditEvidence {
+  validationReport: OosValidationReport;
+  robustnessReport: OosRobustnessReport;
 }
 
 export interface SaveOosValidationGateAuditInput {
   gate: OosValidationGate;
+  evidence: OosValidationGateAuditEvidence;
 }
 
 export interface OosValidationGateAuditFilters {
@@ -648,16 +657,17 @@ export function createRepository(db: RepositoryPool) {
         evidence_hash: string;
         created_at: Date;
         gate: OosValidationGate;
+        evidence: OosValidationGateAuditEvidence | null;
       }>(
         `INSERT INTO oos_validation_gate_audits
           (backtest_run_id, walk_forward_run_id, ativo, timeframe, estrategia,
-           gate_version, status, validation_from, validation_to, evidence_hash, gate)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+           gate_version, status, validation_from, validation_to, evidence_hash, gate, evidence)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb)
          ON CONFLICT (backtest_run_id, walk_forward_run_id, estrategia, evidence_hash)
          DO NOTHING
          RETURNING id, backtest_run_id, walk_forward_run_id, ativo, timeframe,
                    estrategia, gate_version, status, validation_from, validation_to,
-                   evidence_hash, created_at, gate`,
+                   evidence_hash, created_at, gate, evidence`,
         [
           gate.scope.backtestRunId,
           gate.scope.walkForwardRunId,
@@ -670,6 +680,7 @@ export function createRepository(db: RepositoryPool) {
           new Date(gate.scope.validationTo),
           gate.evidenceHash,
           JSON.stringify(gate),
+          input.evidence ? JSON.stringify(input.evidence) : null,
         ],
       );
 
@@ -696,7 +707,7 @@ export function createRepository(db: RepositoryPool) {
       const existing = await db.query<typeof rows[number]>(
         `SELECT id, backtest_run_id, walk_forward_run_id, ativo, timeframe,
                 estrategia, gate_version, status, validation_from, validation_to,
-                evidence_hash, created_at, gate
+                evidence_hash, created_at, gate, evidence
          FROM oos_validation_gate_audits
          WHERE backtest_run_id = $1
            AND walk_forward_run_id IS NOT DISTINCT FROM $2
@@ -732,6 +743,7 @@ export function createRepository(db: RepositoryPool) {
         evidenceHash: existingRow.evidence_hash,
         createdAt: new Date(existingRow.created_at),
         gate: existingRow.gate,
+        evidence: existingRow.evidence ?? null,
       };
     },
 
@@ -783,6 +795,7 @@ export function createRepository(db: RepositoryPool) {
         evidenceHash: row.evidence_hash,
         createdAt: new Date(row.created_at),
         gate: row.gate,
+        evidence: row.evidence ?? null,
       };
     },
 
