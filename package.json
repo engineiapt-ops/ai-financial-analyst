@@ -34,8 +34,8 @@
     "test:oos-gate": "tsx src/evaluation/oosValidationGate.test.ts",
     "test:oos-gate-repository": "tsx src/evaluation/oosValidationGateRepository.test.ts",
     "test:online": "tsx src/online/provenance.test.ts",
-    "test:evaluation-overview": "tsx src/product/evaluationOverview.test.ts",
-    "test:gemini": "tsx src/ai/geminiProvider.test.ts"
+    "test:gemini": "tsx src/ai/geminiProvider.test.ts",
+    "test:evaluation-overview": "tsx src/product/evaluationOverview.test.ts"
   },
   "dependencies": {
     "express": "^4.19.2",

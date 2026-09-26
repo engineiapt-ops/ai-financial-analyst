@@ -6,6 +6,11 @@ import {
   getMarketData,
   saveWalkForwardFold,
   getWalkForwardFolds,
+  createWalkForwardPortfolioRun,
+  saveWalkForwardPortfolioFold,
+  saveWalkForwardPortfolioEquityPoints,
+  getWalkForwardPortfolioRuns,
+  getWalkForwardPortfolioFolds,
 } from "../db/repository.js";
 import {
   DEFAULT_EXECUTION_COSTS,
@@ -18,6 +23,12 @@ import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds, thresholds } from "../config/thresholds.js";
 import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
 import { evaluateRisk } from "../risk/riskEngine.js";
+import {
+  simulateWalkForwardPortfolio,
+  WALK_FORWARD_PORTFOLIO_MODEL_VERSION,
+  WALK_FORWARD_PORTFOLIO_RISK_MODEL_VERSION,
+  type WalkForwardPortfolioTrade,
+} from "../portfolio/walkForwardEngine.js";
 import type { Kline, MarketState } from "../types.js";
 
 const TARGET_PCT = 0.01;
@@ -211,6 +222,89 @@ export async function runWalkForward(options = getOptions()) {
   const results: Record<string, unknown>[] = [];
   let foldNumber = 0;
 
+  const portfolioInitialCapital = 1000;
+  const portfolioPositionSizePct = 2;
+  const portfolioMaxGrossExposurePct = 20;
+
+  const baselinePortfolioRunId = await createWalkForwardPortfolioRun({
+    walkForwardRunId,
+    strategy: "baseline",
+    initialCapital: portfolioInitialCapital,
+    positionSizePct: portfolioPositionSizePct,
+    maxGrossExposurePct: portfolioMaxGrossExposurePct,
+    portfolioModelVersion: WALK_FORWARD_PORTFOLIO_MODEL_VERSION,
+    finalEquity: portfolioInitialCapital,
+    totalReturnPct: 0,
+    maxDrawdownPct: 0,
+    totalSignals: 0,
+    executedTrades: 0,
+    closedTrades: 0,
+    rejectedTrades: 0,
+    winningTrades: 0,
+    losingTrades: 0,
+    totalRealizedPnl: 0,
+    totalFees: 0,
+    totalSlippage: 0,
+    maxOpenPositions: 0,
+    maxGrossExposure: 0,
+    riskGateBlocks: 0,
+  });
+
+  const baselineRiskPortfolioRunId = await createWalkForwardPortfolioRun({
+    walkForwardRunId,
+    strategy: "baseline_risk",
+    initialCapital: portfolioInitialCapital,
+    positionSizePct: portfolioPositionSizePct,
+    maxGrossExposurePct: portfolioMaxGrossExposurePct,
+    portfolioModelVersion: WALK_FORWARD_PORTFOLIO_RISK_MODEL_VERSION,
+    finalEquity: portfolioInitialCapital,
+    totalReturnPct: 0,
+    maxDrawdownPct: 0,
+    totalSignals: 0,
+    executedTrades: 0,
+    closedTrades: 0,
+    rejectedTrades: 0,
+    winningTrades: 0,
+    losingTrades: 0,
+    totalRealizedPnl: 0,
+    totalFees: 0,
+    totalSlippage: 0,
+    maxOpenPositions: 0,
+    maxGrossExposure: 0,
+    riskGateBlocks: 0,
+  });
+
+  let baselinePortfolioCapital = portfolioInitialCapital;
+  let baselineRiskPortfolioCapital = portfolioInitialCapital;
+
+  const baselinePortfolioPoints: Array<ReturnType<typeof simulateWalkForwardPortfolio>["equityCurve"][number]> = [];
+  const baselineRiskPortfolioPoints: Array<ReturnType<typeof simulateWalkForwardPortfolio>["equityCurve"][number]> = [];
+
+  let baselinePortfolioTotalSignals = 0;
+  let baselinePortfolioExecutedTrades = 0;
+  let baselinePortfolioClosedTrades = 0;
+  let baselinePortfolioRejectedTrades = 0;
+  let baselinePortfolioWinningTrades = 0;
+  let baselinePortfolioLosingTrades = 0;
+  let baselinePortfolioRealizedPnl = 0;
+  let baselinePortfolioFees = 0;
+  let baselinePortfolioSlippage = 0;
+  let baselinePortfolioMaxOpenPositions = 0;
+  let baselinePortfolioMaxGrossExposure = 0;
+
+  let baselineRiskPortfolioTotalSignals = 0;
+  let baselineRiskPortfolioExecutedTrades = 0;
+  let baselineRiskPortfolioClosedTrades = 0;
+  let baselineRiskPortfolioRejectedTrades = 0;
+  let baselineRiskPortfolioWinningTrades = 0;
+  let baselineRiskPortfolioLosingTrades = 0;
+  let baselineRiskPortfolioRealizedPnl = 0;
+  let baselineRiskPortfolioFees = 0;
+  let baselineRiskPortfolioSlippage = 0;
+  let baselineRiskPortfolioMaxOpenPositions = 0;
+  let baselineRiskPortfolioMaxGrossExposure = 0;
+  let baselineRiskPortfolioRiskBlocks = 0;
+
   for (let testStart = initialTrainCandles; testStart + testCandles <= klines.length; testStart += stepCandles) {
     foldNumber += 1;
     const testEnd = testStart + testCandles - 1;
@@ -238,6 +332,8 @@ export async function runWalkForward(options = getOptions()) {
 
     const baselineTrades: EvaluatedTrade[] = [];
     const baselineRiskTrades: EvaluatedTrade[] = [];
+    const baselinePortfolioTrades: WalkForwardPortfolioTrade[] = [];
+    const baselineRiskPortfolioTrades: WalkForwardPortfolioTrade[] = [];
     let riskGateBlocks = 0;
 
     // Calibrate regime thresholds strictly on the fold's training window.
@@ -263,6 +359,13 @@ export async function runWalkForward(options = getOptions()) {
         STOP_PCT,
       );
       baselineTrades.push({ trade, exitIndex: candidate.index + trade.candlesHeld });
+      baselinePortfolioTrades.push({
+        id: candidate.index,
+        signalIndex: candidate.index - testStart,
+        exitIndex: Math.min(candidate.index + trade.candlesHeld - testStart, testEnd - testStart),
+        side: decision.recomendacao,
+        outcome: trade,
+      });
 
       const regime = regimeSeries[candidate.index];
       const risk = evaluateRisk(decision, regime);
@@ -281,6 +384,13 @@ export async function runWalkForward(options = getOptions()) {
       baselineRiskTrades.push({
         trade: riskTrade,
         exitIndex: candidate.index + riskTrade.candlesHeld,
+      });
+      baselineRiskPortfolioTrades.push({
+        id: candidate.index,
+        signalIndex: candidate.index - testStart,
+        exitIndex: Math.min(candidate.index + riskTrade.candlesHeld - testStart, testEnd - testStart),
+        side: decision.recomendacao,
+        outcome: riskTrade,
       });
     }
 
@@ -336,6 +446,148 @@ export async function runWalkForward(options = getOptions()) {
       avgCandlesHeld: baselineRisk.avgCandlesHeld,
       notas: `riskGateBlocks=${riskGateBlocks}; calibrationCandles=${trainKlines.length}; lowVolAtr=${foldThresholds.lowVolAtrRelative}; highVolAtr=${foldThresholds.highVolAtrRelative}; model=regime-v1+risk-engine-v1`,
     });
+
+    const foldKlines = klines.slice(testStart, testEnd + 1);
+
+    const baselinePortfolio = simulateWalkForwardPortfolio({
+      klines: foldKlines,
+      trades: baselinePortfolioTrades,
+      totalSignals: baselineTrades.length,
+      initialCapital: baselinePortfolioCapital,
+      positionSizePct: portfolioPositionSizePct,
+      maxGrossExposurePct: portfolioMaxGrossExposurePct,
+    });
+
+    const baselineRiskPortfolio = simulateWalkForwardPortfolio({
+      klines: foldKlines,
+      trades: baselineRiskPortfolioTrades,
+      totalSignals: baselineTrades.length,
+      initialCapital: baselineRiskPortfolioCapital,
+      positionSizePct: portfolioPositionSizePct,
+      maxGrossExposurePct: portfolioMaxGrossExposurePct,
+    });
+
+    await saveWalkForwardPortfolioFold({
+      walkForwardPortfolioRunId: baselinePortfolioRunId,
+      walkForwardRunId,
+      foldNumber,
+      initialCapital: baselinePortfolioCapital,
+      finalEquity: baselinePortfolio.finalEquity,
+      totalReturnPct: baselinePortfolio.totalReturnPct,
+      maxDrawdownPct: baselinePortfolio.maxDrawdownPct,
+      sharpe: baselinePortfolio.sharpe,
+      sortino: baselinePortfolio.sortino,
+      totalSignals: baselinePortfolio.totalSignals,
+      executedTrades: baselinePortfolio.executedTrades,
+      closedTrades: baselinePortfolio.closedTrades,
+      rejectedTrades: baselinePortfolio.rejectedTrades,
+      winningTrades: baselinePortfolio.winningTrades,
+      losingTrades: baselinePortfolio.losingTrades,
+      totalRealizedPnl: baselinePortfolio.totalRealizedPnl,
+      totalFees: baselinePortfolio.totalFees,
+      totalSlippage: baselinePortfolio.totalSlippage,
+      maxOpenPositions: baselinePortfolio.maxOpenPositions,
+      maxGrossExposure: baselinePortfolio.maxGrossExposure,
+      riskGateBlocks: 0,
+    });
+
+    await saveWalkForwardPortfolioFold({
+      walkForwardPortfolioRunId: baselineRiskPortfolioRunId,
+      walkForwardRunId,
+      foldNumber,
+      initialCapital: baselineRiskPortfolioCapital,
+      finalEquity: baselineRiskPortfolio.finalEquity,
+      totalReturnPct: baselineRiskPortfolio.totalReturnPct,
+      maxDrawdownPct: baselineRiskPortfolio.maxDrawdownPct,
+      sharpe: baselineRiskPortfolio.sharpe,
+      sortino: baselineRiskPortfolio.sortino,
+      totalSignals: baselineRiskPortfolio.totalSignals,
+      executedTrades: baselineRiskPortfolio.executedTrades,
+      closedTrades: baselineRiskPortfolio.closedTrades,
+      rejectedTrades: baselineRiskPortfolio.rejectedTrades + riskGateBlocks,
+      winningTrades: baselineRiskPortfolio.winningTrades,
+      losingTrades: baselineRiskPortfolio.losingTrades,
+      totalRealizedPnl: baselineRiskPortfolio.totalRealizedPnl,
+      totalFees: baselineRiskPortfolio.totalFees,
+      totalSlippage: baselineRiskPortfolio.totalSlippage,
+      maxOpenPositions: baselineRiskPortfolio.maxOpenPositions,
+      maxGrossExposure: baselineRiskPortfolio.maxGrossExposure,
+      riskGateBlocks,
+    });
+
+    await saveWalkForwardPortfolioEquityPoints(
+      baselinePortfolio.equityCurve.map((point) => ({
+        walkForwardPortfolioRunId: baselinePortfolioRunId,
+        foldNumber,
+        asOf: point.asOf,
+        equity: point.equity,
+        cash: point.cash,
+        realizedPnl: point.realizedPnl,
+        unrealizedPnl: point.unrealizedPnl,
+        grossExposure: point.grossExposure,
+        openPositions: point.openPositions,
+        drawdownPct: point.drawdownPct,
+      })),
+    );
+
+    await saveWalkForwardPortfolioEquityPoints(
+      baselineRiskPortfolio.equityCurve.map((point) => ({
+        walkForwardPortfolioRunId: baselineRiskPortfolioRunId,
+        foldNumber,
+        asOf: point.asOf,
+        equity: point.equity,
+        cash: point.cash,
+        realizedPnl: point.realizedPnl,
+        unrealizedPnl: point.unrealizedPnl,
+        grossExposure: point.grossExposure,
+        openPositions: point.openPositions,
+        drawdownPct: point.drawdownPct,
+      })),
+    );
+
+    baselinePortfolioCapital = baselinePortfolio.finalEquity;
+    baselineRiskPortfolioCapital = baselineRiskPortfolio.finalEquity;
+
+    baselinePortfolioPoints.push(...baselinePortfolio.equityCurve);
+    baselineRiskPortfolioPoints.push(...baselineRiskPortfolio.equityCurve);
+
+    baselinePortfolioTotalSignals += baselinePortfolio.totalSignals;
+    baselinePortfolioExecutedTrades += baselinePortfolio.executedTrades;
+    baselinePortfolioClosedTrades += baselinePortfolio.closedTrades;
+    baselinePortfolioRejectedTrades += baselinePortfolio.rejectedTrades;
+    baselinePortfolioWinningTrades += baselinePortfolio.winningTrades;
+    baselinePortfolioLosingTrades += baselinePortfolio.losingTrades;
+    baselinePortfolioRealizedPnl += baselinePortfolio.totalRealizedPnl;
+    baselinePortfolioFees += baselinePortfolio.totalFees;
+    baselinePortfolioSlippage += baselinePortfolio.totalSlippage;
+    baselinePortfolioMaxOpenPositions = Math.max(
+      baselinePortfolioMaxOpenPositions,
+      baselinePortfolio.maxOpenPositions,
+    );
+    baselinePortfolioMaxGrossExposure = Math.max(
+      baselinePortfolioMaxGrossExposure,
+      baselinePortfolio.maxGrossExposure,
+    );
+
+    baselineRiskPortfolioTotalSignals += baselineRiskPortfolio.totalSignals;
+    baselineRiskPortfolioExecutedTrades += baselineRiskPortfolio.executedTrades;
+    baselineRiskPortfolioClosedTrades += baselineRiskPortfolio.closedTrades;
+    baselineRiskPortfolioRejectedTrades +=
+      baselineRiskPortfolio.rejectedTrades + riskGateBlocks;
+    baselineRiskPortfolioWinningTrades += baselineRiskPortfolio.winningTrades;
+    baselineRiskPortfolioLosingTrades += baselineRiskPortfolio.losingTrades;
+    baselineRiskPortfolioRealizedPnl += baselineRiskPortfolio.totalRealizedPnl;
+    baselineRiskPortfolioFees += baselineRiskPortfolio.totalFees;
+    baselineRiskPortfolioSlippage += baselineRiskPortfolio.totalSlippage;
+    baselineRiskPortfolioMaxOpenPositions = Math.max(
+      baselineRiskPortfolioMaxOpenPositions,
+      baselineRiskPortfolio.maxOpenPositions,
+    );
+    baselineRiskPortfolioMaxGrossExposure = Math.max(
+      baselineRiskPortfolioMaxGrossExposure,
+      baselineRiskPortfolio.maxGrossExposure,
+    );
+    baselineRiskPortfolioRiskBlocks += riskGateBlocks;
 
     const buyHold = simulateBuyHold(klines, testStart, testEnd);
     const buyHoldSummary = summarize([buyHold]);
@@ -450,13 +702,120 @@ export async function runWalkForward(options = getOptions()) {
       baselineRisk,
       riskGateBlocks,
       highVolatilityCandles,
+      portfolio: {
+        baseline: baselinePortfolio,
+        baselineRisk: baselineRiskPortfolio,
+      },
       highVolatilityPct: (highVolatilityCandles / testCandles) * 100,
       buyhold: buyHoldSummary,
       jev: jevResult ?? { status: "unavailable", notas: jevNote },
     });
   }
 
+  const combinedStats = (points: ReturnType<typeof simulateWalkForwardPortfolio>["equityCurve"], initialCapital: number) => {
+    const returns: number[] = [];
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1].equity;
+      if (previous > 0) returns.push(points[index].equity / previous - 1);
+    }
+    let peakEquity = initialCapital;
+    let maxDrawdownPct = 0;
+    for (const point of points) {
+      peakEquity = Math.max(peakEquity, point.equity);
+      if (peakEquity > 0) {
+        maxDrawdownPct = Math.max(
+          maxDrawdownPct,
+          ((peakEquity - point.equity) / peakEquity) * 100,
+        );
+      }
+    }
+    const finalEquity = points[points.length - 1]?.equity ?? initialCapital;
+    const startAsOf = points[0]?.asOf ?? klines[initialTrainCandles].closeTime ?? klines[initialTrainCandles].openTime;
+    const endAsOf = points[points.length - 1]?.asOf ?? klines[klines.length - 1].closeTime ?? klines[klines.length - 1].openTime;
+    return {
+      finalEquity,
+      totalReturnPct: ((finalEquity / initialCapital) - 1) * 100,
+      maxDrawdownPct,
+      sharpe: returns.length ? (
+        (() => {
+          const mean = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+          const variance = returns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / returns.length;
+          const sigma = Math.sqrt(variance);
+          return sigma === 0 ? null : (mean / sigma) * Math.sqrt(24 * 365);
+        })()
+      ) : null,
+      sortino: returns.length ? (
+        (() => {
+          const downside = returns.filter((value) => value < 0);
+          if (!downside.length) return null;
+          const downsideDeviation = Math.sqrt(
+            downside.reduce((sum, value) => sum + value ** 2, 0) / downside.length,
+          );
+          const mean = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+          return downsideDeviation === 0 ? null : (mean / downsideDeviation) * Math.sqrt(24 * 365);
+        })()
+      ) : null,
+      cagrPct: finalEquity > 0
+        ? (((finalEquity / initialCapital) ** (
+            (24 * 365) / ((endAsOf.getTime() - startAsOf.getTime()) / (60 * 60 * 1000))
+          )) - 1) * 100
+        : null,
+    };
+  };
+
+  const baselineAggregate = combinedStats(baselinePortfolioPoints, portfolioInitialCapital);
+  const baselineRiskAggregate = combinedStats(
+    baselineRiskPortfolioPoints,
+    portfolioInitialCapital,
+  );
+
+  await createWalkForwardPortfolioRun({
+    walkForwardRunId,
+    strategy: "baseline",
+    initialCapital: portfolioInitialCapital,
+    positionSizePct: portfolioPositionSizePct,
+    maxGrossExposurePct: portfolioMaxGrossExposurePct,
+    portfolioModelVersion: WALK_FORWARD_PORTFOLIO_MODEL_VERSION,
+    ...baselineAggregate,
+    totalSignals: baselinePortfolioTotalSignals,
+    executedTrades: baselinePortfolioExecutedTrades,
+    closedTrades: baselinePortfolioClosedTrades,
+    rejectedTrades: baselinePortfolioRejectedTrades,
+    winningTrades: baselinePortfolioWinningTrades,
+    losingTrades: baselinePortfolioLosingTrades,
+    totalRealizedPnl: baselinePortfolioRealizedPnl,
+    totalFees: baselinePortfolioFees,
+    totalSlippage: baselinePortfolioSlippage,
+    maxOpenPositions: baselinePortfolioMaxOpenPositions,
+    maxGrossExposure: baselinePortfolioMaxGrossExposure,
+    riskGateBlocks: 0,
+  });
+
+  await createWalkForwardPortfolioRun({
+    walkForwardRunId,
+    strategy: "baseline_risk",
+    initialCapital: portfolioInitialCapital,
+    positionSizePct: portfolioPositionSizePct,
+    maxGrossExposurePct: portfolioMaxGrossExposurePct,
+    portfolioModelVersion: WALK_FORWARD_PORTFOLIO_RISK_MODEL_VERSION,
+    ...baselineRiskAggregate,
+    totalSignals: baselineRiskPortfolioTotalSignals,
+    executedTrades: baselineRiskPortfolioExecutedTrades,
+    closedTrades: baselineRiskPortfolioClosedTrades,
+    rejectedTrades: baselineRiskPortfolioRejectedTrades,
+    winningTrades: baselineRiskPortfolioWinningTrades,
+    losingTrades: baselineRiskPortfolioLosingTrades,
+    totalRealizedPnl: baselineRiskPortfolioRealizedPnl,
+    totalFees: baselineRiskPortfolioFees,
+    totalSlippage: baselineRiskPortfolioSlippage,
+    maxOpenPositions: baselineRiskPortfolioMaxOpenPositions,
+    maxGrossExposure: baselineRiskPortfolioMaxGrossExposure,
+    riskGateBlocks: baselineRiskPortfolioRiskBlocks,
+  });
+
   return {
+    walkForwardRunId,
+    ativo,  return {
     walkForwardRunId,
     ativo,
     timeframe,
@@ -469,7 +828,12 @@ export async function runWalkForward(options = getOptions()) {
     foldCount: foldNumber,
     thresholdFrozenAt: thresholds.frozenAt,
     results: await getWalkForwardFolds(walkForwardRunId),
-    note: "Fixed-rule walk-forward validation with frozen per-fold regime thresholds: no strategy parameter optimization is performed in this stage.",
+    portfolioRuns: await getWalkForwardPortfolioRuns(walkForwardRunId),
+    portfolioFolds: {
+      baseline: await getWalkForwardPortfolioFolds(baselinePortfolioRunId),
+      baselineRisk: await getWalkForwardPortfolioFolds(baselineRiskPortfolioRunId),
+    },
+    note: "Fixed-rule walk-forward validation with frozen per-fold regime thresholds and realistic finite-capital portfolio simulation: no strategy parameter optimization is performed in this stage.",
   };
 }
 
