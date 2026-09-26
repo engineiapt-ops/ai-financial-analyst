@@ -29,7 +29,7 @@ export interface OosFoldRow {
   train_end: Date;
   test_start: Date;
   test_end: Date;
-  estrategia: "baseline" | "buyhold" | "jev";
+  estrategia: "baseline" | "baseline_risk" | "buyhold" | "jev";
   status: "ok" | "unavailable" | "error";
   test_signals: number;
   total_trades: number;
@@ -312,7 +312,12 @@ export function buildOosValidationReport(input: {
 
   const validationFrom = backtestRun.validationStart;
   const validationTo = backtestRun.periodoFim;
-  const folds = (input.folds ?? []).map(normalizeFold);
+  const allFolds = (input.folds ?? []).map(normalizeFold);
+  const folds = allFolds.filter(
+    (row) =>
+      row.test_start.getTime() >= validationFrom.getTime() &&
+      row.test_end.getTime() <= validationTo.getTime(),
+  );
   const warnings: string[] = [];
 
   if (backtestRun.evaluationPolicyVersion !== OOS_EVALUATION_POLICY_VERSION) {
@@ -345,17 +350,27 @@ export function buildOosValidationReport(input: {
       warnings.push("Backtest and walk-forward dataset hashes do not match.");
     }
 
-    const foldValidationStart = folds.reduce(
-      (min, row) => row.test_start < min ? row.test_start : min,
-      folds[0].test_start,
-    );
-    const foldValidationEnd = folds.reduce(
-      (max, row) => row.test_end > max ? row.test_end : max,
-      folds[0].test_end,
-    );
+    if (folds.length !== allFolds.length) {
+      warnings.push(
+        `Excluded ${allFolds.length - folds.length} walk-forward fold rows outside the backtest validation period.`,
+      );
+    }
 
-    if (foldValidationStart.getTime() > validationFrom.getTime() || foldValidationEnd.getTime() < validationTo.getTime()) {
-      warnings.push("Walk-forward fold coverage does not fully cover the backtest validation period.");
+    if (!folds.length) {
+      warnings.push("No walk-forward folds remain inside the backtest validation period.");
+    } else {
+      const foldValidationStart = folds.reduce(
+        (min, row) => row.test_start < min ? row.test_start : min,
+        folds[0].test_start,
+      );
+      const foldValidationEnd = folds.reduce(
+        (max, row) => row.test_end > max ? row.test_end : max,
+        folds[0].test_end,
+      );
+
+      if (foldValidationStart.getTime() > validationFrom.getTime() || foldValidationEnd.getTime() < validationTo.getTime()) {
+        warnings.push("Walk-forward fold coverage does not fully cover the backtest validation period.");
+      }
     }
   }
 
