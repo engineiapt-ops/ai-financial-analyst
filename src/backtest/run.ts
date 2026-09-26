@@ -177,10 +177,7 @@ async function run() {
           openedAt: signalCandle.closeTime ?? signalCandle.openTime,
           closedAt: trade.outcome === "open"
             ? null
-            : new Date(
-                (signalCandle.closeTime ?? signalCandle.openTime).getTime()
-                + trade.candlesHeld * ((signalCandle.closeTime?.getTime() ?? signalCandle.openTime.getTime()) - signalCandle.openTime.getTime()),
-              ),
+            : future[trade.candlesHeld - 1]?.closeTime ?? future[trade.candlesHeld - 1]?.openTime ?? null,
           grossProfitPercent: trade.grossProfitPercent,
           feePercent: trade.feePercent,
           slippagePercent: trade.slippagePercent,
