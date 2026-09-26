@@ -121,12 +121,16 @@ export function buildOosValidationGate(input: {
       : `A política registrada é ${validationReport.scope.policyVersion ?? "ausente"}.`,
   );
 
+  const boundariesValid =
+    validationFrom.getTime() > calibrationEnd.getTime() &&
+    validationTo.getTime() > validationFrom.getTime();
+
   addCheck(
     "boundary-order",
-    validationFrom.getTime() > calibrationEnd.getTime(),
+    boundariesValid,
     true,
-    validationFrom.getTime() > calibrationEnd.getTime()
-      ? "A validação começa estritamente depois do fim da calibração."
+    boundariesValid
+      ? "As fronteiras de calibração e validação estão em ordem estrita."
       : "As fronteiras de calibração e validação são inválidas.",
   );
 
@@ -229,7 +233,10 @@ export function buildOosValidationGate(input: {
       warning.includes("hashes") ||
       warning.includes("do not match") ||
       warning.includes("No walk-forward") ||
-      warning.includes("No usable walk-forward"),
+      warning.includes("No usable walk-forward") ||
+      warning.includes("coverage") ||
+      warning.includes("scopes do not match") ||
+      warning.includes("scope"),
   );
 
   addCheck(
