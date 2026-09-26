@@ -969,7 +969,23 @@ export function createRepository(db: RepositoryPool) {
            status text, net_pnl numeric, gross_pnl numeric, fees numeric, slippage numeric,
            return_pct numeric, rejection_reason text
          )`,
-        [JSON.stringify(inputs)],
+        [JSON.stringify(inputs.map((item) => ({
+          portfolio_run_id: item.portfolioRunId,
+          paper_trade_id: item.paperTradeId,
+          side: item.side,
+          allocated_notional: item.allocatedNotional,
+          entry_price: item.entryPrice,
+          exit_price: item.exitPrice ?? null,
+          opened_at: item.openedAt,
+          closed_at: item.closedAt ?? null,
+          status: item.status,
+          net_pnl: item.netPnl ?? 0,
+          gross_pnl: item.grossPnl ?? 0,
+          fees: item.fees ?? 0,
+          slippage: item.slippage ?? 0,
+          return_pct: item.returnPct ?? 0,
+          rejection_reason: item.rejectionReason ?? null,
+        })))],
       );
       return inputs.length;
     },
@@ -992,7 +1008,17 @@ export function createRepository(db: RepositoryPool) {
            realized_pnl=EXCLUDED.realized_pnl, unrealized_pnl=EXCLUDED.unrealized_pnl,
            gross_exposure=EXCLUDED.gross_exposure, open_positions=EXCLUDED.open_positions,
            drawdown_pct=EXCLUDED.drawdown_pct`,
-        [JSON.stringify(inputs)],
+        [JSON.stringify(inputs.map((item) => ({
+          portfolio_run_id: item.portfolioRunId,
+          as_of: item.asOf,
+          equity: item.equity,
+          cash: item.cash,
+          realized_pnl: item.realizedPnl,
+          unrealized_pnl: item.unrealizedPnl,
+          gross_exposure: item.grossExposure,
+          open_positions: item.openPositions,
+          drawdown_pct: item.drawdownPct,
+        })))],
       );
       return inputs.length;
     },
