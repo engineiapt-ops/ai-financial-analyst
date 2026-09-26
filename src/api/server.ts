@@ -779,6 +779,7 @@ app.get("/api/evaluation/oos-robustness", async (req, res) => {
     const report = buildOosRobustnessReport({
       backtestRun,
       walkForwardRunId: walkForwardRun.id,
+      walkForwardDatasetHash: walkForwardRun.datasetHash,
       folds,
       iterations: query.iterations,
       confidenceLevel: query.confidenceLevel,
