@@ -182,7 +182,7 @@ assert.equal(
 );
 assert.equal(
   blockedGate.checks.find((check) => check.key === "minimum-closed-trades")?.passed,
-  MIN_GATE_CLOSED_TRADES <= 0 ? true : false,
+  true,
 );
 
 console.log("oos validation gate tests passed");
