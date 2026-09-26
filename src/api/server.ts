@@ -465,7 +465,7 @@ app.post("/api/report", async (req, res) => {
     const analysis = await analyzeMarket(parsed);
     const research = await generateAnalystReport(analysis);
     const snapshot = buildResearchSnapshot(analysis, research);
-    const stored = await saveResearchSnapshot({ snapshot });
+    const stored = await saveResearchSnapshot({ snapshot, decisionLogId: analysis.decisionLogId });
     res.json({
       status: "ok",
       analysis,
