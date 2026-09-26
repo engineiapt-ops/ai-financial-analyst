@@ -87,6 +87,10 @@ export interface MetricsByOrigem {
   avg_profit_percent: number;
   expectancy_percent: number;
   max_drawdown_percent: number;
+  gross_total_profit_percent: number;
+  total_fee_percent: number;
+  total_slippage_percent: number;
+  avg_candles_held: number;
 }
 
 function requireDatabaseUrl(): string {
@@ -327,6 +331,10 @@ export function createRepository(db: RepositoryPool) {
             ROUND(AVG(profit_percent), 2)::float AS avg_profit_percent,
             ROUND(AVG(profit_percent), 2)::float AS expectancy_percent,
             ROUND(MAX(running_peak - cumulative_profit), 2)::float AS max_drawdown_percent,
+            ROUND(SUM(gross_profit_percent), 2)::float AS gross_total_profit_percent,
+            ROUND(SUM(fee_percent), 2)::float AS total_fee_percent,
+            ROUND(SUM(slippage_percent), 2)::float AS total_slippage_percent,
+            ROUND(AVG(candles_held), 2)::float AS avg_candles_held,
             ROUND(
               SUM(CASE WHEN profit_percent > 0 THEN profit_percent ELSE 0 END) /
               NULLIF(ABS(SUM(CASE WHEN profit_percent < 0 THEN profit_percent ELSE 0 END)), 0),
@@ -346,7 +354,11 @@ export function createRepository(db: RepositoryPool) {
           p.total_profit_percent,
           p.avg_profit_percent,
           p.expectancy_percent,
-          p.max_drawdown_percent
+          p.max_drawdown_percent,
+          p.gross_total_profit_percent,
+          p.total_fee_percent,
+          p.total_slippage_percent,
+          p.avg_candles_held
         FROM performance p
         INNER JOIN trade_stats ts ON ts.origem = p.origem
         ORDER BY p.origem
@@ -363,6 +375,10 @@ export function createRepository(db: RepositoryPool) {
         avg_profit_percent: Number(row.avg_profit_percent),
         expectancy_percent: Number(row.expectancy_percent),
         max_drawdown_percent: Number(row.max_drawdown_percent),
+        gross_total_profit_percent: Number(row.gross_total_profit_percent),
+        total_fee_percent: Number(row.total_fee_percent),
+        total_slippage_percent: Number(row.total_slippage_percent),
+        avg_candles_held: Number(row.avg_candles_held),
       }));
     },
 
