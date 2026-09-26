@@ -90,7 +90,7 @@ const report = buildOosValidationReport({
     ativo: "BTCUSDT",
     timeframe: "1h",
     periodoInicio: new Date("2025-01-01T00:00:00Z"),
-    periodoFim: new Date("2026-04-30T00:00:00Z"),
+    periodoFim: new Date("2026-03-20T00:00:00Z"),
     oosStartRatio: 0.7,
     calibrationEnd: new Date("2026-02-28T23:00:00Z"),
     validationStart: new Date("2026-03-01T00:00:00Z"),
@@ -105,7 +105,7 @@ const report = buildOosValidationReport({
     ativo: "BTCUSDT",
     timeframe: "1h",
     datasetStart: new Date("2025-01-01T00:00:00Z"),
-    datasetEnd: new Date("2026-04-30T00:00:00Z"),
+    datasetEnd: new Date("2026-03-20T00:00:00Z"),
     candlesTotal: 1000,
     datasetHash: "abc",
     initialTrainCandles: 700,
@@ -129,6 +129,32 @@ assert.equal(report.stability.buyhold.worstFoldReturnPct, -2);
 assert.equal(report.risk, null);
 assert.equal(report.calibration.sampleCount, 30);
 assert.equal(report.warnings.length, 0);
+
+const riskReport = buildOosValidationReport({
+  backtestRun: {
+    id: 10,
+    mode: "oos",
+    ativo: "BTCUSDT",
+    timeframe: "1h",
+    periodoInicio: new Date("2025-01-01T00:00:00Z"),
+    periodoFim: new Date("2026-03-20T00:00:00Z"),
+    oosStartRatio: 0.7,
+    calibrationEnd: new Date("2026-02-28T23:00:00Z"),
+    validationStart: new Date("2026-03-01T00:00:00Z"),
+    evaluationPolicyVersion: "oos-policy.v1",
+    datasetHash: "abc",
+    candlesTotal: 1000,
+  },
+  calibration,
+  decisionKpis,
+  folds: [
+    makeFold(1, "baseline", 2, 10),
+    { ...makeFold(1, "baseline", 1, 8), estrategia: "baseline_risk", test_start: new Date("2026-03-02T00:00:00Z"), test_end: new Date("2026-03-20T00:00:00Z") },
+  ],
+});
+assert.equal(riskReport.risk?.estimatedBlockedTrades, 2);
+assert.equal(riskReport.risk?.estimatedBlockRatePct, 20);
+assert.equal(riskReport.risk?.profitDeltaPercent, -1);
 
 const managedReport = buildOosValidationReport({
   backtestRun: {
