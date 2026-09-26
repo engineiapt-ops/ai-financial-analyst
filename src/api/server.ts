@@ -1,5 +1,7 @@
 import "dotenv/config";
 import express from "express";
+import { createRateLimitMiddleware, getRequestClientKey, isHeavyApiRequest } from "./rateLimit.js";
+import { requestContextMiddleware } from "./requestContext.js";
 import { z } from "zod";
 import {
   fetchKlines,
@@ -30,11 +32,47 @@ import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForw
 import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDiagnostics.js";
 import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernanceOverview.js";
 import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
+import { listAiProviders } from "../ai/providers.js";
 
 
 
 export const app = express();
+app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
+
+app.use(requestContextMiddleware);
 app.use(express.json());
+
+const apiRateLimitWindowMs = 60_000;
+const apiRateLimitMax = Number(process.env.RATE_LIMIT_MAX ?? 120);
+const heavyRateLimitMax = Number(process.env.RATE_LIMIT_HEAVY_MAX ?? 20);
+
+const apiRateLimiter = createRateLimitMiddleware({
+  windowMs: apiRateLimitWindowMs,
+  max: apiRateLimitMax,
+  key: (req) => `api:${getRequestClientKey(req)}`,
+});
+
+const heavyRateLimiter = createRateLimitMiddleware({
+  windowMs: apiRateLimitWindowMs,
+  max: heavyRateLimitMax,
+  key: (req) => `heavy:${getRequestClientKey(req)}`,
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    apiRateLimiter(req, res, next);
+    return;
+  }
+  next();
+});
+
+app.use((req, res, next) => {
+  if (isHeavyApiRequest(req)) {
+    heavyRateLimiter(req, res, next);
+    return;
+  }
+  next();
+});
 
 const HTML_DASHBOARD = `<!DOCTYPE html>
 <html lang="en">

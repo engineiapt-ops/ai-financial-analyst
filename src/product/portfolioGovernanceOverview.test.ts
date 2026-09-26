@@ -65,10 +65,12 @@ const overview = buildPortfolioGovernanceOverview({
     notes: ["Returns are account-level finite-capital portfolio results."],
   },
   regimeDiagnostics: {
-    totalSignals: 100,
-    totalRiskGateBlocks: 12,
-    blockedSignalWinRatePct: 25,
-    blockedSignalLossRatePct: 50,
+    diagnostics: {
+      totalSignals: 100,
+      totalRiskGateBlocks: 12,
+      blockedSignalWinRatePct: 25,
+      blockedSignalLossRatePct: 50,
+    },
     folds: [{}, {}, {}, {}, {}],
     byTrend: [{ regime: "up" }],
     byVolatility: [{ regime: "high" }],

@@ -71,7 +71,15 @@ export function buildPortfolioGovernanceOverview(input: {
     checks: Array<{ passed: boolean }>;
     notes: string[];
   };
-  regimeDiagnostics: PortfolioGovernanceOverview["regimes"] & { notes?: string[] };
+  regimeDiagnostics: {
+    diagnostics: PortfolioGovernanceOverview["regimes"];
+    byTrend: unknown[];
+    byVolatility: unknown[];
+    byMomentum: unknown[];
+    byCombinedRegime: unknown[];
+    folds: unknown[];
+    notes?: string[];
+  };
 }): PortfolioGovernanceOverview {
   const checksPassed = input.portfolioReport.checks.filter((check) => check.passed).length;
   const checksTotal = input.portfolioReport.checks.length;
@@ -90,10 +98,10 @@ export function buildPortfolioGovernanceOverview(input: {
       strategies: input.portfolioReport.strategies,
     },
     regimes: {
-      totalSignals: input.regimeDiagnostics.totalSignals,
-      totalRiskGateBlocks: input.regimeDiagnostics.totalRiskGateBlocks,
-      blockedSignalWinRatePct: input.regimeDiagnostics.blockedSignalWinRatePct,
-      blockedSignalLossRatePct: input.regimeDiagnostics.blockedSignalLossRatePct,
+      totalSignals: input.regimeDiagnostics.diagnostics.totalSignals,
+      totalRiskGateBlocks: input.regimeDiagnostics.diagnostics.totalRiskGateBlocks,
+      blockedSignalWinRatePct: input.regimeDiagnostics.diagnostics.blockedSignalWinRatePct,
+      blockedSignalLossRatePct: input.regimeDiagnostics.diagnostics.blockedSignalLossRatePct,
       foldCount: input.regimeDiagnostics.folds.length,
       byTrend: input.regimeDiagnostics.byTrend,
       byVolatility: input.regimeDiagnostics.byVolatility,
