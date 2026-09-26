@@ -1,6 +1,7 @@
 import pg, { type Pool, type PoolClient, type QueryResultRow } from "pg";
 import type { DecisionResult, Kline, Timeframe } from "../types.js";
 import type { ResearchSnapshot } from "../research/snapshot.js";
+import type { CalibrationObservation } from "../evaluation/calibration.js";
 
 export interface RepositoryPool {
   query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
@@ -1139,6 +1140,67 @@ export function createRepository(db: RepositoryPool) {
       };
     },
 
+    async getDecisionCalibrationObservations(filters: DecisionKpiFilters = {}): Promise<CalibrationObservation[]> {
+      const conditions: string[] = [
+        "dl.outcome_status = 'settled'",
+        "dl.trade_profit_percent IS NOT NULL",
+        "dl.confidence IS NOT NULL",
+      ];
+      const values: unknown[] = [];
+      const add = (condition: string, value: unknown) => {
+        values.push(value);
+        conditions.push(condition.replace("?", `${values.length}`));
+      };
+
+      if (filters.ativo) add("dl.ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("dl.timeframe = ?", filters.timeframe);
+      if (filters.origem) add("dl.origem = ?", filters.origem);
+      if (filters.recomendacao) add("dl.recomendacao = ?", filters.recomendacao);
+      if (filters.from) add("dl.decision_at >= ?", filters.from);
+      if (filters.to) add("dl.decision_at <= ?", filters.to);
+      if (filters.riskRegime) {
+        add(
+          "COALESCE(rs.snapshot->'risk'->'regime'->>'key', 'unknown') = ?",
+          filters.riskRegime,
+        );
+      }
+
+      const { rows } = await db.query<{
+        confidence: string | number;
+        quality_score: string | number | null;
+        trade_profit_percent: string | number;
+        origem: string;
+        ativo: string;
+        timeframe: Timeframe;
+        risk_regime: string;
+      }>(
+        `SELECT
+           dl.confidence,
+           dl.quality_score,
+           dl.trade_profit_percent,
+           dl.origem,
+           dl.ativo,
+           dl.timeframe,
+           COALESCE(rs.snapshot->'risk'->'regime'->>'key', 'unknown') AS risk_regime
+         FROM decision_log dl
+         LEFT JOIN research_snapshots rs ON rs.decision_log_id = dl.id
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY dl.decision_at ASC
+         LIMIT 10000`,
+        values,
+      );
+
+      return rows.map((row) => ({
+        confidence: Number(row.confidence),
+        qualityScore: row.quality_score === null ? null : Number(row.quality_score),
+        tradeProfitPercent: Number(row.trade_profit_percent),
+        origem: row.origem,
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        riskRegime: row.risk_regime,
+      }));
+    },
+
     async settleDecisionLog(id: number, outcome: DecisionLogOutcome): Promise<void> {
       const result = await db.query(
         `UPDATE decision_log
@@ -2044,6 +2106,8 @@ export const getPortfolioPositions = async (runId: number): Promise<PortfolioPos
 
 export const saveDecisionLog = (input: DecisionLogInput) => createRepository(getDefaultPool()).saveDecisionLog(input);
 export const getDecisionKpis = (filters: DecisionKpiFilters = {}) => createRepository(getDefaultPool()).getDecisionKpis(filters);
+export const getDecisionCalibrationObservations = (filters: DecisionKpiFilters = {}) =>
+  createRepository(getDefaultPool()).getDecisionCalibrationObservations(filters);
 export const getDecisionLog = (id: number) => createRepository(getDefaultPool()).getDecisionLog(id);
 export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => createRepository(getDefaultPool()).settleDecisionLog(id, outcome);
 export const createBenchmarkRun = (input: BenchmarkRunInput) => createRepository(getDefaultPool()).createBenchmarkRun(input);
