@@ -11,7 +11,7 @@
     "start": "node dist/api/server.js",
     "test:indicators": "tsx src/features/indicators.test.ts",
     "test:sentiment": "tsx src/features/sentimentPipeline.test.ts",
-    "test": "npm run test:indicators && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:pit && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:dataset && npm run test:repository && npm run test:server",
+    "test": "npm run test:indicators && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:pit && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:dataset && npm run test:repository && npm run test:server",
     "test:decision": "tsx src/decision/decisionEngine.test.ts",
     "test:baseline": "tsx src/decision/baselineEngine.test.ts",
     "test:paper": "tsx src/papertrading/simulator.test.ts",
@@ -23,7 +23,8 @@
     "market:backfill": "tsx src/marketdata/backfill.ts",
     "backtest:walk-forward": "tsx src/backtest/walkForward.ts",
     "test:research": "tsx src/research/report.test.ts",
-    "test:snapshot": "tsx src/research/snapshot.test.ts"
+    "test:snapshot": "tsx src/research/snapshot.test.ts",
+    "test:evaluation": "tsx src/evaluation/decisionEvaluator.test.ts"
   },
   "dependencies": {
     "express": "^4.19.2",
