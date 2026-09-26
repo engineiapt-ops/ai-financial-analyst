@@ -57,7 +57,13 @@ const heavyRateLimiter = createRateLimitMiddleware({
   key: (req) => `heavy:${getRequestClientKey(req)}`,
 });
 
-app.use(apiRateLimiter);
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    apiRateLimiter(req, res, next);
+    return;
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   if (isHeavyApiRequest(req)) {
