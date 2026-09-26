@@ -15,6 +15,7 @@ import {
   saveTrade,
 } from "../db/repository.js";
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
+import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds } from "../config/thresholds.js";
 import type { MarketState, Timeframe, DecisionResult, Kline } from "../types.js";
 
@@ -87,6 +88,8 @@ async function run() {
     await saveMarketData(ATIVO, TIMEFRAME, klines);
   }
 
+  const datasetAsOf = klines[klines.length - 1].closeTime ?? klines[klines.length - 1].openTime;
+  assertKlinesAvailableAsOf(klines, datasetAsOf);
   const datasetHash = computeDatasetHash(klines);
   const indicatorsSeries = computeIndicatorsSeries(klines);
   const evaluationStart = mode === "oos"
@@ -131,7 +134,8 @@ async function run() {
     const market: MarketState = {
       ativo: ATIVO,
       timeframe: TIMEFRAME,
-      timestamp: signalCandle.openTime.getTime(),
+      timestamp: (signalCandle.closeTime ?? signalCandle.openTime).getTime(),
+      dataAsOf: (signalCandle.closeTime ?? signalCandle.openTime).getTime(),
       precoAtual: signalCandle.close,
       indicators,
       noticiaSentimento: 0,
