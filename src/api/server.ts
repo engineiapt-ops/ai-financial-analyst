@@ -16,7 +16,7 @@ import { buildOosValidationGate } from "../evaluation/oosValidationGate.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds } from "../db/repository.js";
+import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, saveOosValidationGateAudit, getOosValidationGateAudit } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -857,16 +857,42 @@ app.get("/api/evaluation/oos-gate", async (req, res) => {
       validationReport,
       robustnessReport,
     });
+    const audit = await saveOosValidationGateAudit({ gate });
 
     res.json({
       status: "ok",
       gate,
+      audit: {
+        id: audit.id,
+        createdAt: audit.createdAt,
+        evidenceHash: audit.evidenceHash,
+      },
       evidence: {
         validationReportVersion: validationReport.reportVersion,
         robustnessReportVersion: robustnessReport.reportVersion,
         evidenceHash: gate.evidenceHash,
       },
     });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-gate/audits/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ status: "error", error: "audit id must be a positive integer" });
+    }
+
+    const audit = await getOosValidationGateAudit(id);
+    if (!audit) {
+      return res.status(404).json({ status: "error", error: "OOS validation gate audit not found" });
+    }
+
+    res.json({ status: "ok", audit });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
