@@ -63,11 +63,12 @@ export function buildSystemReadinessOverview(input: {
     executionState === "ready" &&
     authenticationState === "ready";
 
-  const state: ReadinessState = executionState === "blocked"
-    ? "blocked"
-    : criticalChecksReady
-      ? "ready"
-      : "degraded";
+  const state: ReadinessState =
+    executionState === "blocked" || authenticationState === "blocked"
+      ? "blocked"
+      : criticalChecksReady
+        ? "ready"
+        : "degraded";
 
   return {
     version: SYSTEM_READINESS_VERSION,
