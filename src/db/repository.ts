@@ -349,7 +349,9 @@ export function createRepository(db: RepositoryPool) {
     async getMetricsByOrigem(backtestRunId?: number): Promise<MetricsByOrigem[]> {
       const { rows } = await db.query<MetricsByOrigem>(`
         WITH filtered AS (
-          SELECT s.origem, t.id, t.outcome, t.profit_percent, t.opened_at, t.closed_at
+          SELECT s.origem, t.id, t.outcome, t.profit_percent,
+                 t.gross_profit_percent, t.fee_percent, t.slippage_percent,
+                 t.candles_held, t.opened_at, t.closed_at
           FROM signals s
           INNER JOIN paper_trades t ON t.signal_id = s.id
           WHERE ($1::bigint IS NULL OR s.backtest_run_id = $1)
