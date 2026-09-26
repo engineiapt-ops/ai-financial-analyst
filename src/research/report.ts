@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { filterNewsByAsOf } from "../marketdata/pointInTime.js";
-import { GdeltSource, type NewsHeadline } from "../features/sentimentPipeline.js";
+import {
+  CryptoPanicSource,
+  GdeltSource,
+  scoreHeadline,
+  type NewsHeadline,
+  type NewsSource,
+} from "../features/sentimentPipeline.js";
 import type { AnalyzeOutput } from "../api/analyze.js";
 
 export const AnalystReportSchema = z.object({
@@ -20,12 +26,22 @@ export interface ResearchEvidence {
   source: string;
   title: string;
   publishedAt: string;
+  url?: string;
+  sentimentScore: number;
+  stance: "positive" | "neutral" | "negative";
+}
+
+export interface ResearchSourceStatus {
+  source: string;
+  status: "ok" | "error";
+  headlines: number;
 }
 
 export interface AnalystResearchResult {
   asOf: string;
   sentiment: number;
   evidence: ResearchEvidence[];
+  sources: ResearchSourceStatus[];
   report: AnalystReport;
 }
 
@@ -37,6 +53,19 @@ function recommendationText(recommendation: AnalyzeOutput["decision"]["recomenda
   if (recommendation === "BUY") return "O motor quantitativo identificou condição compatível com entrada.";
   if (recommendation === "SELL") return "O motor quantitativo identificou condição compatível com saída.";
   return "O motor quantitativo não encontrou condição suficiente para entrada ou saída.";
+}
+
+function normalizeTitle(title: string): string {
+  return title
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function stanceFromScore(score: number): ResearchEvidence["stance"] {
+  if (score > 0) return "positive";
+  if (score < 0) return "negative";
+  return "neutral";
 }
 
 export function buildDeterministicReport(input: AnalyzeOutput, sentiment: number, evidence: ResearchEvidence[]): AnalystReport {
@@ -88,32 +117,80 @@ export function buildDeterministicReport(input: AnalyzeOutput, sentiment: number
   });
 }
 
-export async function collectResearchEvidence(ativo: string, asOf: Date): Promise<{
+export function createDefaultResearchSources(): NewsSource[] {
+  const sources: NewsSource[] = [new GdeltSource()];
+  const cryptoPanicKey = process.env.CRYPTOPANIC_API_KEY?.trim();
+  if (cryptoPanicKey) sources.push(new CryptoPanicSource(cryptoPanicKey));
+  return sources;
+}
+
+export async function collectResearchEvidence(
+  ativo: string,
+  asOf: Date,
+  sources: NewsSource[] = createDefaultResearchSources(),
+): Promise<{
   sentiment: number;
   evidence: ResearchEvidence[];
+  sources: ResearchSourceStatus[];
 }> {
-  const source = new GdeltSource();
-  try {
-    const headlines: NewsHeadline[] = await source.fetchRecent(ativo);
-    const filtered = filterNewsByAsOf(headlines, asOf)
-      .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
-      .slice(0, 8);
+  const results = await Promise.allSettled(sources.map((source) => source.fetchRecent(ativo)));
+  const sourceStatus: ResearchSourceStatus[] = [];
+  const allHeadlines: NewsHeadline[] = [];
 
-    const positive = filtered.filter((h) => /surge|rally|bullish|approve|inflow|alta|subida|valoriz/i.test(h.title)).length;
-    const negative = filtered.filter((h) => /crash|bearish|hack|ban|lawsuit|outflow|queda|baixa|desvaloriz/i.test(h.title)).length;
-    const sentiment = filtered.length === 0 ? 0 : Math.max(-1, Math.min(1, (positive - negative) / filtered.length));
+  results.forEach((result, index) => {
+    const source = sources[index];
+    if (result.status === "fulfilled") {
+      const valid = result.value.filter(
+        (headline) =>
+          typeof headline.title === "string" &&
+          headline.title.trim().length > 0 &&
+          headline.publishedAt instanceof Date &&
+          !Number.isNaN(headline.publishedAt.getTime()),
+      );
+      sourceStatus.push({
+        source: source.constructor.name,
+        status: "ok",
+        headlines: valid.length,
+      });
+      allHeadlines.push(...valid);
+    } else {
+      sourceStatus.push({
+        source: source.constructor.name,
+        status: "error",
+        headlines: 0,
+      });
+    }
+  });
 
-    return {
-      sentiment,
-      evidence: filtered.map((headline) => ({
+  const filtered = filterNewsByAsOf(allHeadlines, asOf)
+    .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+
+  const seen = new Set<string>();
+  const evidence = filtered
+    .filter((headline) => {
+      const key = normalizeTitle(headline.title);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 8)
+    .map((headline) => {
+      const sentimentScore = scoreHeadline(headline.title);
+      return {
         source: headline.source,
         title: headline.title,
         publishedAt: headline.publishedAt.toISOString(),
-      })),
-    };
-  } catch {
-    return { sentiment: 0, evidence: [] };
-  }
+        ...(headline.url ? { url: headline.url } : {}),
+        sentimentScore,
+        stance: stanceFromScore(sentimentScore),
+      };
+    });
+
+  const sentiment = evidence.length === 0
+    ? 0
+    : Math.max(-1, Math.min(1, evidence.reduce((sum, item) => sum + item.sentimentScore, 0) / evidence.length));
+
+  return { sentiment, evidence, sources: sourceStatus };
 }
 
 export async function generateAnalystReport(input: AnalyzeOutput): Promise<AnalystResearchResult> {
@@ -125,6 +202,7 @@ export async function generateAnalystReport(input: AnalyzeOutput): Promise<Analy
     asOf: asOf.toISOString(),
     sentiment: research.sentiment,
     evidence: research.evidence,
+    sources: research.sources,
     report,
   };
 }
