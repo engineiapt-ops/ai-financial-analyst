@@ -180,6 +180,57 @@ export interface WalkForwardFoldInput {
   notas?: string | null;
 }
 
+export interface WalkForwardPortfolioRunSummaryInput {
+  walkForwardRunId: number;
+  strategy: "baseline" | "baseline_risk";
+  initialCapital: number;
+  positionSizePct: number;
+  maxGrossExposurePct: number;
+  portfolioModelVersion: string;
+  finalEquity: number;
+  totalReturnPct: number;
+  cagrPct?: number | null;
+  maxDrawdownPct: number;
+  sharpe?: number | null;
+  sortino?: number | null;
+  totalSignals: number;
+  executedTrades: number;
+  closedTrades: number;
+  rejectedTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  totalRealizedPnl: number;
+  totalFees: number;
+  totalSlippage: number;
+  maxOpenPositions: number;
+  maxGrossExposure: number;
+  riskGateBlocks: number;
+}
+
+export interface WalkForwardPortfolioFoldInput {
+  walkForwardPortfolioRunId: number;
+  walkForwardRunId: number;
+  foldNumber: number;
+  initialCapital: number;
+  finalEquity: number;
+  totalReturnPct: number;
+  maxDrawdownPct: number;
+  sharpe?: number | null;
+  sortino?: number | null;
+  totalSignals: number;
+  executedTrades: number;
+  closedTrades: number;
+  rejectedTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  totalRealizedPnl: number;
+  totalFees: number;
+  totalSlippage: number;
+  maxOpenPositions: number;
+  maxGrossExposure: number;
+  riskGateBlocks: number;
+}
+
 export interface PortfolioRunInput {
   sourceBacktestRunId: number;
   ativo: string;
@@ -751,6 +802,122 @@ export function createRepository(db: RepositoryPool) {
       const id = Number(rows[0]?.id);
       if (!Number.isInteger(id) || id <= 0) throw new Error("Database did not return a valid walk-forward run id");
       return id;
+    },
+
+    async createWalkForwardPortfolioRun(input: WalkForwardPortfolioRunSummaryInput): Promise<number> {
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO walk_forward_portfolio_runs
+          (walk_forward_run_id, strategy, initial_capital, position_size_pct, max_gross_exposure_pct,
+           portfolio_model_version, final_equity, total_return_pct, cagr_pct, max_drawdown_pct,
+           sharpe, sortino, total_signals, executed_trades, closed_trades, rejected_trades,
+           winning_trades, losing_trades, total_realized_pnl, total_fees, total_slippage,
+           max_open_positions, max_gross_exposure, risk_gate_blocks)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+         ON CONFLICT (walk_forward_run_id, strategy) DO UPDATE SET
+           initial_capital=EXCLUDED.initial_capital,
+           position_size_pct=EXCLUDED.position_size_pct,
+           max_gross_exposure_pct=EXCLUDED.max_gross_exposure_pct,
+           portfolio_model_version=EXCLUDED.portfolio_model_version,
+           final_equity=EXCLUDED.final_equity,
+           total_return_pct=EXCLUDED.total_return_pct,
+           cagr_pct=EXCLUDED.cagr_pct,
+           max_drawdown_pct=EXCLUDED.max_drawdown_pct,
+           sharpe=EXCLUDED.sharpe,
+           sortino=EXCLUDED.sortino,
+           total_signals=EXCLUDED.total_signals,
+           executed_trades=EXCLUDED.executed_trades,
+           closed_trades=EXCLUDED.closed_trades,
+           rejected_trades=EXCLUDED.rejected_trades,
+           winning_trades=EXCLUDED.winning_trades,
+           losing_trades=EXCLUDED.losing_trades,
+           total_realized_pnl=EXCLUDED.total_realized_pnl,
+           total_fees=EXCLUDED.total_fees,
+           total_slippage=EXCLUDED.total_slippage,
+           max_open_positions=EXCLUDED.max_open_positions,
+           max_gross_exposure=EXCLUDED.max_gross_exposure,
+           risk_gate_blocks=EXCLUDED.risk_gate_blocks
+         RETURNING id`,
+        [
+          input.walkForwardRunId, input.strategy, input.initialCapital, input.positionSizePct,
+          input.maxGrossExposurePct, input.portfolioModelVersion, input.finalEquity,
+          input.totalReturnPct, input.cagrPct ?? null, input.maxDrawdownPct, input.sharpe ?? null,
+          input.sortino ?? null, input.totalSignals, input.executedTrades, input.closedTrades,
+          input.rejectedTrades, input.winningTrades, input.losingTrades, input.totalRealizedPnl,
+          input.totalFees, input.totalSlippage, input.maxOpenPositions, input.maxGrossExposure,
+          input.riskGateBlocks,
+        ],
+      );
+      return Number(rows[0]?.id);
+    },
+
+    async saveWalkForwardPortfolioFold(input: WalkForwardPortfolioFoldInput): Promise<number> {
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO walk_forward_portfolio_folds
+          (walk_forward_portfolio_run_id, walk_forward_run_id, fold_number, initial_capital,
+           final_equity, total_return_pct, max_drawdown_pct, sharpe, sortino, total_signals,
+           executed_trades, closed_trades, rejected_trades, winning_trades, losing_trades,
+           total_realized_pnl, total_fees, total_slippage, max_open_positions,
+           max_gross_exposure, risk_gate_blocks)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+         ON CONFLICT (walk_forward_portfolio_run_id, fold_number) DO UPDATE SET
+           initial_capital=EXCLUDED.initial_capital,
+           final_equity=EXCLUDED.final_equity,
+           total_return_pct=EXCLUDED.total_return_pct,
+           max_drawdown_pct=EXCLUDED.max_drawdown_pct,
+           sharpe=EXCLUDED.sharpe,
+           sortino=EXCLUDED.sortino,
+           total_signals=EXCLUDED.total_signals,
+           executed_trades=EXCLUDED.executed_trades,
+           closed_trades=EXCLUDED.closed_trades,
+           rejected_trades=EXCLUDED.rejected_trades,
+           winning_trades=EXCLUDED.winning_trades,
+           losing_trades=EXCLUDED.losing_trades,
+           total_realized_pnl=EXCLUDED.total_realized_pnl,
+           total_fees=EXCLUDED.total_fees,
+           total_slippage=EXCLUDED.total_slippage,
+           max_open_positions=EXCLUDED.max_open_positions,
+           max_gross_exposure=EXCLUDED.max_gross_exposure,
+           risk_gate_blocks=EXCLUDED.risk_gate_blocks
+         RETURNING id`,
+        [
+          input.walkForwardPortfolioRunId, input.walkForwardRunId, input.foldNumber,
+          input.initialCapital, input.finalEquity, input.totalReturnPct, input.maxDrawdownPct,
+          input.sharpe ?? null, input.sortino ?? null, input.totalSignals, input.executedTrades,
+          input.closedTrades, input.rejectedTrades, input.winningTrades, input.losingTrades,
+          input.totalRealizedPnl, input.totalFees, input.totalSlippage, input.maxOpenPositions,
+          input.maxGrossExposure, input.riskGateBlocks,
+        ],
+      );
+      return Number(rows[0]?.id);
+    },
+
+    async getWalkForwardPortfolioRuns(walkForwardRunId: number) {
+      const { rows } = await db.query(
+        `SELECT id, walk_forward_run_id, strategy, initial_capital, position_size_pct,
+                max_gross_exposure_pct, portfolio_model_version, final_equity, total_return_pct,
+                cagr_pct, max_drawdown_pct, sharpe, sortino, total_signals, executed_trades,
+                closed_trades, rejected_trades, winning_trades, losing_trades, total_realized_pnl,
+                total_fees, total_slippage, max_open_positions, max_gross_exposure, risk_gate_blocks
+         FROM walk_forward_portfolio_runs
+         WHERE walk_forward_run_id=$1
+         ORDER BY strategy`,
+        [walkForwardRunId],
+      );
+      return rows;
+    },
+
+    async getWalkForwardPortfolioFolds(walkForwardPortfolioRunId: number) {
+      const { rows } = await db.query(
+        `SELECT fold_number, initial_capital, final_equity, total_return_pct, max_drawdown_pct,
+                sharpe, sortino, total_signals, executed_trades, closed_trades, rejected_trades,
+                winning_trades, losing_trades, total_realized_pnl, total_fees, total_slippage,
+                max_open_positions, max_gross_exposure, risk_gate_blocks
+         FROM walk_forward_portfolio_folds
+         WHERE walk_forward_portfolio_run_id=$1
+         ORDER BY fold_number`,
+        [walkForwardPortfolioRunId],
+      );
+      return rows;
     },
 
     async saveWalkForwardFold(input: WalkForwardFoldInput): Promise<number> {
