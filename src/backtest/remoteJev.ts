@@ -9,6 +9,7 @@ import {
   saveTrade,
 } from "../db/repository.js";
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
+import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds } from "../config/thresholds.js";
 import type { MarketState, Kline, DecisionResult } from "../types.js";
 
@@ -69,6 +70,8 @@ export async function runRemoteJevBacktest(fromRunId: number) {
   }
   assertDatasetMatchesMetadata(klines, runRecord.candlesTotal, runRecord.datasetHash);
 
+  const datasetAsOf = klines[klines.length - 1].closeTime ?? klines[klines.length - 1].openTime;
+  assertKlinesAvailableAsOf(klines, datasetAsOf);
   const datasetHash = computeDatasetHash(klines);
   const indicatorsSeries = computeIndicatorsSeries(klines);
   const evaluationStart = Math.floor(klines.length * OOS_START_RATIO);
@@ -117,7 +120,8 @@ export async function runRemoteJevBacktest(fromRunId: number) {
       market: {
         ativo: "BTCUSDT",
         timeframe: "1h",
-        timestamp: signalCandle.openTime.getTime(),
+        timestamp: (signalCandle.closeTime ?? signalCandle.openTime).getTime(),
+        dataAsOf: (signalCandle.closeTime ?? signalCandle.openTime).getTime(),
         precoAtual: signalCandle.close,
         indicators,
         noticiaSentimento: 0,
