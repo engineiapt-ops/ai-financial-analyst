@@ -79,3 +79,15 @@ RATE_LIMIT_HEAVY_MAX=20
 ```
 
 Set `TRUST_PROXY=true` only when the deployment is behind a trusted reverse proxy that provides `X-Forwarded-For`. The limiter is intentionally dependency-free and process-local; it is a best-effort protection layer and is not a substitute for a distributed rate limiter at the edge.
+## API authentication
+
+Sensitive endpoints now require an API token. Send it either as `X-API-Key` or as `Authorization: Bearer <token>`.
+
+Configuration:
+```env
+API_AUTH_TOKEN=replace-with-a-random-secret
+```
+
+The protected surface includes market analysis/report generation, research snapshot access, decision persistence, backtests, risk-regime analysis and portfolio operations. Read-only health, market connectivity and evaluation endpoints remain accessible without the token.
+
+The dashboard includes a session-only API key field for `/api/analyze`; the key is sent only in the request header and is not persisted server-side.
