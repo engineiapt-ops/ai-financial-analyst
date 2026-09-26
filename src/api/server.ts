@@ -498,6 +498,66 @@ export const AnalyzeSchema = z.object({
 });
 
 
+app.get("/api/ai/providers", (_req, res) => {
+  res.json({
+    status: "ok",
+    providers: listAiProviders(),
+  });
+});
+
+app.post("/api/online-analysis", async (req, res) => {
+  try {
+    const parsed = z.object({
+      ...AnalyzeSchema.shape,
+      aiProvider: z.enum(["none", "gemini"]).default("none"),
+    }).parse(req.body);
+
+    const result = await runOnlineAnalysis(
+      {
+        ativo: parsed.ativo,
+        timeframe: parsed.timeframe,
+        valorInvestimento: parsed.valorInvestimento,
+        engine: parsed.engine,
+        news: parsed.news,
+      },
+      parsed.aiProvider,
+    );
+
+    res.json({
+      status: "ok",
+      ...result,
+      provenance: {
+        packetId: result.packet.packetId,
+        snapshotId: result.snapshot.snapshotId,
+        snapshotContentHash: result.snapshot.contentHash,
+        decisionLogId: result.analysis.decisionLogId,
+        signalId: result.analysis.signalId,
+        dataAsOf: result.analysis.market.dataAsOf,
+        marketDataQuality: result.analysis.marketDataQuality,
+        deterministicRecommendation: result.analysis.decision.recomendacao,
+        aiProvider: result.ai?.provider ?? "none",
+        aiModel: result.ai?.model ?? null,
+        aiInputPacketHash: result.ai?.inputPacketHash ?? null,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status =
+      message.includes("DATABASE_URL") ||
+      err instanceof MarketDataQualityError ||
+      err instanceof GeminiProviderError
+        ? 503
+        : 400;
+
+    res.status(status).json({
+      status: "error",
+      error: message,
+      ...(err instanceof MarketDataQualityError ? { code: err.code, quality: err.quality } : {}),
+      ...(err instanceof GeminiProviderError ? { code: err.code } : {}),
+    });
+  }
+});
+
 app.post("/api/report", async (req, res) => {
   try {
     const parsed = AnalyzeSchema.parse(req.body);
