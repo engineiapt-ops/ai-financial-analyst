@@ -507,6 +507,28 @@ app.get("/api/backtest/walk-forward", async (req, res) => {
   }
 });
 
+app.get("/api/admin/backfill-5000", async (req, res) => {
+  const token = String(req.query.token ?? "");
+  if (token !== "wfbase_8f4a6c2d_7b19_43ef_a5c0_2d91e6c7b4aa") {
+    return res.status(404).json({ status: "error", error: "not found" });
+  }
+  try {
+    const functionUrl = "https://dhvigrzfjipshubcbuaa.supabase.co/functions/v1/backfill-market-data";
+    const response = await fetch(functionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer sb_publishable__syPodO9QwomNH1lS9yqGA_5V8xKOLv",
+      },
+      body: JSON.stringify({ symbol: "BTCUSDT", timeframe: "1h", candles: 5000 }),
+    });
+    const body = await response.text();
+    res.status(response.status).type("application/json").send(body);
+  } catch (err: any) {
+    res.status(500).json({ status: "error", error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.get("/api/backtest/baseline", async (req, res) => {
   try {
     const rawRunId = req.query.fromRun;
