@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS benchmark_runs (
 CREATE TABLE IF NOT EXISTS benchmark_results (
   id BIGSERIAL PRIMARY KEY,
   benchmark_run_id BIGINT NOT NULL REFERENCES benchmark_runs(id) ON DELETE CASCADE,
-  estrategia TEXT NOT NULL CHECK (estrategia IN ('baseline', 'buyhold', 'jev')),
+  estrategia TEXT NOT NULL CHECK (estrategia IN ('baseline', 'baseline_risk', 'buyhold', 'jev')),
   status TEXT NOT NULL CHECK (status IN ('ok', 'unavailable', 'error')),
   total_trades INT NOT NULL DEFAULT 0,
   closed_trades INT NOT NULL DEFAULT 0,
