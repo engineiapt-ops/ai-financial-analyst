@@ -16,6 +16,8 @@ import {
 import { computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds, thresholds } from "../config/thresholds.js";
+import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
+import { evaluateRisk } from "../risk/riskEngine.js";
 import type { Kline, MarketState } from "../types.js";
 
 const TARGET_PCT = 0.01;
@@ -235,9 +237,22 @@ export async function runWalkForward(options = getOptions()) {
     }
 
     const baselineTrades: EvaluatedTrade[] = [];
+    const baselineRiskTrades: EvaluatedTrade[] = [];
+    let riskGateBlocks = 0;
+
+    // Calibrate regime thresholds strictly on the fold's training window.
+    const trainKlines = klines.slice(trainStart, testStart);
+    const foldThresholds = calibrateRegimeThresholds(
+      trainKlines,
+      trainKlines.length,
+      klines[trainEnd].closeTime ?? klines[trainEnd].openTime,
+    );
+    const regimeSeries = buildRegimeSeries(klines, foldThresholds);
+
     for (const candidate of candidates) {
       const decision = evaluateBaseline(candidate.market);
       if (decision.recomendacao === "WAIT") continue;
+
       const trade = simulateTrade(
         decision.recomendacao,
         klines[candidate.index],
@@ -246,9 +261,29 @@ export async function runWalkForward(options = getOptions()) {
         STOP_PCT,
       );
       baselineTrades.push({ trade, exitIndex: candidate.index + trade.candlesHeld });
+
+      const regime = regimeSeries[candidate.index];
+      const risk = evaluateRisk(decision, regime);
+      if (!risk.allowed) {
+        riskGateBlocks += 1;
+        continue;
+      }
+
+      const riskTrade = simulateTrade(
+        decision.recomendacao,
+        klines[candidate.index],
+        candidate.future,
+        TARGET_PCT,
+        STOP_PCT,
+      );
+      baselineRiskTrades.push({
+        trade: riskTrade,
+        exitIndex: candidate.index + riskTrade.candlesHeld,
+      });
     }
 
     const baseline = summarize(baselineTrades);
+    const baselineRisk = summarize(baselineRiskTrades);
     await saveWalkForwardFold({
       walkForwardRunId,
       foldNumber,
@@ -272,6 +307,32 @@ export async function runWalkForward(options = getOptions()) {
       totalFeePercent: baseline.totalFeePercent,
       totalSlippagePercent: baseline.totalSlippagePercent,
       avgCandlesHeld: baseline.avgCandlesHeld,
+    });
+
+    await saveWalkForwardFold({
+      walkForwardRunId,
+      foldNumber,
+      trainStart: klines[trainStart].openTime,
+      trainEnd: klines[trainEnd].closeTime ?? klines[trainEnd].openTime,
+      testStart: klines[testStart].openTime,
+      testEnd: klines[testEnd].closeTime ?? klines[testEnd].openTime,
+      estrategia: "baseline_risk",
+      status: "ok",
+      testSignals: candidates.length,
+      totalTrades: baselineRisk.totalTrades,
+      closedTrades: baselineRisk.closedTrades,
+      openTrades: baselineRisk.openTrades,
+      winRate: baselineRisk.winRate,
+      profitFactor: baselineRisk.profitFactor,
+      totalProfitPercent: baselineRisk.totalProfitPercent,
+      avgProfitPercent: baselineRisk.avgProfitPercent,
+      expectancyPercent: baselineRisk.expectancyPercent,
+      maxDrawdownPercent: baselineRisk.maxDrawdownPercent,
+      grossTotalProfitPercent: baselineRisk.grossTotalProfitPercent,
+      totalFeePercent: baselineRisk.totalFeePercent,
+      totalSlippagePercent: baselineRisk.totalSlippagePercent,
+      avgCandlesHeld: baselineRisk.avgCandlesHeld,
+      notas: `riskGateBlocks=${riskGateBlocks}; calibrationCandles=${trainKlines.length}; lowVolAtr=${foldThresholds.lowVolAtrRelative}; highVolAtr=${foldThresholds.highVolAtrRelative}; model=regime-v1+risk-engine-v1`,
     });
 
     const buyHold = simulateBuyHold(klines, testStart, testEnd);
@@ -384,6 +445,8 @@ export async function runWalkForward(options = getOptions()) {
       testStart: klines[testStart].openTime,
       testEnd: klines[testEnd].closeTime ?? klines[testEnd].openTime,
       baseline,
+      baselineRisk,
+      riskGateBlocks,
       buyhold: buyHoldSummary,
       jev: jevResult ?? { status: "unavailable", notas: jevNote },
     });
@@ -402,7 +465,7 @@ export async function runWalkForward(options = getOptions()) {
     foldCount: foldNumber,
     thresholdFrozenAt: thresholds.frozenAt,
     results: await getWalkForwardFolds(walkForwardRunId),
-    note: "Fixed-rule walk-forward validation: no parameter fitting is performed in this stage.",
+    note: "Fixed-rule walk-forward validation with frozen per-fold regime thresholds: no strategy parameter optimization is performed in this stage.",
   };
 }
 
