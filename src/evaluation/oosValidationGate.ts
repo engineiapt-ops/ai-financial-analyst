@@ -65,12 +65,21 @@ function hashEvidence(input: {
   robustnessReport: OosRobustnessReport;
   checks: ValidationGateCheck[];
 }): string {
+  const stableValidation = {
+    ...input.validationReport,
+    generatedAt: undefined,
+  };
+  const stableRobustness = {
+    ...input.robustnessReport,
+    generatedAt: undefined,
+  };
+
   return createHash("sha256")
     .update(canonicalJson({
       gateVersion: input.gateVersion,
       strategy: input.strategy,
-      validation: input.validationReport,
-      robustness: input.robustnessReport,
+      validation: stableValidation,
+      robustness: stableRobustness,
       checks: input.checks,
     }))
     .digest("hex");
