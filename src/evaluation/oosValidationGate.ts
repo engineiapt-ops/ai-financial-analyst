@@ -140,6 +140,11 @@ export function buildOosValidationGate(input: {
         )
       : null;
 
+  const minimumValidationCheck =
+    validationCandleCount !== null &&
+    validationCandleCount >= MIN_VALIDATION_CANDLES &&
+    validationReport.scope.datasetHash !== null;
+
   addCheck(
     "validation-scope",
     minimumValidationCheck,
