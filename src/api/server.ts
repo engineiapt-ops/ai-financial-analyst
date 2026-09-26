@@ -542,6 +542,7 @@ app.get("/api/system/readiness", async (_req, res) => {
     database: databaseCheck,
     aiProviders: listAiProviders(),
     paperTradingOnly: true,
+    apiAuthenticationConfigured: Boolean(process.env.API_AUTH_TOKEN?.trim()),
     governanceContracts: [
       "evaluation-overview.v1",
       "portfolio-governance-overview.v1",
