@@ -100,6 +100,7 @@ export interface OosScope {
   calibrationEnd: string;
   policyVersion: string | null;
   oosStartRatio: number | null;
+  candlesTotal: number | null;
   datasetHash: string | null;
   walkForwardDatasetHash: string | null;
 }

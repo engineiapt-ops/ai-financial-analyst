@@ -65,7 +65,7 @@ export function buildOnlineAnalysisPacket(
   }
 
   const base = {
-    packetVersion: ONLINE_ANALYSIS_PACKET_VERSION,
+    packetVersion: ONLINE_ANALYSIS_PACKET_VERSION as typeof ONLINE_ANALYSIS_PACKET_VERSION,
     analysis,
     research,
     snapshot: {

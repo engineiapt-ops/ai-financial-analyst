@@ -12,7 +12,13 @@ function assertCloseTo(actual: number, expected: number, epsilon = 0.0001, messa
   }
 }
 
-function headline(source: string, title: string): NewsHeadline {
+function headline(source: string, title: string, publishedAt?: string | Date): NewsHeadline {
+  if (publishedAt) {
+    return { source, title, publishedAt: new Date(publishedAt) };
+  }
+  if (source.includes("T") || source.includes("-")) {
+    return { source: "test", title, publishedAt: new Date(source) };
+  }
   return { source, title, publishedAt: new Date("2026-09-24T12:00:00Z") };
 }
 

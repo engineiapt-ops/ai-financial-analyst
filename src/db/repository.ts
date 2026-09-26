@@ -1265,8 +1265,8 @@ export function createRepository(db: RepositoryPool) {
       if (filters.origem) add("origem = ?", filters.origem);
       if (filters.recomendacao) add("recomendacao = ?", filters.recomendacao);
       if (filters.from) add("decision_at >= ?", filters.from);
-      if (filters.riskRegime) add("COALESCE(rs.snapshot->'risk'->'regime'->>'key', 'unknown') = ?", filters.riskRegime);
       if (filters.to) add("decision_at <= ?", filters.to);
+      if (filters.riskRegime) add("COALESCE(rs.snapshot->'risk'->'regime'->>'key', 'unknown') = ?", filters.riskRegime);
 
       const baseWhere = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
       const commonCte = `

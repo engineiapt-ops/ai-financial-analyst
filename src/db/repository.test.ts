@@ -56,9 +56,12 @@ class FakeClient {
 class FakeDb implements RepositoryPool {
   queries: string[] = [];
   client = new FakeClient();
-  async query<T = any>(text: string, _values?: unknown[]): Promise<{ rows: T[] }> {
+  async query<T = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }> {
     this.queries.push(text);
     if (text.includes("SELECT 1")) return { rows: [] };
+    if (text.includes("INSERT INTO research_snapshots") || text.includes("FROM research_snapshots")) {
+      return this.client.query(text, values);
+    }
     if (text.includes("FROM backtest_runs") && text.includes("WHERE id = $1")) {
       return {
         rows: [{

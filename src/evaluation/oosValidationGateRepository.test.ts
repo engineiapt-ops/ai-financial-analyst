@@ -101,7 +101,7 @@ class FakeDb implements RepositoryPool {
     return { rows: [] } as { rows: T[] };
   }
 
-  async connect() {
+  async connect(): Promise<any> {
     throw new Error("connect is not expected in this test");
   }
 }

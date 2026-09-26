@@ -382,7 +382,7 @@ export function simulateWalkForwardPortfolio(options: {
     sortino: annualizedSortino(returns),
     totalSignals,
     executedTrades,
-    closedTrades: closedTrades.length,
+    closedTrades,
     rejectedTrades: exposureRejectedTrades,
     exposureRejectedTrades,
     winningTrades,

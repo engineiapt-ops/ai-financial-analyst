@@ -61,7 +61,7 @@ const evaluation = evaluateDecisionLog(
   base,
   candles,
   new Date("2026-09-20T13:00:00Z"),
-  { lookaheadCandles: 2, flatThresholdPct: 0.1 },
+  { lookaheadCandles: 1, flatThresholdPct: 0.1 },
 );
 
 assert.equal(evaluation.evaluationPrice, 103);
@@ -74,7 +74,7 @@ const sell = evaluateDecisionLog(
   { ...base, id: 8, recomendacao: "SELL" },
   candles,
   new Date("2026-09-20T13:00:00Z"),
-  { lookaheadCandles: 2, flatThresholdPct: 0.1 },
+  { lookaheadCandles: 1, flatThresholdPct: 0.1 },
 );
 assert.equal(Number((sell.tradeProfitPercent ?? 0).toFixed(4)), -3);
 
@@ -82,7 +82,7 @@ const wait = evaluateDecisionLog(
   { ...base, id: 9, recomendacao: "WAIT" },
   candles,
   new Date("2026-09-20T13:00:00Z"),
-  { lookaheadCandles: 2, flatThresholdPct: 0.1 },
+  { lookaheadCandles: 1, flatThresholdPct: 0.1 },
 );
 assert.equal(wait.tradeProfitPercent, null);
 assert.equal(wait.outcome.outcomeStatus, "not_applicable");

@@ -1083,7 +1083,8 @@ app.get("/api/evaluation/portfolio-walk-forward", async (req, res) => {
   }
 });
 
-// Portfolio regime diagnostics endpoint (deterministic, read-only).\napp.get("/api/evaluation/portfolio-regimes", async (req, res) => {
+// Portfolio regime diagnostics endpoint (deterministic, read-only).
+app.get("/api/evaluation/portfolio-regimes", async (req, res) => {
   try {
     const fromRun = Number(req.query.fromRun);
     if (!Number.isInteger(fromRun) || fromRun <= 0) {

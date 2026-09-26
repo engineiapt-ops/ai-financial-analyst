@@ -815,8 +815,6 @@ export async function runWalkForward(options = getOptions()) {
 
   return {
     walkForwardRunId,
-    ativo,  return {
-    walkForwardRunId,
     ativo,
     timeframe,
     candles: klines.length,

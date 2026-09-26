@@ -126,6 +126,7 @@ export async function runRiskRegimeAnalysis(
     metric.netPnl += pnl;
     if (pnl > 0) metric.winningPositions += 1;
     if (pnl < 0) metric.losingPositions += 1;
+  }
 
   for (const metric of metrics.values()) {
     metric.returnOnAllocatedPct = metric.allocatedNotional > 0

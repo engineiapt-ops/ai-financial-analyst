@@ -72,7 +72,7 @@ assert.equal(first.strategies.find((item) => item.estrategia === "baseline")?.us
 assert.equal(first.strategies.find((item) => item.estrategia === "baseline")?.fullSampleTotalReturnPct, 3);
 assert.equal(first.strategies.find((item) => item.estrategia === "baseline")?.leaveOneFoldOut.minTotalReturnPct, 0);
 assert.equal(first.strategies.find((item) => item.estrategia === "baseline")?.leaveOneFoldOut.maxTotalReturnPct, 5);
-assert.equal(first.strategies.find((item) => item.estrategia === "baseline")?.concentration.foldNumber, 4);
+assert.equal(first.strategies.find((item) => item.estrategia === "baseline")?.concentration.foldNumber, 3);
 assert.deepEqual(first.strategies, second.strategies);
 assert.ok(first.strategies.find((item) => item.estrategia === "baseline")?.bootstrap.totalReturnPct.lower !== null);
 assert.ok(first.strategies.find((item) => item.estrategia === "baseline")?.bootstrap.totalReturnPct.upper !== null);

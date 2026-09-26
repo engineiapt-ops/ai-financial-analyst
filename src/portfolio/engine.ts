@@ -433,10 +433,10 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
   }
 
   const closedResults = positionResults.filter((position) => position.status !== "rejected");
-  const winningTrades = closedResults.filter((position) => position.netPnl > 0).length;
-  const losingTrades = closedResults.filter((position) => position.netPnl < 0).length;
-  const totalPositive = closedResults.reduce((sum, position) => sum + Math.max(0, position.netPnl), 0);
-  const totalNegative = closedResults.reduce((sum, position) => sum + Math.min(0, position.netPnl), 0);
+  const winningTrades = closedResults.filter((position) => (position.netPnl ?? 0) > 0).length;
+  const losingTrades = closedResults.filter((position) => (position.netPnl ?? 0) < 0).length;
+  const totalPositive = closedResults.reduce((sum, position) => sum + Math.max(0, position.netPnl ?? 0), 0);
+  const totalNegative = closedResults.reduce((sum, position) => sum + Math.min(0, position.netPnl ?? 0), 0);
   const maxDrawdownPct = equityCurve.reduce((max, point) => Math.max(max, point.drawdownPct), 0);
 
   const summary: PortfolioRunSummary = {

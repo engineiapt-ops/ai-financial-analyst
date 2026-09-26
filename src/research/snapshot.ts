@@ -78,7 +78,7 @@ export function buildResearchSnapshot(
   }
 
   const content = {
-    schemaVersion: RESEARCH_SNAPSHOT_VERSION,
+    schemaVersion: RESEARCH_SNAPSHOT_VERSION as typeof RESEARCH_SNAPSHOT_VERSION,
     analysis: {
       signalId: analysis.signalId,
       decisionLogId: analysis.decisionLogId,

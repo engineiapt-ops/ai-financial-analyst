@@ -80,7 +80,7 @@ export class GeminiProvider implements AnalystAiProvider {
     timeoutMs?: number;
     fetchImpl?: typeof fetch;
   } = {}) {
-    this.apiKey = options.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
+    this.apiKey = options.apiKey !== undefined ? options.apiKey.trim() : process.env.GEMINI_API_KEY?.trim();
     this.model = options.model?.trim() || process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
     this.baseUrl = (options.baseUrl?.trim() || process.env.GEMINI_API_BASE?.trim() || DEFAULT_BASE_URL).replace(/\/$/, "");
     this.timeoutMs = options.timeoutMs ?? Number(process.env.GEMINI_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
