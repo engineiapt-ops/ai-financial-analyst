@@ -13,6 +13,7 @@ const ready = buildSystemReadinessOverview({
     { id: "gemini", configured: true, enabled: true },
   ],
   paperTradingOnly: true,
+  apiAuthenticationConfigured: true,
   governanceContracts: [
     "evaluation-overview.v1",
     "portfolio-governance-overview.v1",
@@ -33,6 +34,7 @@ const degraded = buildSystemReadinessOverview({
     { id: "gemini", configured: false, enabled: false },
   ],
   paperTradingOnly: true,
+  apiAuthenticationConfigured: false,
   governanceContracts: ["evaluation-overview.v1"],
 });
 
@@ -40,6 +42,7 @@ assert.equal(degraded.state, "degraded");
 assert.equal(degraded.checks.marketData.state, "degraded");
 assert.equal(degraded.checks.database.state, "degraded");
 assert.equal(degraded.checks.aiProviders.state, "ready");
+assert.equal(degraded.checks.authentication.state, "blocked");
 assert.equal(degraded.checks.governance.state, "degraded");
 
 const blocked = buildSystemReadinessOverview({
@@ -48,6 +51,7 @@ const blocked = buildSystemReadinessOverview({
   database: { available: true, detail: "ok" },
   aiProviders: [{ id: "none", configured: true, enabled: true }],
   paperTradingOnly: false,
+  apiAuthenticationConfigured: true,
   governanceContracts: [
     "evaluation-overview.v1",
     "portfolio-governance-overview.v1",
