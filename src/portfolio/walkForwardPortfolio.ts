@@ -415,6 +415,7 @@ function simulatePortfolio(
           entryFee,
         });
         grossExposure += notional;
+        executed += 1;
         fees += entryFee;
         slippage += notional * SLIPPAGE_PCT;
 
@@ -438,10 +439,13 @@ function simulatePortfolio(
 
       peakEquity = Math.max(peakEquity, equity);
       globalPeakEquity = Math.max(globalPeakEquity, equity);
+      const foldDrawdownPct = peakEquity > 0
+        ? ((peakEquity - equity) / peakEquity) * 100
+        : 0;
       const drawdownPct = globalPeakEquity > 0
         ? ((globalPeakEquity - equity) / globalPeakEquity) * 100
         : 0;
-      foldMaxDrawdown = Math.max(foldMaxDrawdown, drawdownPct);
+      foldMaxDrawdown = Math.max(foldMaxDrawdown, foldDrawdownPct);
       foldMaxOpen = Math.max(foldMaxOpen, active.size);
       foldMaxGross = Math.max(foldMaxGross, grossExposure);
       maxOpenPositions = Math.max(maxOpenPositions, active.size);
@@ -476,6 +480,31 @@ function simulatePortfolio(
     }
 
     const finalEquity = cash;
+    const finalAsOf = new Date(
+      (klines[testEndIndex].closeTime ?? klines[testEndIndex].openTime).getTime() + 1,
+    );
+    globalPeakEquity = Math.max(globalPeakEquity, finalEquity);
+    const finalDrawdownPct = globalPeakEquity > 0
+      ? ((globalPeakEquity - finalEquity) / globalPeakEquity) * 100
+      : 0;
+    const finalFoldPoint = {
+      foldNumber: fold.foldNumber,
+      asOf: finalAsOf,
+      equity: finalEquity,
+      cash: finalEquity,
+      realizedPnl: totalRealizedPnl + realizedPnl,
+      unrealizedPnl: 0,
+      grossExposure: 0,
+      openPositions: 0,
+      drawdownPct: finalDrawdownPct,
+    };
+    foldEquity.push(finalFoldPoint);
+    allEquity.push(finalFoldPoint);
+    foldMaxDrawdown = Math.max(
+      foldMaxDrawdown,
+      peakEquity > 0 ? ((peakEquity - finalEquity) / peakEquity) * 100 : 0,
+    );
+
     const foldReturns: number[] = [];
     for (let index = 1; index < foldEquity.length; index += 1) {
       const previous = foldEquity[index - 1].equity;
@@ -507,7 +536,6 @@ function simulatePortfolio(
 
     totalSignals += candidates.length;
     capital = finalEquity;
-    executedTrades += closed;
     totalRealizedPnl += realizedPnl;
     totalFees += fees;
     totalSlippage += slippage;
