@@ -177,7 +177,8 @@ export function createRepository(db: RepositoryPool) {
         criado_em: Date;
       }>(
         `SELECT id, engine, mode, ativo, timeframe, periodo_inicio, periodo_fim,
-                oos_start_ratio, thresholds_congelados_em, candles_total, dataset_hash, criado_em
+                oos_start_ratio, thresholds_congelados_em, candles_total, dataset_hash,
+                execution_model_version, target_pct, stop_pct, lookahead_candles, slippage_pct, fee_pct, criado_em
          FROM backtest_runs
          WHERE id = $1`,
         [id],
