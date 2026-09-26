@@ -293,6 +293,12 @@ function asFinite(value: number, field: string): number {
   return value;
 }
 
+
+function timeframeDurationMs(timeframe: Timeframe): number {
+  const hours = timeframe === "1h" ? 1 : timeframe === "4h" ? 4 : 24;
+  return hours * 60 * 60 * 1000;
+}
+
 function validateLimit(limit: number): number {
   if (!Number.isInteger(limit) || limit < 1 || limit > 5000) {
     throw new Error("limit must be an integer between 1 and 5000");
@@ -872,7 +878,7 @@ export function createRepository(db: RepositoryPool) {
           (source_backtest_run_id, ativo, timeframe, initial_capital, final_equity,
            position_size_pct, max_gross_exposure_pct, portfolio_model_version,
            dataset_hash, total_return_pct, max_drawdown_pct)
-         VALUES ($1,$2,$3,$4,$4,$5,$6,$7,$8,$9,0,0)
+         VALUES ($1,$2,$3,$4,$4,$5,$6,$7,$8,0,0)
          RETURNING id`,
         [
           input.sourceBacktestRunId,
@@ -1074,6 +1080,7 @@ export function createRepository(db: RepositoryPool) {
       );
       return rows.map((row) => ({
         openTime: new Date(row.openTime),
+        closeTime: new Date(new Date(row.openTime).getTime() + timeframeDurationMs(timeframe) - 1),
         open: Number(row.open),
         high: Number(row.high),
         low: Number(row.low),
@@ -1104,6 +1111,7 @@ export function createRepository(db: RepositoryPool) {
       );
       return rows.map((row) => ({
         openTime: new Date(row.openTime),
+        closeTime: new Date(new Date(row.openTime).getTime() + timeframeDurationMs(timeframe) - 1),
         open: Number(row.open),
         high: Number(row.high),
         low: Number(row.low),
