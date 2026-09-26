@@ -8,6 +8,11 @@ export interface SystemReadinessOverview {
   state: ReadinessState;
   checks: {
     api: { state: "ready"; detail: string };
+    authentication: {
+      state: "ready" | "blocked";
+      configured: boolean;
+      detail: string;
+    };
     marketData: { state: ReadinessState; detail: string };
     database: { state: ReadinessState; detail: string };
     aiProviders: {
@@ -35,6 +40,7 @@ export function buildSystemReadinessOverview(input: {
   database: { available: boolean; detail: string };
   aiProviders: Array<{ id: string; configured: boolean; enabled: boolean }>;
   paperTradingOnly: boolean;
+  apiAuthenticationConfigured: boolean;
   governanceContracts: string[];
 }): SystemReadinessOverview {
   const configuredProviders = input.aiProviders
@@ -46,13 +52,16 @@ export function buildSystemReadinessOverview(input: {
   const aiState: ReadinessState = configuredProviders.length > 0 ? "ready" : "degraded";
   const executionState: "ready" | "blocked" =
     input.paperTradingOnly ? "ready" : "blocked";
+  const authenticationState: "ready" | "blocked" =
+    input.apiAuthenticationConfigured ? "ready" : "blocked";
   const governanceState: ReadinessState =
     input.governanceContracts.length >= 2 ? "ready" : "degraded";
 
   const criticalChecksReady =
     marketState === "ready" &&
     databaseState === "ready" &&
-    executionState === "ready";
+    executionState === "ready" &&
+    authenticationState === "ready";
 
   const state: ReadinessState = executionState === "blocked"
     ? "blocked"
@@ -66,6 +75,13 @@ export function buildSystemReadinessOverview(input: {
     state,
     checks: {
       api: { state: "ready", detail: "API process is serving the readiness contract" },
+      authentication: {
+        state: authenticationState,
+        configured: input.apiAuthenticationConfigured,
+        detail: input.apiAuthenticationConfigured
+          ? "Protected API endpoints require a configured token"
+          : "Protected API endpoints are blocked because API_AUTH_TOKEN is not configured",
+      },
       marketData: {
         state: marketState,
         detail: input.marketData.detail,
