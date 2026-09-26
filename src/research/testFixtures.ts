@@ -3,6 +3,7 @@ import type { AnalyzeOutput } from "../api/analyze.js";
 export function buildTestAnalyzeOutput(): AnalyzeOutput {
   return {
     signalId: 1,
+    decisionLogId: 2,
     market: {
       ativo: "BTCUSDT",
       timeframe: "1h",

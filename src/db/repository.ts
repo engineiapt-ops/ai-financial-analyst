@@ -94,6 +94,31 @@ export interface SaveResearchSnapshotInput {
   decisionLogId?: number | null;
 }
 
+export interface DecisionLogRecord {
+  id: number;
+  ativo: string;
+  timeframe: Timeframe;
+  decisionAt: Date;
+  dataAsOf: Date;
+  origem: DecisionResult["origem"];
+  recomendacao: DecisionResult["recomendacao"];
+  jevModelVersion: string | null;
+  jevChoice: DecisionResult["jevChoice"] | null;
+  jevProbs: Record<string, number> | null;
+  confidence: number | null;
+  qualityScore: number | null;
+  riscoElevado: boolean | null;
+  tamanhoPosicaoPct: number;
+  observacao: string | null;
+  referencePrice: number;
+  outcomeStatus: "pending" | "settled" | "not_applicable";
+  outcomeDirection: "up" | "down" | "flat" | null;
+  forwardReturnPercent: number | null;
+  tradeProfitPercent: number | null;
+  exitReason: "target" | "stop" | "end" | null;
+  evaluatedAt: Date | null;
+}
+
 export interface DecisionLogInput {
   backtestRunId?: number | null;
   ativo: string;
@@ -820,8 +845,71 @@ export function createRepository(db: RepositoryPool) {
       return Number(rows[0]?.id);
     },
 
+    async getDecisionLog(id: number): Promise<DecisionLogRecord | null> {
+      const { rows } = await db.query<{
+        id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        decision_at: Date;
+        data_as_of: Date;
+        origem: DecisionResult["origem"];
+        recomendacao: DecisionResult["recomendacao"];
+        jev_model_version: string | null;
+        jev_choice: DecisionResult["jevChoice"] | null;
+        jev_probs: Record<string, number> | null;
+        confidence: string | number | null;
+        quality_score: string | number | null;
+        risco_elevado: boolean | null;
+        tamanho_posicao_pct: string | number;
+        observacao: string | null;
+        reference_price: string | number;
+        outcome_status: "pending" | "settled" | "not_applicable";
+        outcome_direction: "up" | "down" | "flat" | null;
+        forward_return_percent: string | number | null;
+        trade_profit_percent: string | number | null;
+        exit_reason: "target" | "stop" | "end" | null;
+        evaluated_at: Date | null;
+      }>(
+        `SELECT id, ativo, timeframe, decision_at, data_as_of, origem, recomendacao,
+                jev_model_version, jev_choice, jev_probs, confidence, quality_score,
+                risco_elevado, tamanho_posicao_pct, observacao, reference_price,
+                outcome_status, outcome_direction, forward_return_percent,
+                trade_profit_percent, exit_reason, evaluated_at
+         FROM decision_log
+         WHERE id = $1`,
+        [id],
+      );
+
+      const row = rows[0];
+      if (!row) return null;
+      return {
+        id: Number(row.id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        decisionAt: new Date(row.decision_at),
+        dataAsOf: new Date(row.data_as_of),
+        origem: row.origem,
+        recomendacao: row.recomendacao,
+        jevModelVersion: row.jev_model_version,
+        jevChoice: row.jev_choice,
+        jevProbs: row.jev_probs,
+        confidence: row.confidence === null ? null : Number(row.confidence),
+        qualityScore: row.quality_score === null ? null : Number(row.quality_score),
+        riscoElevado: row.risco_elevado,
+        tamanhoPosicaoPct: Number(row.tamanho_posicao_pct),
+        observacao: row.observacao,
+        referencePrice: Number(row.reference_price),
+        outcomeStatus: row.outcome_status,
+        outcomeDirection: row.outcome_direction,
+        forwardReturnPercent: row.forward_return_percent === null ? null : Number(row.forward_return_percent),
+        tradeProfitPercent: row.trade_profit_percent === null ? null : Number(row.trade_profit_percent),
+        exitReason: row.exit_reason,
+        evaluatedAt: row.evaluated_at ? new Date(row.evaluated_at) : null,
+      };
+    },
+
     async settleDecisionLog(id: number, outcome: DecisionLogOutcome): Promise<void> {
-      await db.query(
+      const result = await db.query(
         `UPDATE decision_log
          SET outcome_status = $2,
              outcome_direction = $3,
@@ -829,7 +917,7 @@ export function createRepository(db: RepositoryPool) {
              trade_profit_percent = $5,
              exit_reason = $6,
              evaluated_at = $7
-         WHERE id = $1`,
+         WHERE id = $1 AND outcome_status = 'pending'`,
         [
           id,
           outcome.outcomeStatus,
@@ -840,6 +928,9 @@ export function createRepository(db: RepositoryPool) {
           outcome.evaluatedAt ?? new Date(),
         ],
       );
+      if (result.rows.length === 0) {
+        throw new Error("decision log is already settled or does not exist");
+      }
     },
 
     async createBenchmarkRun(input: BenchmarkRunInput): Promise<number> {
@@ -1721,6 +1812,7 @@ export const getPortfolioPositions = async (runId: number): Promise<PortfolioPos
 };
 
 export const saveDecisionLog = (input: DecisionLogInput) => createRepository(getDefaultPool()).saveDecisionLog(input);
+export const getDecisionLog = (id: number) => createRepository(getDefaultPool()).getDecisionLog(id);
 export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => createRepository(getDefaultPool()).settleDecisionLog(id, outcome);
 export const createBenchmarkRun = (input: BenchmarkRunInput) => createRepository(getDefaultPool()).createBenchmarkRun(input);
 export const saveBenchmarkResult = (input: BenchmarkResultInput) => createRepository(getDefaultPool()).saveBenchmarkResult(input);

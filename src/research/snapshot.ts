@@ -11,6 +11,7 @@ export interface ResearchSnapshot {
   createdAt: string;
   analysis: {
     signalId: number;
+    decisionLogId: number;
     ativo: string;
     timeframe: AnalyzeOutput["market"]["timeframe"];
     dataAsOf: string;
@@ -80,6 +81,7 @@ export function buildResearchSnapshot(
     schemaVersion: RESEARCH_SNAPSHOT_VERSION,
     analysis: {
       signalId: analysis.signalId,
+      decisionLogId: analysis.decisionLogId,
       ativo: analysis.market.ativo,
       timeframe: analysis.market.timeframe,
       dataAsOf: dataAsOf.toISOString(),

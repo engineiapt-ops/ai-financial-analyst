@@ -3,7 +3,7 @@ import { computeIndicators } from "../features/indicators.js";
 import { GdeltSource, getSentiment } from "../features/sentimentPipeline.js";
 import { evaluateBaseline } from "../decision/baselineEngine.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
-import { saveMarketData, saveSignal } from "../db/repository.js";
+import { saveDecisionLog, saveMarketData, saveSignal } from "../db/repository.js";
 import { filterKlinesByAsOf } from "../marketdata/pointInTime.js";
 import { calibrateRegimeThresholds, classifyRegime } from "../risk/regime.js";
 import { applyRiskToDecision, evaluateRisk } from "../risk/riskEngine.js";
@@ -20,6 +20,7 @@ export interface AnalyzeInput {
 
 export interface AnalyzeOutput {
   signalId: number;
+  decisionLogId: number;
   market: MarketState;
   decision: DecisionResult;
   valorInvestimento: number;
@@ -85,10 +86,20 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
     entrada: decision.recomendacao === "WAIT" ? null : last.close,
   });
 
+  const decisionLogId = await saveDecisionLog({
+    ativo,
+    timeframe: input.timeframe,
+    decisionAt: new Date(),
+    dataAsOf,
+    decision,
+    referencePrice: last.close,
+  });
+
   await saveMarketData(ativo, input.timeframe, klines);
 
   return {
     signalId,
+    decisionLogId,
     market,
     decision,
     valorInvestimento: input.valorInvestimento,

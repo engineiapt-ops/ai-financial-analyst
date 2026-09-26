@@ -8,10 +8,11 @@ import {
   ping as pingBinance,
 } from "../marketdata/binanceClient.js";
 import { analyzeMarket } from "./analyze.js";
+import { evaluateDecisionLog } from "../evaluation/decisionEvaluator.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot } from "../db/repository.js";
+import { getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -465,7 +466,7 @@ app.post("/api/report", async (req, res) => {
     const analysis = await analyzeMarket(parsed);
     const research = await generateAnalystReport(analysis);
     const snapshot = buildResearchSnapshot(analysis, research);
-    const stored = await saveResearchSnapshot({ snapshot });
+    const stored = await saveResearchSnapshot({ snapshot, decisionLogId: analysis.decisionLogId });
     res.json({
       status: "ok",
       analysis,
@@ -516,28 +517,68 @@ app.get("/api/research/snapshots/:snapshotId", async (req, res) => {
   }
 });
 
-app.get("/api/research/snapshots/:snapshotId", async (req, res) => {
+
+app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
   try {
-    const snapshotId = String(req.params.snapshotId ?? "").trim();
-    if (!/^rs_[a-f0-9]{24}$/.test(snapshotId)) {
-      return res.status(400).json({ status: "error", error: "invalid snapshotId" });
+    const decisionLogId = Number(req.params.decisionLogId);
+    if (!Number.isInteger(decisionLogId) || decisionLogId <= 0) {
+      return res.status(400).json({ status: "error", error: "decisionLogId must be a positive integer" });
     }
-    const stored = await getResearchSnapshot(snapshotId);
-    if (!stored) return res.status(404).json({ status: "error", error: "research snapshot not found" });
+
+    const body = z.object({
+      lookaheadCandles: z.coerce.number().int().min(1).max(5000).default(24),
+      flatThresholdPct: z.coerce.number().min(0).max(100).default(0.1),
+      evaluatedAt: z.string().datetime().optional(),
+    }).parse(req.body);
+
+    const decision = await getDecisionLog(decisionLogId);
+    if (!decision) {
+      return res.status(404).json({ status: "error", error: "decision log not found" });
+    }
+    if (decision.outcomeStatus !== "pending") {
+      return res.status(409).json({ status: "error", error: "decision log is already settled" });
+    }
+
+    const evaluatedAt = body.evaluatedAt ? new Date(body.evaluatedAt) : new Date();
+    const candles = await getMarketDataRange(
+      decision.ativo,
+      decision.timeframe,
+      decision.dataAsOf,
+      evaluatedAt,
+    );
+
+    const evaluation = evaluateDecisionLog(
+      decision,
+      candles,
+      evaluatedAt,
+      {
+        lookaheadCandles: body.lookaheadCandles,
+        flatThresholdPct: body.flatThresholdPct,
+      },
+    );
+
+    await settleDecisionLog(decisionLogId, evaluation.outcome);
+
     res.json({
       status: "ok",
-      snapshot: stored.snapshot,
-      persistence: {
-        snapshotId: stored.snapshotId,
-        contentHash: stored.contentHash,
-        signalId: stored.signalId,
-        decisionLogId: stored.decisionLogId,
-        createdAt: stored.createdAt,
+      decisionLogId,
+      evaluation: {
+        referencePrice: evaluation.referencePrice,
+        evaluationCandleClose: evaluation.evaluationCandleClose,
+        evaluationPrice: evaluation.evaluationPrice,
+        lookaheadCandles: evaluation.lookaheadCandles,
+        forwardReturnPercent: evaluation.forwardReturnPercent,
+        outcomeDirection: evaluation.outcomeDirection,
+        tradeProfitPercent: evaluation.tradeProfitPercent,
+        outcomeStatus: evaluation.outcome.outcomeStatus,
+        evaluatedAt,
       },
     });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
-    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    const status = message.includes("DATABASE_URL") ? 503
+      : message.includes("Insufficient future closed candles") ? 422
+      : 400;
     res.status(status).json({ status: "error", error: message });
   }
 });
