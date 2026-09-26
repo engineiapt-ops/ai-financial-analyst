@@ -9,10 +9,11 @@ import {
 } from "../marketdata/binanceClient.js";
 import { analyzeMarket } from "./analyze.js";
 import { evaluateDecisionLog } from "../evaluation/decisionEvaluator.js";
+import { buildCalibrationReport } from "../evaluation/calibration.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog } from "../db/repository.js";
+import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -624,6 +625,58 @@ app.get("/api/evaluation/kpis", async (req, res) => {
         to: to.toISOString(),
       },
       ...kpis,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/calibration", async (req, res) => {
+  try {
+    const query = z.object({
+      ativo: z.string().min(1).optional(),
+      timeframe: z.enum(["1h", "4h", "1d"]).optional(),
+      origem: z.enum(["baseline", "jev"]).optional(),
+      recomendacao: z.enum(["BUY", "WAIT", "SELL"]).optional(),
+      riskRegime: z.string().min(1).max(64).optional(),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(90),
+      from: z.string().datetime().optional(),
+      to: z.string().datetime().optional(),
+    }).parse(req.query);
+
+    const now = new Date();
+    const from = query.from
+      ? new Date(query.from)
+      : new Date(now.getTime() - query.lookbackDays * 24 * 60 * 60 * 1000);
+    const to = query.to ? new Date(query.to) : now;
+
+    if (to.getTime() < from.getTime()) {
+      return res.status(400).json({ status: "error", error: "to must be after from" });
+    }
+
+    const filters = {
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      origem: query.origem,
+      recomendacao: query.recomendacao,
+      riskRegime: query.riskRegime,
+      from,
+      to,
+    };
+
+    const observations = await getDecisionCalibrationObservations(filters);
+    const calibration = buildCalibrationReport(observations, filters);
+
+    res.json({
+      status: "ok",
+      generatedAt: now.toISOString(),
+      period: {
+        from: from.toISOString(),
+        to: to.toISOString(),
+      },
+      ...calibration,
     });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
