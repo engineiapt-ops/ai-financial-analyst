@@ -129,6 +129,8 @@ export interface SaveOosValidationGateAuditInput {
 export interface OosValidationGateAuditFilters {
   backtestRunId?: number | null;
   walkForwardRunId?: number | null;
+  ativo?: string | null;
+  timeframe?: Timeframe | null;
   strategy?: "baseline" | "baseline_risk" | "jev" | null;
   limit?: number;
 }
@@ -816,6 +818,12 @@ export function createRepository(db: RepositoryPool) {
       }
       if (filters.walkForwardRunId !== null && filters.walkForwardRunId !== undefined) {
         add("walk_forward_run_id = ?", filters.walkForwardRunId);
+      }
+      if (filters.ativo) {
+        add("ativo = ?", filters.ativo.trim().toUpperCase());
+      }
+      if (filters.timeframe) {
+        add("timeframe = ?", filters.timeframe);
       }
       if (filters.strategy) {
         add("estrategia = ?", filters.strategy);
