@@ -13,6 +13,15 @@ export interface SystemReadinessOverview {
       configured: boolean;
       detail: string;
     };
+    configuration: {
+      state: ReadinessState;
+      productionMode: boolean;
+      configured: string[];
+      missing: string[];
+      invalid: string[];
+      warnings: string[];
+      detail: string;
+    };
     marketData: { state: ReadinessState; detail: string };
     database: { state: ReadinessState; detail: string };
     aiProviders: {
@@ -41,6 +50,15 @@ export function buildSystemReadinessOverview(input: {
   aiProviders: Array<{ id: string; configured: boolean; enabled: boolean }>;
   paperTradingOnly: boolean;
   apiAuthenticationConfigured: boolean;
+  runtimeConfig: {
+    state: ReadinessState;
+    productionMode: boolean;
+    configured: string[];
+    missing: string[];
+    invalid: string[];
+    warnings: string[];
+    detail: string;
+  };
   governanceContracts: string[];
 }): SystemReadinessOverview {
   const configuredProviders = input.aiProviders
@@ -64,9 +82,11 @@ export function buildSystemReadinessOverview(input: {
     authenticationState === "ready";
 
   const state: ReadinessState =
-    executionState === "blocked" || authenticationState === "blocked"
+    executionState === "blocked" ||
+    authenticationState === "blocked" ||
+    input.runtimeConfig.state === "blocked"
       ? "blocked"
-      : criticalChecksReady
+      : criticalChecksReady && input.runtimeConfig.state === "ready"
         ? "ready"
         : "degraded";
 
@@ -82,6 +102,15 @@ export function buildSystemReadinessOverview(input: {
         detail: input.apiAuthenticationConfigured
           ? "Protected API endpoints require a configured token"
           : "Protected API endpoints are blocked because API_AUTH_TOKEN is not configured",
+      },
+      configuration: {
+        state: input.runtimeConfig.state,
+        productionMode: input.runtimeConfig.productionMode,
+        configured: input.runtimeConfig.configured,
+        missing: input.runtimeConfig.missing,
+        invalid: input.runtimeConfig.invalid,
+        warnings: input.runtimeConfig.warnings,
+        detail: input.runtimeConfig.detail,
       },
       marketData: {
         state: marketState,
