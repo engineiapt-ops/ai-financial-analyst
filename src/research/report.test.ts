@@ -11,5 +11,3 @@ assert.equal(typeof result.invalidacao, "string");
 assert.ok(result.confianca >= 0 && result.confianca <= 1);
 
 console.log("research report tests passed");
-
-process.env.OPENAI_ANALYST_ENABLED = "false";
