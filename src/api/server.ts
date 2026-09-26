@@ -25,6 +25,7 @@ import { runPortfolioEngine } from "../portfolio/engine.js";
 import { runWalkForwardPortfolio } from "../portfolio/walkForwardPortfolio.js";
 import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
 import { runRiskRegimeAnalysis } from "../risk/analysis.js";
+import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForwardReport.js";
 
 
 
@@ -889,6 +890,25 @@ app.get("/api/portfolio/walk-forward", async (req, res) => {
       maxGrossExposurePct,
     });
     res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/portfolio-walk-forward", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({
+        status: "error",
+        error: "fromRun must be a positive integer",
+      });
+    }
+
+    const report = await buildPortfolioWalkForwardReport(fromRun);
+    res.json({ status: "ok", ...report });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
