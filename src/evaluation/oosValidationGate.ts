@@ -58,7 +58,7 @@ function canonicalJson(value: unknown): string {
   });
 }
 
-function hashEvidence(input: {
+export function computeOosValidationGateEvidenceHash(input: {
   gateVersion: string;
   strategy: ValidationGateStrategy;
   validationReport: OosValidationReport;
@@ -293,7 +293,7 @@ export function buildOosValidationGate(input: {
     },
   };
 
-  gate.evidenceHash = hashEvidence({
+  gate.evidenceHash = computeOosValidationGateEvidenceHash({
     gateVersion: OOS_VALIDATION_GATE_VERSION,
     strategy,
     validationReport,
