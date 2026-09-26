@@ -147,6 +147,14 @@ const readyGate = buildOosValidationGate({
 assert.equal(readyGate.status, "ready");
 assert.equal(readyGate.blockingReasons.length, 0);
 assert.equal(readyGate.evidenceHash.length, 64);
+const repeatedGate = buildOosValidationGate({
+  strategy: "baseline",
+  validationReport,
+  robustnessReport,
+  generatedAt: new Date("2026-06-22T00:00:00Z"),
+});
+assert.equal(repeatedGate.evidenceHash, readyGate.evidenceHash);
+
 assert.equal(
   readyGate.checks.find((check) => check.key === "minimum-folds")?.passed,
   true,
