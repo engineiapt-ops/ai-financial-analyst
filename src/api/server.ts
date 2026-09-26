@@ -18,6 +18,7 @@ import { runRemoteBaselineBacktest } from "../backtest/remoteBaseline.js";
 import { runWalkForward } from "../backtest/walkForward.js";
 import { runPortfolioEngine } from "../portfolio/engine.js";
 import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
+import { runRiskRegimeAnalysis } from "../risk/analysis.js";
 
 
 
@@ -521,6 +522,32 @@ app.get("/api/backtest/baseline", async (req, res) => {
       return res.status(400).json({ status: "error", error: "candles must be an integer between 1000 and 5000" });
     }
     const result = await runRemoteBaselineBacktest(fromRunId, candles);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/risk/regimes", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    const rawPortfolioRun = req.query.portfolioRun;
+    const portfolioRun =
+      rawPortfolioRun === undefined ? undefined : Number(rawPortfolioRun);
+
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    if (
+      portfolioRun !== undefined &&
+      (!Number.isInteger(portfolioRun) || portfolioRun <= 0)
+    ) {
+      return res.status(400).json({ status: "error", error: "portfolioRun must be a positive integer" });
+    }
+
+    const result = await runRiskRegimeAnalysis(fromRun, portfolioRun);
     res.json({ status: "ok", ...result });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
