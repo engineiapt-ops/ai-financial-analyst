@@ -4,6 +4,7 @@ import { GdeltSource, getSentiment } from "../features/sentimentPipeline.js";
 import { evaluateBaseline } from "../decision/baselineEngine.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
 import { saveMarketData, saveSignal } from "../db/repository.js";
+import { filterKlinesByAsOf } from "../marketdata/pointInTime.js";
 import type { MarketState, Timeframe, DecisionResult } from "../types.js";
 
 export interface AnalyzeInput {
@@ -30,21 +31,27 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
     throw new Error("valorInvestimento must be greater than zero");
   }
 
-  const klines = await fetchKlines(ativo, input.timeframe, 100);
+  const now = new Date();
+  const klines = filterKlinesByAsOf(
+    await fetchKlines(ativo, input.timeframe, 100),
+    now,
+  );
   if (klines.length < 21) {
-    throw new Error("Insufficient market candles for EMA21");
+    throw new Error("Insufficient closed market candles for EMA21");
   }
 
+  const last = klines[klines.length - 1];
+  const dataAsOf = last.closeTime ?? last.openTime;
   const indicators = computeIndicators(klines);
   const noticiaSentimento = input.news
-    ? await getSentiment(ativo, [new GdeltSource()])
+    ? await getSentiment(ativo, [new GdeltSource()], dataAsOf)
     : 0;
 
-  const last = klines[klines.length - 1];
   const market: MarketState = {
     ativo,
     timeframe: input.timeframe,
-    timestamp: last.closeTime?.getTime() ?? last.openTime.getTime(),
+    timestamp: dataAsOf.getTime(),
+    dataAsOf: dataAsOf.getTime(),
     precoAtual: last.close,
     indicators,
     noticiaSentimento,
