@@ -22,6 +22,7 @@ export interface MarketState {
   ativo: string;
   timeframe: Timeframe;
   timestamp: number;
+  dataAsOf: number;
   precoAtual: number;
   indicators: Indicators;
   noticiaSentimento: number;
