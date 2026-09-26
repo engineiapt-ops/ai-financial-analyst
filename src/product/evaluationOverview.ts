@@ -1,5 +1,19 @@
 import type { CalibrationReport } from "../evaluation/calibration.js";
-import type { DecisionKpis } from "../db/repository.js";
+interface DecisionKpiSummaryShape {
+  totalDecisions: number;
+  settledDecisions: number;
+  pendingDecisions: number;
+  winRate: number | null;
+  avgForwardReturnPercent: number | null;
+  avgTradeProfitPercent: number | null;
+  totalTradeProfitPercent: number;
+  avgConfidence: number | null;
+  avgQualityScore: number | null;
+}
+
+interface DecisionKpisShape {
+  summary: DecisionKpiSummaryShape;
+}
 
 export const EVALUATION_OVERVIEW_VERSION = "evaluation-overview.v1";
 
@@ -54,7 +68,7 @@ export function buildEvaluationOverview(input: {
   to: Date;
   ativo?: string;
   timeframe?: string;
-  kpis: DecisionKpis;
+  kpis: DecisionKpisShape;
   calibration: CalibrationReport;
   audits: Array<{
     id: number;
