@@ -718,10 +718,17 @@ export async function runWalkForward(options = getOptions()) {
       const previous = points[index - 1].equity;
       if (previous > 0) returns.push(points[index].equity / previous - 1);
     }
-    const maxDrawdownPct = points.reduce(
-      (max, point) => Math.max(max, point.drawdownPct),
-      0,
-    );
+    let peakEquity = initialCapital;
+    let maxDrawdownPct = 0;
+    for (const point of points) {
+      peakEquity = Math.max(peakEquity, point.equity);
+      if (peakEquity > 0) {
+        maxDrawdownPct = Math.max(
+          maxDrawdownPct,
+          ((peakEquity - point.equity) / peakEquity) * 100,
+        );
+      }
+    }
     const finalEquity = points[points.length - 1]?.equity ?? initialCapital;
     const startAsOf = points[0]?.asOf ?? klines[initialTrainCandles].closeTime ?? klines[initialTrainCandles].openTime;
     const endAsOf = points[points.length - 1]?.asOf ?? klines[klines.length - 1].closeTime ?? klines[klines.length - 1].openTime;
