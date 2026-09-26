@@ -25,6 +25,11 @@ const LOOKAHEAD_CANDLES = 20;
 const OOS_START_RATIO = 0.7;
 const CONCURRENCY = 2;
 
+interface EvaluatedTrade {
+  trade: TradeOutcome;
+  exitIndex: number;
+}
+
 interface StrategySummary {
   status: "ok" | "unavailable" | "error";
   totalTrades: number;
@@ -43,28 +48,29 @@ interface StrategySummary {
   notas?: string;
 }
 
-function summarizeTrades(trades: TradeOutcome[]): StrategySummary {
-  const closed = trades.filter((trade) => trade.outcome !== "open");
-  const wins = closed.filter((trade) => trade.outcome === "win");
-  const gross = closed.reduce((sum, trade) => sum + trade.grossProfitPercent, 0);
-  const net = closed.reduce((sum, trade) => sum + trade.profitPercent, 0);
-  const positive = closed.reduce((sum, trade) => sum + Math.max(0, trade.profitPercent), 0);
-  const negative = closed.reduce((sum, trade) => sum + Math.min(0, trade.profitPercent), 0);
+function summarizeTrades(entries: EvaluatedTrade[]): StrategySummary {
+  const ordered = [...entries].sort((a, b) => a.exitIndex - b.exitIndex);
+  const closed = ordered.filter((entry) => entry.trade.outcome !== "open");
+  const wins = closed.filter((entry) => entry.trade.outcome === "win");
+  const gross = closed.reduce((sum, entry) => sum + entry.trade.grossProfitPercent, 0);
+  const net = closed.reduce((sum, entry) => sum + entry.trade.profitPercent, 0);
+  const positive = closed.reduce((sum, entry) => sum + Math.max(0, entry.trade.profitPercent), 0);
+  const negative = closed.reduce((sum, entry) => sum + Math.min(0, entry.trade.profitPercent), 0);
 
   let cumulative = 0;
   let peak = 0;
   let maxDrawdown = 0;
-  for (const trade of closed) {
-    cumulative += trade.profitPercent;
+  for (const entry of closed) {
+    cumulative += entry.trade.profitPercent;
     peak = Math.max(peak, cumulative);
     maxDrawdown = Math.max(maxDrawdown, peak - cumulative);
   }
 
   return {
     status: "ok",
-    totalTrades: trades.length,
+    totalTrades: entries.length,
     closedTrades: closed.length,
-    openTrades: trades.length - closed.length,
+    openTrades: entries.length - closed.length,
     winRate: closed.length ? (wins.length / closed.length) * 100 : null,
     profitFactor: negative < 0 ? positive / Math.abs(negative) : null,
     totalProfitPercent: net,
@@ -72,10 +78,10 @@ function summarizeTrades(trades: TradeOutcome[]): StrategySummary {
     expectancyPercent: closed.length ? net / closed.length : 0,
     maxDrawdownPercent: maxDrawdown,
     grossTotalProfitPercent: gross,
-    totalFeePercent: closed.reduce((sum, trade) => sum + trade.feePercent, 0),
-    totalSlippagePercent: closed.reduce((sum, trade) => sum + trade.slippagePercent, 0),
+    totalFeePercent: closed.reduce((sum, entry) => sum + entry.trade.feePercent, 0),
+    totalSlippagePercent: closed.reduce((sum, entry) => sum + entry.trade.slippagePercent, 0),
     avgCandlesHeld: closed.length
-      ? closed.reduce((sum, trade) => sum + trade.candlesHeld, 0) / closed.length
+      ? closed.reduce((sum, entry) => sum + entry.trade.candlesHeld, 0) / closed.length
       : null,
   };
 }
@@ -242,19 +248,22 @@ export async function runBenchmarkSuite(
 
   const candidates = buildCandidates(klines);
 
-  const baselineTrades: TradeOutcome[] = [];
-  for (const candidate of candidates) {
+  const baselineTrades: EvaluatedTrade[] = [];
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
     const decision = evaluateBaseline(candidate.market);
     if (decision.recomendacao === "WAIT") continue;
-    baselineTrades.push(
-      simulateTrade(
-        decision.recomendacao,
-        candidate.signalCandle,
-        candidate.future,
-        TARGET_PCT,
-        STOP_PCT,
-      ),
+    const trade = simulateTrade(
+      decision.recomendacao,
+      candidate.signalCandle,
+      candidate.future,
+      TARGET_PCT,
+      STOP_PCT,
     );
+    baselineTrades.push({
+      trade,
+      exitIndex: index + trade.candlesHeld,
+    });
   }
 
   const baselineSummary = summarizeTrades(baselineTrades);
@@ -280,7 +289,7 @@ export async function runBenchmarkSuite(
   });
 
   const buyHold = simulateBuyHold(klines);
-  const buyHoldSummary = summarizeTrades([buyHold]);
+  const buyHoldSummary = summarizeTrades([{ trade: buyHold, exitIndex: klines.length }]);
   await saveBenchmarkResult({
     benchmarkRunId,
     estrategia: "buyhold",
@@ -313,18 +322,17 @@ export async function runBenchmarkSuite(
         async (candidate) => decideWithJev(candidate.market, "oos"),
         CONCURRENCY,
       );
-      const jevTrades = candidates.flatMap((candidate, index) => {
+      const jevTrades: EvaluatedTrade[] = candidates.flatMap((candidate, index) => {
         const decision = decisions[index];
         if (decision.recomendacao === "WAIT") return [];
-        return [
-          simulateTrade(
-            decision.recomendacao,
-            candidate.signalCandle,
-            candidate.future,
-            TARGET_PCT,
-            STOP_PCT,
-          ),
-        ];
+        const trade = simulateTrade(
+          decision.recomendacao,
+          candidate.signalCandle,
+          candidate.future,
+          TARGET_PCT,
+          STOP_PCT,
+        );
+        return [{ trade, exitIndex: index + trade.candlesHeld }];
       });
       const summary = summarizeTrades(jevTrades);
       await saveBenchmarkResult({
