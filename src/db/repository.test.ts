@@ -34,6 +34,12 @@ class FakeDb implements RepositoryPool {
           thresholds_congelados_em: new Date("2026-01-10T00:00:00Z"),
           candles_total: 1000,
           dataset_hash: "abcd1234ef",
+          execution_model_version: "v2",
+          target_pct: 0.01,
+          stop_pct: 0.005,
+          lookahead_candles: 20,
+          slippage_pct: 0.0005,
+          fee_pct: 0.001,
           criado_em: new Date("2026-01-10T00:00:00Z"),
         }],
       } as { rows: T[] };
@@ -166,6 +172,10 @@ const expectedMetrics = [
     avg_profit_percent: 0.75,
     expectancy_percent: 0.75,
     max_drawdown_percent: 0.5,
+    gross_total_profit_percent: 1.9,
+    total_fee_percent: 0.2,
+    total_slippage_percent: 0.1,
+    avg_candles_held: 4,
   },
 ];
 
