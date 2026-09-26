@@ -8,6 +8,45 @@ class FakeClient {
   async query<T = any>(text: string, _values?: unknown[]): Promise<{ rows: T[] }> {
     this.queries.push(text);
     if (text.includes("INSERT INTO market_data")) return { rows: [] };
+    if (text.includes("INSERT INTO research_snapshots")) {
+      return {
+        rows: [{
+          snapshot_id: "rs_1234567890abcdef12345678",
+          schema_version: "research-snapshot.v1",
+          content_hash: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          signal_id: 7,
+          decision_log_id: null,
+          ativo: "BTCUSDT",
+          timeframe: "1h",
+          data_as_of: new Date("2026-01-10T00:00:00Z"),
+          created_at: new Date("2026-01-10T00:00:00Z"),
+          snapshot: {
+            snapshotId: "rs_1234567890abcdef12345678",
+            contentHash: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          },
+        }],
+      } as { rows: T[] };
+    }
+    if (text.includes("FROM research_snapshots")) {
+      return {
+        rows: [{
+          snapshot_id: "rs_1234567890abcdef12345678",
+          schema_version: "research-snapshot.v1",
+          content_hash: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          signal_id: 7,
+          decision_log_id: null,
+          ativo: "BTCUSDT",
+          timeframe: "1h",
+          data_as_of: new Date("2026-01-10T00:00:00Z"),
+          created_at: new Date("2026-01-10T00:00:00Z"),
+          snapshot: {
+            snapshotId: "rs_1234567890abcdef12345678",
+            contentHash: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          },
+        }],
+      } as { rows: T[] };
+    }
+
     if (text === "BEGIN" || text === "COMMIT" || text === "ROLLBACK") return { rows: [] };
     return { rows: [{ id: 7 }] } as { rows: T[] };
   }
