@@ -135,7 +135,7 @@ const history = await repo.listOosValidationGateAudits({
 });
 assert.equal(history.length, 1);
 assert.equal(history[0]?.evidenceHash, gate.evidenceHash);
-assert.ok(history[0]?.evidence);
+assert.equal(history[0]?.evidence, null);
 
 await assert.rejects(
   repo.getOosValidationGateAudit(0),
