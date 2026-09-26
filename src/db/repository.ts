@@ -17,6 +17,12 @@ export interface BacktestRunInput {
   thresholdsCongeladosEm?: Date | null;
   candlesTotal?: number | null;
   datasetHash?: string | null;
+  executionModelVersion?: string | null;
+  targetPct?: number | null;
+  stopPct?: number | null;
+  lookaheadCandles?: number | null;
+  slippagePct?: number | null;
+  feePct?: number | null;
 }
 
 export interface BacktestRun {
@@ -31,6 +37,12 @@ export interface BacktestRun {
   thresholdsCongeladosEm: Date | null;
   candlesTotal: number | null;
   datasetHash: string | null;
+  executionModelVersion: string | null;
+  targetPct: number | null;
+  stopPct: number | null;
+  lookaheadCandles: number | null;
+  slippagePct: number | null;
+  feePct: number | null;
   criadoEm: Date;
 }
 
@@ -51,6 +63,14 @@ export interface SaveTradeInput {
   outcome: "win" | "loss" | "open";
   profitPercent: number;
   drawdown?: number | null;
+  grossProfitPercent?: number | null;
+  feePercent?: number | null;
+  slippagePercent?: number | null;
+  candlesHeld?: number | null;
+  executionModelVersion?: string | null;
+  exitReason?: "target" | "stop" | "end" | null;
+  maxFavorableExcursionPercent?: number | null;
+  maxAdverseExcursionPercent?: number | null;
   openedAt?: Date;
   closedAt?: Date | null;
 }
@@ -107,8 +127,9 @@ export function createRepository(db: RepositoryPool) {
       }
       const { rows } = await db.query<{ id: number }>(
         `INSERT INTO backtest_runs
-          (engine, mode, ativo, timeframe, periodo_inicio, periodo_fim, oos_start_ratio, thresholds_congelados_em, candles_total, dataset_hash)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          (engine, mode, ativo, timeframe, periodo_inicio, periodo_fim, oos_start_ratio, thresholds_congelados_em, candles_total, dataset_hash,
+           execution_model_version, target_pct, stop_pct, lookahead_candles, slippage_pct, fee_pct)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING id`,
         [
           input.engine,
@@ -121,6 +142,12 @@ export function createRepository(db: RepositoryPool) {
           input.thresholdsCongeladosEm ?? null,
           input.candlesTotal ?? null,
           input.datasetHash ?? null,
+          input.executionModelVersion ?? null,
+          input.targetPct ?? null,
+          input.stopPct ?? null,
+          input.lookaheadCandles ?? null,
+          input.slippagePct ?? null,
+          input.feePct ?? null,
         ],
       );
       const id = Number(rows[0]?.id);
@@ -141,6 +168,12 @@ export function createRepository(db: RepositoryPool) {
         thresholds_congelados_em: Date | null;
         candles_total: number | null;
         dataset_hash: string | null;
+        execution_model_version: string | null;
+        target_pct: string | number | null;
+        stop_pct: string | number | null;
+        lookahead_candles: number | null;
+        slippage_pct: string | number | null;
+        fee_pct: string | number | null;
         criado_em: Date;
       }>(
         `SELECT id, engine, mode, ativo, timeframe, periodo_inicio, periodo_fim,
@@ -163,6 +196,12 @@ export function createRepository(db: RepositoryPool) {
         thresholdsCongeladosEm: row.thresholds_congelados_em ? new Date(row.thresholds_congelados_em) : null,
         candlesTotal: row.candles_total !== null ? Number(row.candles_total) : null,
         datasetHash: row.dataset_hash ?? null,
+        executionModelVersion: row.execution_model_version ?? null,
+        targetPct: row.target_pct !== null ? Number(row.target_pct) : null,
+        stopPct: row.stop_pct !== null ? Number(row.stop_pct) : null,
+        lookaheadCandles: row.lookahead_candles !== null ? Number(row.lookahead_candles) : null,
+        slippagePct: row.slippage_pct !== null ? Number(row.slippage_pct) : null,
+        feePct: row.fee_pct !== null ? Number(row.fee_pct) : null,
         criadoEm: new Date(row.criado_em),
       };
     },
@@ -212,8 +251,11 @@ export function createRepository(db: RepositoryPool) {
       }
       const { rows } = await db.query<{ id: number }>(
         `INSERT INTO paper_trades
-          (signal_id, entry_price, exit_price, outcome, profit_percent, drawdown, opened_at, closed_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          (signal_id, entry_price, exit_price, outcome, profit_percent,
+           gross_profit_percent, fee_percent, slippage_percent, candles_held,
+           execution_model_version, exit_reason, max_favorable_excursion_percent,
+           max_adverse_excursion_percent, drawdown, opened_at, closed_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING id`,
         [
           input.signalId,
@@ -221,6 +263,14 @@ export function createRepository(db: RepositoryPool) {
           input.exitPrice ?? null,
           input.outcome,
           input.profitPercent,
+          input.grossProfitPercent ?? null,
+          input.feePercent ?? null,
+          input.slippagePercent ?? null,
+          input.candlesHeld ?? null,
+          input.executionModelVersion ?? null,
+          input.exitReason ?? null,
+          input.maxFavorableExcursionPercent ?? null,
+          input.maxAdverseExcursionPercent ?? null,
           input.drawdown ?? null,
           input.openedAt ?? new Date(),
           input.closedAt ?? null,
@@ -438,7 +488,20 @@ export const saveTrade = (
   exitPrice: number | null,
   outcome: "win" | "loss" | "open",
   profitPercent: number,
-  options?: Pick<SaveTradeInput, "drawdown" | "openedAt" | "closedAt">,
+  options?: Pick<
+    SaveTradeInput,
+    | "drawdown"
+    | "grossProfitPercent"
+    | "feePercent"
+    | "slippagePercent"
+    | "candlesHeld"
+    | "executionModelVersion"
+    | "exitReason"
+    | "maxFavorableExcursionPercent"
+    | "maxAdverseExcursionPercent"
+    | "openedAt"
+    | "closedAt"
+  >,
 ) => createRepository(getDefaultPool()).saveTrade({
   signalId, entryPrice, exitPrice, outcome, profitPercent, ...options,
 });
