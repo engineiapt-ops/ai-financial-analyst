@@ -38,6 +38,7 @@ assert.equal(first.snapshotId, second.snapshotId);
 assert.equal(first.contentHash, second.contentHash);
 assert.match(first.snapshotId, /^rs_[a-f0-9]{24}$/);
 assert.equal(first.analysis.signalId, 1);
+assert.equal(first.analysis.decisionLogId, 2);
 assert.equal(first.decision.recomendacao, "BUY");
 assert.equal(first.research.evidence[0]?.source, "mock");
 assert.equal(first.risk.regime.key, "normal");
