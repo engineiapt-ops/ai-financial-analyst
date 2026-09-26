@@ -8,6 +8,7 @@ import {
   ping as pingBinance,
 } from "../marketdata/binanceClient.js";
 import { analyzeMarket } from "./analyze.js";
+import { generateAnalystReport } from "../research/report.js";
 import type { Timeframe } from "../types.js";
 import { getMetricsByOrigem } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
@@ -456,6 +457,19 @@ export const AnalyzeSchema = z.object({
   news: z.boolean().default(true),
 });
 
+
+app.post("/api/report", async (req, res) => {
+  try {
+    const parsed = AnalyzeSchema.parse(req.body);
+    const analysis = await analyzeMarket(parsed);
+    const research = await generateAnalystReport(analysis);
+    res.json({ status: "ok", analysis, research });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
 
 app.get("/api/metrics", async (req, res) => {
   try {
