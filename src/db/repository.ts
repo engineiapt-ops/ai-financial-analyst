@@ -465,7 +465,7 @@ export function createRepository(db: RepositoryPool) {
           input.decision.jevModelVersion ?? null,
           input.decision.jevChoice ?? null,
           input.decision.jevProbs ? JSON.stringify(input.decision.jevProbs) : null,
-          null,
+          input.decision.confidence ?? null,
           input.decision.qualityScore ?? null,
           input.decision.riscoElevado ?? null,
           input.decision.tamanhoPosicaoPct,
