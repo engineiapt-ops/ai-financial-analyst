@@ -14,9 +14,9 @@ import { calibrateRegimeThresholds, classifyRegime, type RegimeSnapshot } from "
 import { evaluateRisk } from "../risk/riskEngine.js";
 import type { Kline, MarketState } from "../types.js";
 
-export const WALK_FORWARD_PORTFOLIO_MODEL_VERSION = "walk-forward-portfolio-v1.1";
+export const WALK_FORWARD_PORTFOLIO_MODEL_VERSION = "walk-forward-portfolio-v1";
 export const WALK_FORWARD_RISK_PORTFOLIO_MODEL_VERSION =
-  "walk-forward-portfolio-v1.1+risk-regime-v1";
+  "walk-forward-portfolio-v1+risk-regime-v1";
 
 const DEFAULT_INITIAL_CAPITAL = 1000;
 const DEFAULT_POSITION_SIZE_PCT = 2;
@@ -368,14 +368,14 @@ function simulatePortfolio(
           0,
           equity * (maxGrossExposurePct / 100) - grossExposure,
         );
+        const notional = Math.min(requestedNotional, remainingExposure);
 
-        if (remainingExposure < requestedNotional) {
+        if (notional <= 0) {
           rejectedTrades += 1;
           rejects += 1;
           continue;
         }
 
-        const notional = requestedNotional;
         const entryFee = notional * FEE_PCT;
         cash -= notional + entryFee;
         const quantity = notional / candidate.trade.entryPrice;
