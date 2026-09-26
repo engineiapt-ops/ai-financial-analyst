@@ -15,6 +15,7 @@ import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
 import { runBenchmarkSuite } from "../backtest/benchmark.js";
 import { runRemoteBaselineBacktest } from "../backtest/remoteBaseline.js";
+import { runWalkForward } from "../backtest/walkForward.js";
 
 
 
@@ -471,6 +472,40 @@ app.get("/api/metrics", async (req, res) => {
 
 
 
+
+app.get("/api/backtest/walk-forward", async (req, res) => {
+  try {
+    const ativo = String(req.query.symbol ?? "BTCUSDT").toUpperCase();
+    const timeframe = String(req.query.timeframe ?? "1h");
+    const candles = Number(req.query.candles ?? 5000);
+    const initialTrainCandles = Number(req.query.initialTrain ?? 2000);
+    const testCandles = Number(req.query.test ?? 500);
+    const stepCandles = Number(req.query.step ?? 500);
+    const includeJev = String(req.query.includeJev ?? "false").toLowerCase() === "true";
+
+    if (!["1h", "4h", "1d"].includes(timeframe)) {
+      return res.status(400).json({ status: "error", error: "timeframe must be 1h, 4h or 1d" });
+    }
+    if (![candles, initialTrainCandles, testCandles, stepCandles].every(Number.isInteger)) {
+      return res.status(400).json({ status: "error", error: "walk-forward parameters must be integers" });
+    }
+
+    const result = await runWalkForward({
+      ativo,
+      timeframe: timeframe as "1h" | "4h" | "1d",
+      candles,
+      initialTrainCandles,
+      testCandles,
+      stepCandles,
+      includeJev,
+    });
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("Insufficient market_data") ? 422 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
 
 app.get("/api/backtest/baseline", async (req, res) => {
   try {
