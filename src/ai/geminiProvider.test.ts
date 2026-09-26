@@ -23,7 +23,7 @@ const okProvider = new GeminiProvider({
   fetchImpl: async (_input, init) => {
     const body = JSON.parse(String(init?.body));
     assert.equal(body.contents[0].role, "user");
-    assert.equal(body.generationConfig.responseMimeType, "application/json");
+    assert.equal(body.generationConfig.responseFormat.text.mimeType, "application/json");
     return new Response(JSON.stringify({
       candidates: [{
         content: {
