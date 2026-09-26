@@ -920,6 +920,54 @@ export function createRepository(db: RepositoryPool) {
       return rows;
     },
 
+    async getWalkForwardRun(walkForwardRunId: number) {
+      const { rows } = await db.query<{
+        id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        dataset_start: Date;
+        dataset_end: Date;
+        candles_total: number;
+        dataset_hash: string;
+        initial_train_candles: number;
+        test_candles: number;
+        step_candles: number;
+        lookahead_candles: number;
+        execution_model_version: string;
+        target_pct: string | number;
+        stop_pct: string | number;
+        slippage_pct: string | number;
+        fee_pct: string | number;
+      }>(
+        `SELECT id, ativo, timeframe, dataset_start, dataset_end, candles_total, dataset_hash,
+                initial_train_candles, test_candles, step_candles, lookahead_candles,
+                execution_model_version, target_pct, stop_pct, slippage_pct, fee_pct
+         FROM walk_forward_runs
+         WHERE id=$1`,
+        [walkForwardRunId],
+      );
+      const row = rows[0];
+      if (!row) return null;
+      return {
+        id: Number(row.id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        datasetStart: new Date(row.dataset_start),
+        datasetEnd: new Date(row.dataset_end),
+        candlesTotal: Number(row.candles_total),
+        datasetHash: row.dataset_hash,
+        initialTrainCandles: Number(row.initial_train_candles),
+        testCandles: Number(row.test_candles),
+        stepCandles: Number(row.step_candles),
+        lookaheadCandles: Number(row.lookahead_candles),
+        executionModelVersion: row.execution_model_version,
+        targetPct: Number(row.target_pct),
+        stopPct: Number(row.stop_pct),
+        slippagePct: Number(row.slippage_pct),
+        feePct: Number(row.fee_pct),
+      };
+    },
+
     async saveWalkForwardFold(input: WalkForwardFoldInput): Promise<number> {
       const { rows } = await db.query<{ id: number }>(
         `INSERT INTO walk_forward_folds
