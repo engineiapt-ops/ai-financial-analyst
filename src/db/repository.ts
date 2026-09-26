@@ -1475,6 +1475,20 @@ export const getBacktestRun = (id: number) =>
   createRepository(getDefaultPool()).getBacktestRun(id);
 
 export const createWalkForwardRun = (input: WalkForwardRunInput) => createRepository(getDefaultPool()).createWalkForwardRun(input);
+export const getWalkForwardRun = (walkForwardRunId: number) =>
+  createRepository(getDefaultPool()).getWalkForwardRun(walkForwardRunId);
+export const createWalkForwardPortfolioRun = (input: WalkForwardPortfolioRunSummaryInput) =>
+  createRepository(getDefaultPool()).createWalkForwardPortfolioRun(input);
+export const saveWalkForwardPortfolioFold = (input: WalkForwardPortfolioFoldInput) =>
+  createRepository(getDefaultPool()).saveWalkForwardPortfolioFold(input);
+export const saveWalkForwardPortfolioEquityPoints = (inputs: WalkForwardPortfolioEquityInput[]) =>
+  createRepository(getDefaultPool()).saveWalkForwardPortfolioEquityPoints(inputs);
+export const getWalkForwardPortfolioRuns = (walkForwardRunId: number) =>
+  createRepository(getDefaultPool()).getWalkForwardPortfolioRuns(walkForwardRunId);
+export const getWalkForwardPortfolioFolds = (walkForwardPortfolioRunId: number) =>
+  createRepository(getDefaultPool()).getWalkForwardPortfolioFolds(walkForwardPortfolioRunId);
+
+
 export const saveWalkForwardFold = (input: WalkForwardFoldInput) => createRepository(getDefaultPool()).saveWalkForwardFold(input);
 export const getWalkForwardFolds = (walkForwardRunId: number) => createRepository(getDefaultPool()).getWalkForwardFolds(walkForwardRunId);
 
