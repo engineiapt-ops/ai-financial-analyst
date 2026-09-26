@@ -481,7 +481,7 @@ export function createRepository(db: RepositoryPool) {
     },
 
     async settleDecisionLog(id: number, outcome: DecisionLogOutcome): Promise<void> {
-      const { rowCount } = await db.query(
+      await db.query(
         `UPDATE decision_log
          SET outcome_status = $2,
              outcome_direction = $3,
@@ -500,7 +500,6 @@ export function createRepository(db: RepositoryPool) {
           outcome.evaluatedAt ?? new Date(),
         ],
       );
-      if (rowCount === 0) throw new Error(`Decision log ${id} not found`);
     },
 
     async createBenchmarkRun(input: BenchmarkRunInput): Promise<number> {
