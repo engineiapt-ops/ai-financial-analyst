@@ -127,15 +127,6 @@ export async function runRiskRegimeAnalysis(
     if (pnl > 0) metric.winningPositions += 1;
     if (pnl < 0) metric.losingPositions += 1;
 
-    const syntheticDecision = {
-      origem: "baseline",
-      recomendacao: position.side,
-      tamanhoPosicaoPct: 2,
-    } as const;
-    const wouldRiskBlock = evaluateRisk(syntheticDecision, regime).reason === "high_volatility";
-    if (wouldRiskBlock) metric.highVolatilityBlocksWouldOccur += 1;
-  }
-
   for (const metric of metrics.values()) {
     metric.returnOnAllocatedPct = metric.allocatedNotional > 0
       ? (metric.netPnl / metric.allocatedNotional) * 100
