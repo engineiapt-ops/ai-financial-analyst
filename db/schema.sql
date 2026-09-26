@@ -307,6 +307,8 @@ CREATE TABLE IF NOT EXISTS oos_validation_gate_audits (
   id BIGSERIAL PRIMARY KEY,
   backtest_run_id BIGINT NOT NULL REFERENCES backtest_runs(id) ON DELETE RESTRICT,
   walk_forward_run_id BIGINT REFERENCES walk_forward_runs(id) ON DELETE RESTRICT,
+  ativo TEXT NOT NULL,
+  timeframe TEXT NOT NULL CHECK (timeframe IN ('1h', '4h', '1d')),
   estrategia TEXT NOT NULL CHECK (estrategia IN ('baseline', 'baseline_risk', 'jev')),
   gate_version TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('ready', 'blocked')),
