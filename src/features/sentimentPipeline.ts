@@ -1,3 +1,5 @@
+import { filterNewsByAsOf } from "../marketdata/pointInTime.js";
+
 export interface NewsHeadline {
   source: string;
   title: string;
@@ -136,7 +138,7 @@ export function scoreHeadlines(headlines: NewsHeadline[]): number {
   return Math.max(-1, Math.min(1, total / valid.length));
 }
 
-export async function getSentiment(ativo: string, sources: NewsSource[]): Promise<number> {
+export async function getSentiment(ativo: string, sources: NewsSource[], asOf?: Date): Promise<number> {
   if (!sources.length) return 0;
 
   const results = await Promise.allSettled(sources.map((source) => source.fetchRecent(ativo)));
@@ -144,5 +146,6 @@ export async function getSentiment(ativo: string, sources: NewsSource[]): Promis
     result.status === "fulfilled" ? result.value.filter(isValidHeadline) : []
   );
 
-  return scoreHeadlines(headlines);
+  const pointInTimeHeadlines = asOf ? filterNewsByAsOf(headlines, asOf) : headlines;
+  return scoreHeadlines(pointInTimeHeadlines);
 }
