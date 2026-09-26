@@ -63,3 +63,7 @@ The product dashboard also exposes `GET /api/evaluation/overview`, which consoli
 ## Portfolio governance overview
 
 The product API exposes `GET /api/evaluation/portfolio-overview?fromRun=<walk-forward-run-id>` to consolidate account-level portfolio walk-forward validation and regime diagnostics. This layer is read-only/diagnostic and does not select a preferred strategy or alter trading rules.
+
+## System readiness
+
+The API exposes `GET /api/system/readiness` as a read-only operational check for market connectivity, database availability, configured AI providers, paper-only execution mode, and governance contract presence.

@@ -14,7 +14,7 @@ import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits } from "../db/repository.js";
+import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits, healthDatabase } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -29,6 +29,7 @@ import { buildEvaluationOverview } from "../product/evaluationOverview.js";
 import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForwardReport.js";
 import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDiagnostics.js";
 import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernanceOverview.js";
+import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
 
 
 
@@ -455,6 +456,37 @@ app.get("/", (req, res) => {
       "/api/market/klines",
     ],
   });
+});
+
+app.get("/api/system/readiness", async (_req, res) => {
+  const [marketDataCheck, databaseCheck] = await Promise.all([
+    pingBinance()
+      .then((ok) => ({ available: ok, detail: ok ? "Binance ping OK" : "Binance ping failed" }))
+      .catch((error: unknown) => ({
+        available: false,
+        detail: error instanceof Error ? error.message : String(error),
+      })),
+    healthDatabase()
+      .then(() => ({ available: true, detail: "Database query OK" }))
+      .catch((error: unknown) => ({
+        available: false,
+        detail: error instanceof Error ? error.message : String(error),
+      })),
+  ]);
+
+  const overview = buildSystemReadinessOverview({
+    generatedAt: new Date(),
+    marketData: marketDataCheck,
+    database: databaseCheck,
+    aiProviders: listAiProviders(),
+    paperTradingOnly: true,
+    governanceContracts: [
+      "evaluation-overview.v1",
+      "portfolio-governance-overview.v1",
+    ],
+  });
+
+  res.status(200).json({ status: "ok", ...overview });
 });
 
 app.get("/health", (_req, res) => {
