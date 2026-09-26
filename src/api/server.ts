@@ -10,10 +10,11 @@ import {
 import { analyzeMarket } from "./analyze.js";
 import { evaluateDecisionLog } from "../evaluation/decisionEvaluator.js";
 import { buildCalibrationReport } from "../evaluation/calibration.js";
+import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog } from "../db/repository.js";
+import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -678,6 +679,66 @@ app.get("/api/evaluation/calibration", async (req, res) => {
       },
       ...calibration,
     });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-report", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive(),
+      walkForwardRunId: z.coerce.number().int().positive().optional(),
+    }).parse(req.query);
+
+    const backtestRun = await getBacktestRun(query.backtestRunId);
+    if (!backtestRun) {
+      return res.status(404).json({ status: "error", error: "backtest run not found" });
+    }
+
+    if (backtestRun.mode !== "oos") {
+      return res.status(422).json({ status: "error", error: "backtestRunId must reference an oos run" });
+    }
+
+    if (!backtestRun.validationStart || !backtestRun.calibrationEnd) {
+      return res.status(422).json({ status: "error", error: "backtest run is missing OOS calibration/validation boundaries" });
+    }
+
+    const validationFrom = backtestRun.validationStart;
+    const validationTo = backtestRun.periodoFim;
+    const filters = {
+      ativo: backtestRun.ativo,
+      timeframe: backtestRun.timeframe,
+      from: validationFrom,
+      to: validationTo,
+    };
+
+    const [decisionKpis, observations, walkForwardRun] = await Promise.all([
+      getDecisionKpis(filters),
+      getDecisionCalibrationObservations(filters),
+      query.walkForwardRunId ? getWalkForwardRun(query.walkForwardRunId) : Promise.resolve(null),
+    ]);
+
+    if (query.walkForwardRunId && !walkForwardRun) {
+      return res.status(404).json({ status: "error", error: "walk-forward run not found" });
+    }
+
+    const folds = walkForwardRun
+      ? await getWalkForwardFolds(walkForwardRun.id)
+      : [];
+
+    const calibration = buildCalibrationReport(observations, filters);
+    const report = buildOosValidationReport({
+      backtestRun,
+      walkForwardRun,
+      folds,
+      calibration,
+      decisionKpis,
+    });
+
+    res.json({ status: "ok", ...report });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
