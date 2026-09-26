@@ -764,7 +764,7 @@ app.get("/api/evaluation/oos-robustness", async (req, res) => {
       return res.status(422).json({ status: "error", error: "backtestRunId must reference an oos run" });
     }
     if (!backtestRun.validationStart) {
-      return res.status(422).json({ status: "422", error: "backtest run is missing validationStart" });
+      return res.status(422).json({ status: "error", error: "backtest run is missing validationStart" });
     }
 
     const walkForwardRun = await getWalkForwardRun(query.walkForwardRunId);
