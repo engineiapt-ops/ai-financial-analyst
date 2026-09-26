@@ -72,7 +72,12 @@ export function buildPortfolioGovernanceOverview(input: {
     notes: string[];
   };
   regimeDiagnostics: {
-    diagnostics: PortfolioGovernanceOverview["regimes"];
+    diagnostics: {
+      totalSignals: number;
+      totalRiskGateBlocks: number;
+      blockedSignalWinRatePct: number | null;
+      blockedSignalLossRatePct: number | null;
+    };
     byTrend: unknown[];
     byVolatility: unknown[];
     byMomentum: unknown[];
