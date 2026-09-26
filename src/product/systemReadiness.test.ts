@@ -14,6 +14,15 @@ const ready = buildSystemReadinessOverview({
   ],
   paperTradingOnly: true,
   apiAuthenticationConfigured: true,
+  runtimeConfig: {
+    state: "ready",
+    productionMode: true,
+    configured: ["DATABASE_URL", "API_AUTH_TOKEN"],
+    missing: [],
+    invalid: [],
+    warnings: [],
+    detail: "Runtime configuration is valid",
+  },
   governanceContracts: [
     "evaluation-overview.v1",
     "portfolio-governance-overview.v1",
@@ -35,6 +44,15 @@ const degraded = buildSystemReadinessOverview({
   ],
   paperTradingOnly: true,
   apiAuthenticationConfigured: false,
+  runtimeConfig: {
+    state: "blocked",
+    productionMode: true,
+    configured: [],
+    missing: ["DATABASE_URL", "API_AUTH_TOKEN"],
+    invalid: [],
+    warnings: [],
+    detail: "missing",
+  },
   governanceContracts: ["evaluation-overview.v1"],
 });
 
@@ -52,6 +70,15 @@ const blocked = buildSystemReadinessOverview({
   aiProviders: [{ id: "none", configured: true, enabled: true }],
   paperTradingOnly: false,
   apiAuthenticationConfigured: true,
+  runtimeConfig: {
+    state: "ready",
+    productionMode: true,
+    configured: ["DATABASE_URL", "API_AUTH_TOKEN"],
+    missing: [],
+    invalid: [],
+    warnings: [],
+    detail: "Runtime configuration is valid",
+  },
   governanceContracts: [
     "evaluation-overview.v1",
     "portfolio-governance-overview.v1",

@@ -101,3 +101,10 @@ OBSERVABILITY_LOGS=true
 ```
 
 Logging can be disabled with `OBSERVABILITY_LOGS=false`. Logs never include request bodies, API keys or provider secrets.
+## Runtime configuration readiness
+
+The readiness contract now validates deployment configuration without exposing secrets.
+
+In production/Vercel, `DATABASE_URL` and `API_AUTH_TOKEN` are required. Optional integrations such as Gemini are reported as warnings when absent, while malformed URLs, booleans or numeric limits are reported as invalid configuration.
+
+This check is read-only and does not change strategy, thresholds, sizing or execution.
