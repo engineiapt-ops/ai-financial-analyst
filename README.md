@@ -67,3 +67,15 @@ The product API exposes `GET /api/evaluation/portfolio-overview?fromRun=<walk-fo
 ## System readiness
 
 The API exposes `GET /api/system/readiness` as a read-only operational check for market connectivity, database availability, configured AI providers, paper-only execution mode, and governance contract presence.
+## API hardening
+
+The API now assigns a unique `X-Request-ID` to every request and applies an in-memory rate limit to API routes. The default limit is 120 requests per minute per client, with a stricter 20 requests per minute limit for analysis, report, backtest, portfolio and risk-regime endpoints.
+
+Configuration:
+```env
+TRUST_PROXY=false
+RATE_LIMIT_MAX=120
+RATE_LIMIT_HEAVY_MAX=20
+```
+
+Set `TRUST_PROXY=true` only when the deployment is behind a trusted reverse proxy that provides `X-Forwarded-For`. The limiter is intentionally dependency-free and process-local; it is a best-effort protection layer and is not a substitute for a distributed rate limiter at the edge.
