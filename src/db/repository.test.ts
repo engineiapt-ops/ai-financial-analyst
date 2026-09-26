@@ -138,6 +138,66 @@ assert.equal(runRecord?.id, 7);
 assert.equal(runRecord?.candlesTotal, 1000);
 assert.equal(runRecord?.datasetHash, "abcd1234ef");
 
+
+const snapshot = {
+  schemaVersion: "research-snapshot.v1",
+  snapshotId: "rs_1234567890abcdef12345678",
+  contentHash: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  createdAt: "2026-01-10T00:00:00.000Z",
+  analysis: {
+    signalId: 7,
+    ativo: "BTCUSDT",
+    timeframe: "1h",
+    dataAsOf: "2026-01-10T00:00:00.000Z",
+    referencePrice: 100000,
+    indicators: { vwap: 99900, ema9: 100100, ema21: 99800, rsi: 58, atr: 1200 },
+  },
+  decision: {
+    origem: "jev",
+    recomendacao: "BUY",
+    tamanhoPosicaoPct: 2,
+    confidence: null,
+    qualityScore: 0.8,
+    riscoElevado: false,
+    jevChoice: "ALTA",
+    jevProbs: { ALTA: 0.75, BAIXA: 0.2, AGUARDAR: 0.05 },
+    jevModelVersion: "jev-1.13",
+    observacao: null,
+  },
+  risk: {
+    version: "risk-engine-v1",
+    allowed: true,
+    positionSizePct: 2,
+    maxGrossExposurePct: 20,
+    reason: "risk_ok",
+    regime: { key: "normal", volatility: "NORMAL" },
+  },
+  research: { asOf: "2026-01-10T00:00:00.000Z", sentiment: 0, evidence: [], sources: [] },
+  report: {
+    titulo: "Relatório BTCUSDT 1h",
+    resumo: "ok",
+    drivers: [],
+    riscos: [],
+    invalidacao: "reavaliar",
+    recomendacao: "BUY",
+    confianca: 0.8,
+    fonteDecisao: "quantitativo",
+  },
+} as any;
+
+const storedSnapshot = await repo.saveResearchSnapshot({ snapshot });
+assert.equal(storedSnapshot.snapshotId, snapshot.snapshotId);
+assert.equal(storedSnapshot.contentHash, snapshot.contentHash);
+assert.equal(storedSnapshot.signalId, 7);
+assert.equal(storedSnapshot.decisionLogId, null);
+assert.equal(storedSnapshot.snapshot.snapshotId, snapshot.snapshotId);
+
+const loadedSnapshot = await repo.getResearchSnapshot(snapshot.snapshotId);
+assert.ok(loadedSnapshot);
+assert.equal(loadedSnapshot?.contentHash, snapshot.contentHash);
+assert.equal(loadedSnapshot?.signalId, 7);
+await assert.rejects(repo.getResearchSnapshot(""), /snapshotId is required/);
+
 const signalId = await repo.saveSignal({
   backtestRunId: runId,
   ativo: "BTCUSDT",
