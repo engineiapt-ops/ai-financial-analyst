@@ -35,6 +35,7 @@ import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernance
 import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
 import { listAiProviders } from "../ai/providers.js";
 import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
+import { inspectRuntimeConfig } from "./runtimeConfig.js";
 
 
 
@@ -545,6 +546,7 @@ app.get("/api/system/readiness", async (_req, res) => {
     aiProviders: listAiProviders(),
     paperTradingOnly: true,
     apiAuthenticationConfigured: Boolean(process.env.API_AUTH_TOKEN?.trim()),
+    runtimeConfig: inspectRuntimeConfig(),
     governanceContracts: [
       "evaluation-overview.v1",
       "portfolio-governance-overview.v1",
