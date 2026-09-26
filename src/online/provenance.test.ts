@@ -24,9 +24,9 @@ assert.equal(packetA.packetVersion, "online-analysis.v1");
 assert.equal(packetA.packetId, packetB.packetId);
 assert.equal(packetA.provenance.decisionLogId, analysis.decisionLogId);
 assert.equal(packetA.snapshot.contentHash, snapshot.contentHash);
-const packetHash = computeOnlineAnalysisPacketHash(packetA);\nassert.equal(packetHash.length, 64);\nassert.equal(packetA.packetId, "oa_" + packetHash.slice(0, 24));
-assert.equal(computeOnlineAnalysisPacketHash(packetA), packetA.packetId.replace("oa_", "").padEnd(24, "0").slice(0, 24) === packetA.packetId.replace("oa_", "") ? computeOnlineAnalysisPacketHash(packetA) : computeOnlineAnalysisPacketHash(packetA));
-
+const packetHash = computeOnlineAnalysisPacketHash(packetA);
+assert.equal(packetHash.length, 64);
+assert.equal(packetA.packetId, "oa_" + packetHash.slice(0, 24));
 const mismatchedResearch = { ...research, asOf: "2026-09-26T12:00:00.000Z" };
 assert.throws(
   () => buildOnlineAnalysisPacket(analysis, mismatchedResearch, snapshot),
