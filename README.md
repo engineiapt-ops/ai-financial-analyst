@@ -91,3 +91,13 @@ API_AUTH_TOKEN=replace-with-a-random-secret
 The protected surface includes market analysis/report generation, research snapshot access, decision persistence, backtests, risk-regime analysis and portfolio operations. Read-only health, market connectivity and evaluation endpoints remain accessible without the token.
 
 The dashboard includes a session-only API key field for `/api/analyze`; the key is sent only in the request header and is not persisted server-side.
+## Observability
+
+The API emits structured JSON request logs with request ID, method, path, HTTP status and latency. Unhandled errors are logged with the same request ID and return a generic error response without exposing internal details.
+
+Configuration:
+```env
+OBSERVABILITY_LOGS=true
+```
+
+Logging can be disabled with `OBSERVABILITY_LOGS=false`. Logs never include request bodies, API keys or provider secrets.
