@@ -34,7 +34,7 @@ const baseUrl = "http://127.0.0.1:" + port;
 try {
   const health = await fetch(baseUrl + "/health");
   assert.equal(health.status, 200);
-  assert.equal(health.headers.get("x-request-id")?.length > 0, true);
+  assert.equal(Boolean(health.headers.get("x-request-id")), true);
   assert.deepEqual(await health.json(), {
     status: "ok",
     service: "ai-financial-analyst-api",
@@ -46,7 +46,7 @@ try {
     body: JSON.stringify({}),
   });
   assert.equal(unauthorized.status, 401);
-  assert.equal(unauthorized.headers.get("x-request-id")?.length > 0, true);
+  assert.equal(Boolean(unauthorized.headers.get("x-request-id")), true);
   assert.deepEqual(await unauthorized.json(), {
     status: "error",
     error: "unauthorized",
