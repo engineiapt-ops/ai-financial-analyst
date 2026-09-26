@@ -10,6 +10,7 @@ function market(overrides: Partial<MarketState["indicators"]> = {}, price = 100)
     ativo: "BTCUSDT",
     timeframe: "1h",
     timestamp: Date.now(),
+    dataAsOf: Date.now(),
     precoAtual: price,
     indicators: {
       vwap: 100,
