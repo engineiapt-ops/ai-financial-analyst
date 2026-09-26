@@ -79,13 +79,28 @@ export async function runSentimentPipelineTests() {
   }
 
   {
-    process.stdout.write("5. Testando ausência de fontes... ");
+    process.stdout.write("5. Testando corte point-in-time de notícias... ");
+    const source: NewsSource = {
+      async fetchRecent() {
+        return [
+          headline("2026-09-25T09:59:00Z", "Bitcoin rally"),
+          headline("2026-09-25T10:01:00Z", "Bitcoin crash"),
+        ];
+      },
+    };
+    const score = await getSentiment("BTCUSDT", [source], new Date("2026-09-25T10:00:00Z"));
+    assert(score > 0, "notícia posterior ao asOf não deve contaminar o sentimento");
+    console.log("PASS");
+  }
+
+  {
+    process.stdout.write("6. Testando ausência de fontes... ");
     assert(await getSentiment("BTCUSDT", []) === 0, "sem fontes deve retornar neutro");
     console.log("PASS");
   }
 
   {
-    process.stdout.write("6. Testando aliases BTC/BTCUSD/BTCUSDT via fonte mock... ");
+    process.stdout.write("7. Testando aliases BTC/BTCUSD/BTCUSDT via fonte mock... ");
     const received: string[] = [];
     const source: NewsSource = {
       async fetchRecent(ativo) {
