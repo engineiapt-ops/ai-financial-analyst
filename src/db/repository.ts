@@ -928,7 +928,7 @@ export function createRepository(db: RepositoryPool) {
           outcome.evaluatedAt ?? new Date(),
         ],
       );
-      if ("rowCount" in result && result.rowCount === 0) {
+      if (result.rows.length === 0) {
         throw new Error("decision log is already settled or does not exist");
       }
     },
