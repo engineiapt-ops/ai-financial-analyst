@@ -28,6 +28,8 @@ import { runPortfolioEngine } from "../portfolio/engine.js";
 import { runWalkForwardPortfolio } from "../portfolio/walkForwardPortfolio.js";
 import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
 import { runRiskRegimeAnalysis } from "../risk/analysis.js";
+import { listAiProviders, runOnlineAnalysis } from "../online/service.js";
+import { GeminiProviderError } from "../ai/geminiProvider.js";
 
 
 
@@ -149,6 +151,17 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       padding-top: 1rem;
       display: none;
     }
+    .provenance-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-top: 0.75rem; }
+    .provenance-item { background: #0f172a; padding: 0.6rem; border-radius: 0.25rem; font-size: 0.75rem; word-break: break-word; }
+    .provenance-label { color: var(--text-muted); display:block; margin-bottom:0.15rem; }
+    .ai-box { margin-top: 1rem; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.8rem; background: #0b1220; }
+    .ai-box h3 { font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .ai-box p, .ai-box li { font-size: 0.8rem; color: var(--text-muted); }
+    .ai-box ul { padding-left: 1rem; margin: 0.35rem 0 0.6rem; }
+    .status-pill { display:inline-flex; align-items:center; gap:0.35rem; padding:0.2rem 0.5rem; border-radius:9999px; font-size:0.72rem; background:var(--badge-bg); border:1px solid var(--border); }
+    .status-dot { width:7px; height:7px; border-radius:50%; background:var(--yellow); }
+    .status-dot.ok { background:var(--green); }
+    .status-dot.off { background:var(--red); }
     .rec-badge {
       display: inline-block;
       font-size: 1.1rem;
@@ -324,7 +337,27 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         }
       } catch (e) {}
     }
+    async function refreshAiProvider() {
+      try {
+        const providerRes = await fetch('/api/ai/providers').then(r => r.json());
+        const gemini = (providerRes.providers || []).find(p => p.id === 'gemini');
+        const select = document.getElementById('aiProvider');
+        const option = select.querySelector('option[value="gemini"]');
+        if (gemini?.configured) {
+          document.getElementById('aiProviderText').textContent = gemini.model + ' configured';
+          option.disabled = false;
+          option.textContent = 'Gemini contextual analysis (' + gemini.model + ')';
+          const dot = document.querySelector('#aiProviderText');
+        } else {
+          document.getElementById('aiProviderText').textContent = 'Gemini key not configured';
+          option.disabled = true;
+        }
+      } catch (e) {
+        document.getElementById('aiProviderText').textContent = 'AI provider status unavailable';
+      }
+    }
     refreshStatus();
+    refreshAiProvider();
 
     const form = document.getElementById('analyzeForm');
     const analyzeBtn = document.getElementById('analyzeBtn');
@@ -342,10 +375,10 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
           timeframe: document.getElementById('timeframe').value,
           valorInvestimento: Number(document.getElementById('valorInvestimento').value),
           engine: document.getElementById('engine').value,
-          news: document.getElementById('news').checked,
+          news: document.getElementById('news').checked,\n          aiProvider: document.getElementById('aiProvider').value,
         };
 
-        const res = await fetch('/api/analyze', {
+        const res = await fetch('/api/online-analysis', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
