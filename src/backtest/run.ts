@@ -5,7 +5,7 @@ import { fetchKlines } from "../marketdata/binanceClient.js";
 import { computeIndicatorsSeries } from "../features/indicators.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
 import { evaluateBaseline } from "../decision/baselineEngine.js";
-import { simulateTrade } from "../papertrading/simulator.js";
+import { simulateTrade, DEFAULT_EXECUTION_COSTS, EXECUTION_MODEL_VERSION } from "../papertrading/simulator.js";
 import {
   createBacktestRun,
   getBacktestRun,
@@ -106,6 +106,12 @@ async function run() {
     thresholdsCongeladosEm: mode === "oos" ? new Date() : null,
     candlesTotal: klines.length,
     datasetHash,
+    executionModelVersion: EXECUTION_MODEL_VERSION,
+    targetPct: TARGET_PCT,
+    stopPct: STOP_PCT,
+    lookaheadCandles: LOOKAHEAD_CANDLES,
+    slippagePct: DEFAULT_EXECUTION_COSTS.slippagePct,
+    feePct: DEFAULT_EXECUTION_COSTS.feePct,
   });
 
   let processed = 0;
@@ -167,7 +173,23 @@ async function run() {
         trade.exitPrice,
         trade.outcome,
         trade.profitPercent,
-        { openedAt: signalCandle.openTime },
+        {
+          openedAt: signalCandle.closeTime ?? signalCandle.openTime,
+          closedAt: trade.outcome === "open"
+            ? null
+            : new Date(
+                (signalCandle.closeTime ?? signalCandle.openTime).getTime()
+                + trade.candlesHeld * ((signalCandle.closeTime?.getTime() ?? signalCandle.openTime.getTime()) - signalCandle.openTime.getTime()),
+              ),
+          grossProfitPercent: trade.grossProfitPercent,
+          feePercent: trade.feePercent,
+          slippagePercent: trade.slippagePercent,
+          candlesHeld: trade.candlesHeld,
+          executionModelVersion: EXECUTION_MODEL_VERSION,
+          exitReason: trade.exitReason,
+          maxFavorableExcursionPercent: trade.maxFavorableExcursionPct,
+          maxAdverseExcursionPercent: trade.maxAdverseExcursionPct,
+        },
       );
       if (trade.outcome === "open") {
         openTrades++;
