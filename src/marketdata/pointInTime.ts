@@ -13,6 +13,18 @@ export function createPointInTimeContext(asOf: Date | number): PointInTimeContex
   return { asOf: date };
 }
 
+
+export function filterKlinesByAsOf(
+  klines: Kline[],
+  asOf: Date | number,
+): Kline[] {
+  const context = createPointInTimeContext(asOf);
+  return klines.filter((kline) => {
+    const closeTime = kline.closeTime ?? kline.openTime;
+    return closeTime.getTime() <= context.asOf.getTime();
+  });
+}
+
 export function assertKlinesAvailableAsOf(
   klines: Kline[],
   asOf: Date | number,
