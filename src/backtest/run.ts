@@ -13,6 +13,8 @@ import {
   saveMarketData,
   saveSignal,
   saveTrade,
+  saveDecisionLog,
+  settleDecisionLog,
 } from "../db/repository.js";
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
@@ -41,6 +43,16 @@ function getFromRunId(): number | null {
     if (Number.isInteger(parsed) && parsed > 0) return parsed;
   }
   return null;
+}
+
+
+function forwardOutcome(signalPrice: number, future: Kline[]) {
+  const finalPrice = future[future.length - 1]?.close ?? signalPrice;
+  const delta = ((finalPrice - signalPrice) / signalPrice) * 100;
+  return {
+    forwardReturnPercent: delta,
+    outcomeDirection: delta > 0 ? "up" as const : delta < 0 ? "down" as const : "flat" as const,
+  };
 }
 
 function getLevels(entryPrice: number, side: "BUY" | "SELL") {
@@ -156,7 +168,31 @@ async function run() {
     }
 
     for (const decision of decisions) {
-      if (decision.recomendacao === "WAIT") continue;
+      const decisionAt = signalCandle.closeTime ?? signalCandle.openTime;
+      const decisionLogId = await saveDecisionLog({
+        backtestRunId: runId,
+        ativo: ATIVO,
+        timeframe: TIMEFRAME,
+        decisionAt,
+        dataAsOf: decisionAt,
+        decision,
+        referencePrice: signalCandle.close,
+        targetPct: TARGET_PCT,
+        stopPct: STOP_PCT,
+        lookaheadCandles: LOOKAHEAD_CANDLES,
+        executionModelVersion: EXECUTION_MODEL_VERSION,
+      });
+
+      if (decision.recomendacao === "WAIT") {
+        const forward = forwardOutcome(signalCandle.close, future);
+        await settleDecisionLog(decisionLogId, {
+          outcomeStatus: "settled",
+          outcomeDirection: forward.outcomeDirection,
+          forwardReturnPercent: forward.forwardReturnPercent,
+          evaluatedAt: future[future.length - 1]?.closeTime ?? future[future.length - 1]?.openTime ?? decisionAt,
+        });
+        continue;
+      }
 
       const trade = simulateTrade(
         decision.recomendacao,
