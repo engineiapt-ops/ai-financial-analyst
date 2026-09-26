@@ -29,7 +29,10 @@ export interface JevResponse {
 
 export function buildState(market: MarketState): Record<string, unknown> {
   return {
-    ativo: market.ativo, timestamp: market.timestamp, preco_atual: market.precoAtual,
+    ativo: market.ativo,
+    timestamp: market.timestamp,
+    data_as_of: market.dataAsOf,
+    preco_atual: market.precoAtual,
     EMA9: market.indicators.ema9, EMA21: market.indicators.ema21,
     RSI: market.indicators.rsi, VWAP: market.indicators.vwap, ATR: market.indicators.atr,
     noticia_sentimento: market.noticiaSentimento, macro_dolar: market.macroDolar,
