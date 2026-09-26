@@ -32,6 +32,7 @@ import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForw
 import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDiagnostics.js";
 import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernanceOverview.js";
 import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
+import { listAiProviders } from "../ai/providers.js";
 
 
 
