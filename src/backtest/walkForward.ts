@@ -405,3 +405,13 @@ export async function runWalkForward(options = getOptions()) {
     note: "Fixed-rule walk-forward validation: no parameter fitting is performed in this stage.",
   };
 }
+
+
+if (import.meta.url === new URL(process.argv[1], "file:").href) {
+  runWalkForward().then((result) => {
+    console.log(JSON.stringify(result, null, 2));
+  }).catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
