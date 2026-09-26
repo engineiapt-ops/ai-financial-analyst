@@ -79,10 +79,12 @@ export async function runRiskRegimeAnalysis(
     throw new Error("Invalid calibration window for regime analysis");
   }
 
+  const calibrationEnd = klines[calibrationCandles - 1].closeTime
+    ?? klines[calibrationCandles - 1].openTime;
   const thresholds = calibrateRegimeThresholds(
     klines,
     calibrationCandles,
-    sourceRun.thresholdsCongeladosEm ?? new Date(),
+    calibrationEnd,
   );
   const allRegimes = buildRegimeSeries(klines, thresholds);
   const evaluationRegimes = allRegimes.slice(calibrationCandles);
@@ -103,6 +105,15 @@ export async function runRiskRegimeAnalysis(
 
     const metric = upsertMetric(metrics, regime);
     metric.portfolioEntries += 1;
+
+    const syntheticDecision = {
+      origem: "baseline" as const,
+      recomendacao: position.side,
+      tamanhoPosicaoPct: 2,
+    };
+    const wouldRiskBlock =
+      evaluateRisk(syntheticDecision, regime).reason === "high_volatility";
+    if (wouldRiskBlock) metric.highVolatilityBlocksWouldOccur += 1;
 
     if (position.status === "rejected") {
       metric.rejectedPositions += 1;
