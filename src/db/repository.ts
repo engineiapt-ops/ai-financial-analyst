@@ -231,6 +231,19 @@ export interface WalkForwardPortfolioFoldInput {
   riskGateBlocks: number;
 }
 
+export interface WalkForwardPortfolioEquityInput {
+  walkForwardPortfolioRunId: number;
+  foldNumber: number;
+  asOf: Date;
+  equity: number;
+  cash: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  grossExposure: number;
+  openPositions: number;
+  drawdownPct: number;
+}
+
 export interface PortfolioRunInput {
   sourceBacktestRunId: number;
   ativo: string;
@@ -889,6 +902,51 @@ export function createRepository(db: RepositoryPool) {
         ],
       );
       return Number(rows[0]?.id);
+    },
+
+    async saveWalkForwardPortfolioEquityPoints(points: WalkForwardPortfolioEquityInput[]): Promise<void> {
+      if (!points.length) return;
+      const payload = points.map((point) => ({
+        walk_forward_portfolio_run_id: point.walkForwardPortfolioRunId,
+        fold_number: point.foldNumber,
+        as_of: point.asOf,
+        equity: point.equity,
+        cash: point.cash,
+        realized_pnl: point.realizedPnl,
+        unrealized_pnl: point.unrealizedPnl,
+        gross_exposure: point.grossExposure,
+        open_positions: point.openPositions,
+        drawdown_pct: point.drawdownPct,
+      }));
+      await db.query(
+        `INSERT INTO walk_forward_portfolio_equity
+          (walk_forward_portfolio_run_id, fold_number, as_of, equity, cash, realized_pnl,
+           unrealized_pnl, gross_exposure, open_positions, drawdown_pct)
+         SELECT walk_forward_portfolio_run_id, fold_number, as_of, equity, cash, realized_pnl,
+                unrealized_pnl, gross_exposure, open_positions, drawdown_pct
+         FROM jsonb_to_recordset($1::jsonb) AS x(
+           walk_forward_portfolio_run_id BIGINT,
+           fold_number INT,
+           as_of TIMESTAMPTZ,
+           equity NUMERIC,
+           cash NUMERIC,
+           realized_pnl NUMERIC,
+           unrealized_pnl NUMERIC,
+           gross_exposure NUMERIC,
+           open_positions INT,
+           drawdown_pct NUMERIC
+         )
+         ON CONFLICT (walk_forward_portfolio_run_id, as_of) DO UPDATE SET
+           fold_number=EXCLUDED.fold_number,
+           equity=EXCLUDED.equity,
+           cash=EXCLUDED.cash,
+           realized_pnl=EXCLUDED.realized_pnl,
+           unrealized_pnl=EXCLUDED.unrealized_pnl,
+           gross_exposure=EXCLUDED.gross_exposure,
+           open_positions=EXCLUDED.open_positions,
+           drawdown_pct=EXCLUDED.drawdown_pct`,
+        [JSON.stringify(payload)],
+      );
     },
 
     async getWalkForwardPortfolioRuns(walkForwardRunId: number) {
