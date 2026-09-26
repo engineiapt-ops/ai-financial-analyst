@@ -391,3 +391,5 @@ export function simulateWalkForwardPortfolio(options: {
     equityCurve,
   };
 }
+
+// walk-forward portfolio engine is intentionally deterministic; model versions are frozen per run.
