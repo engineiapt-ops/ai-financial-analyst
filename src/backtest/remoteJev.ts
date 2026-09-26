@@ -1,6 +1,6 @@
 import { computeIndicatorsSeries } from "../features/indicators.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
-import { simulateTrade } from "../papertrading/simulator.js";
+import { simulateTrade, DEFAULT_EXECUTION_COSTS, EXECUTION_MODEL_VERSION } from "../papertrading/simulator.js";
 import {
   createBacktestRun,
   getBacktestRun,
@@ -87,6 +87,12 @@ export async function runRemoteJevBacktest(fromRunId: number) {
     thresholdsCongeladosEm: new Date(),
     candlesTotal: klines.length,
     datasetHash,
+    executionModelVersion: EXECUTION_MODEL_VERSION,
+    targetPct: TARGET_PCT,
+    stopPct: STOP_PCT,
+    lookaheadCandles: LOOKAHEAD_CANDLES,
+    slippagePct: DEFAULT_EXECUTION_COSTS.slippagePct,
+    feePct: DEFAULT_EXECUTION_COSTS.feePct,
   });
 
   const candidates: Array<{
