@@ -256,7 +256,7 @@ export interface WalkForwardFoldInput {
   trainEnd: Date;
   testStart: Date;
   testEnd: Date;
-  estrategia: "baseline" | "buyhold" | "jev";
+  estrategia: "baseline" | "baseline_risk" | "buyhold" | "jev";
   status: "ok" | "unavailable" | "error";
   testSignals?: number;
   totalTrades?: number;
