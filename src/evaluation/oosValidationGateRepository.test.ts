@@ -2,6 +2,9 @@ import { strict as assert } from "node:assert";
 import type { RepositoryPool } from "../db/repository.js";
 import { createRepository } from "../db/repository.js";
 import type { OosValidationGate } from "./oosValidationGate.js";
+import type { OosValidationGateAuditEvidence } from "../db/repository.js";
+
+const evidence = { validationReport: {} as OosValidationGateAuditEvidence["validationReport"], robustnessReport: {} as OosValidationGateAuditEvidence["robustnessReport"] };
 
 const gate: OosValidationGate = {
   gateVersion: "oos-validation-gate.v1",
@@ -48,6 +51,7 @@ class FakeDb implements RepositoryPool {
           evidence_hash: gate.evidenceHash,
           created_at: new Date("2026-09-26T00:00:00Z"),
           gate,
+          evidence,
         }],
       } as { rows: T[] };
     }
@@ -68,6 +72,7 @@ class FakeDb implements RepositoryPool {
           evidence_hash: gate.evidenceHash,
           created_at: new Date("2026-09-26T00:00:00Z"),
           gate,
+          evidence,
         }],
       } as { rows: T[] };
     }
@@ -103,12 +108,13 @@ class FakeDb implements RepositoryPool {
 const db = new FakeDb();
 const repo = createRepository(db);
 
-const saved = await repo.saveOosValidationGateAudit({ gate });
+const saved = await repo.saveOosValidationGateAudit({ gate, evidence });
 assert.equal(saved.id, 17);
 assert.equal(saved.backtestRunId, 10);
 assert.equal(saved.walkForwardRunId, 20);
 assert.equal(saved.evidenceHash, gate.evidenceHash);
 assert.equal(saved.gate.status, "ready");
+assert.ok(saved.evidence);
 assert.match(
   db.queries.find((query) => query.includes("INSERT INTO oos_validation_gate_audits")) ?? "",
   /ON CONFLICT/,
@@ -119,6 +125,7 @@ assert.ok(loaded);
 assert.equal(loaded?.id, 17);
 assert.equal(loaded?.gateVersion, "oos-validation-gate.v1");
 assert.equal(loaded?.gate.evidenceHash, gate.evidenceHash);
+assert.ok(loaded?.evidence);
 
 const history = await repo.listOosValidationGateAudits({
   backtestRunId: 10,
@@ -127,6 +134,7 @@ const history = await repo.listOosValidationGateAudits({
 });
 assert.equal(history.length, 1);
 assert.equal(history[0]?.evidenceHash, gate.evidenceHash);
+assert.ok(history[0]?.evidence);
 
 await assert.rejects(
   repo.getOosValidationGateAudit(0),
