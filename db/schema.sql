@@ -374,29 +374,3 @@ DROP TRIGGER IF EXISTS research_snapshots_immutable ON research_snapshots;
 CREATE TRIGGER research_snapshots_immutable
   BEFORE UPDATE OR DELETE ON research_snapshots
   FOR EACH ROW EXECUTE FUNCTION reject_research_snapshot_mutation();
-
-
-
-),
-  gate JSONB NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (backtest_run_id, walk_forward_run_id, estrategia, evidence_hash)
-);
-
-CREATE INDEX IF NOT EXISTS idx_oos_gate_audit_backtest
-  ON oos_validation_gate_audits(backtest_run_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_oos_gate_audit_scope
-  ON oos_validation_gate_audits(ativo);
-CREATE OR REPLACE FUNCTION reject_oos_validation_gate_audit_mutation()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $
-BEGIN
-  RAISE EXCEPTION 'oos_validation_gate_audits are immutable';
-END;
-$;
-
-DROP TRIGGER IF EXISTS oos_validation_gate_audits_immutable ON oos_validation_gate_audits;
-CREATE TRIGGER oos_validation_gate_audits_immutable
-  BEFORE UPDATE OR DELETE ON oos_validation_gate_audits
-  FOR EACH ROW EXECUTE FUNCTION reject_oos_validation_gate_audit_mutation();
