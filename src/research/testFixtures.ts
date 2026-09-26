@@ -30,6 +30,15 @@ export function buildTestAnalyzeOutput(): AnalyzeOutput {
     valorInvestimento: 1000,
     valorExposto: 20,
     candlesAnalisados: 100,
+    marketDataQuality: {
+      version: "market-data-quality.v1",
+      status: "fresh",
+      timeframe: "1h",
+      checkedAt: "2026-09-26T11:30:00.000Z",
+      dataAsOf: "2026-09-26T11:00:00.000Z",
+      ageMs: 30 * 60 * 1000,
+      maxAgeMs: 90 * 60 * 1000,
+    },
     risk: {
       version: "risk-engine-v1",
       allowed: true,
