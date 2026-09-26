@@ -38,6 +38,7 @@ export interface DecisionResult {
   recomendacao: Recomendacao;
   tamanhoPosicaoPct: number;
   qualityScore?: number;
+  confidence?: number;
   riscoElevado?: boolean;
   jevChoice?: "ALTA" | "BAIXA" | "AGUARDAR";
   jevProbs?: Record<string, number>;
