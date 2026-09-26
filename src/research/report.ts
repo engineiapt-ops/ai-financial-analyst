@@ -39,7 +39,7 @@ function recommendationText(recommendation: AnalyzeOutput["decision"]["recomenda
   return "O motor quantitativo não encontrou condição suficiente para entrada ou saída.";
 }
 
-function buildDeterministicReport(input: AnalyzeOutput, sentiment: number, evidence: ResearchEvidence[]): AnalystReport {
+export function buildDeterministicReport(input: AnalyzeOutput, sentiment: number, evidence: ResearchEvidence[]): AnalystReport {
   const { market, decision, risk } = input;
   const ema9 = market.indicators.ema9;
   const ema21 = market.indicators.ema21;
