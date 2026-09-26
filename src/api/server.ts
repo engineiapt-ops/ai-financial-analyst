@@ -12,6 +12,7 @@ import { evaluateDecisionLog } from "../evaluation/decisionEvaluator.js";
 import { buildCalibrationReport } from "../evaluation/calibration.js";
 import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
 import { buildOosRobustnessReport } from "../evaluation/oosRobustness.js";
+import { buildOosValidationGate } from "../evaluation/oosValidationGate.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
@@ -786,6 +787,86 @@ app.get("/api/evaluation/oos-robustness", async (req, res) => {
     });
 
     res.json({ status: "ok", ...report });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-gate", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive(),
+      walkForwardRunId: z.coerce.number().int().positive(),
+      strategy: z.enum(["baseline", "baseline_risk", "jev"]),
+      iterations: z.coerce.number().int().min(1000).max(100000).default(10000),
+    }).parse(req.query);
+
+    const backtestRun = await getBacktestRun(query.backtestRunId);
+    if (!backtestRun) {
+      return res.status(404).json({ status: "error", error: "backtest run not found" });
+    }
+    if (backtestRun.mode !== "oos") {
+      return res.status(422).json({ status: "error", error: "backtestRunId must reference an oos run" });
+    }
+    if (!backtestRun.validationStart || !backtestRun.calibrationEnd) {
+      return res.status(422).json({ status: "error", error: "backtest run is missing OOS boundaries" });
+    }
+
+    const walkForwardRun = await getWalkForwardRun(query.walkForwardRunId);
+    if (!walkForwardRun) {
+      return res.status(404).json({ status: "error", error: "walk-forward run not found" });
+    }
+    if (walkForwardRun.ativo !== backtestRun.ativo || walkForwardRun.timeframe !== backtestRun.timeframe) {
+      return res.status(422).json({ status: "error", error: "backtest and walk-forward asset/timeframe scopes do not match" });
+    }
+
+    const validationFrom = backtestRun.validationStart;
+    const validationTo = backtestRun.periodoFim;
+    const filters = {
+      ativo: backtestRun.ativo,
+      timeframe: backtestRun.timeframe,
+      from: validationFrom,
+      to: validationTo,
+    };
+
+    const [decisionKpis, observations, folds] = await Promise.all([
+      getDecisionKpis(filters),
+      getDecisionCalibrationObservations(filters),
+      getWalkForwardFolds(walkForwardRun.id),
+    ]);
+
+    const calibration = buildCalibrationReport(observations, filters);
+    const validationReport = buildOosValidationReport({
+      backtestRun,
+      walkForwardRun,
+      folds,
+      calibration,
+      decisionKpis,
+    });
+    const robustnessReport = buildOosRobustnessReport({
+      backtestRun,
+      walkForwardRunId: walkForwardRun.id,
+      walkForwardDatasetHash: walkForwardRun.datasetHash,
+      folds,
+      iterations: query.iterations,
+    });
+    const gate = buildOosValidationGate({
+      strategy: query.strategy,
+      validationReport,
+      robustnessReport,
+    });
+
+    res.json({
+      status: "ok",
+      gate,
+      evidence: {
+        validationReportVersion: validationReport.reportVersion,
+        robustnessReportVersion: robustnessReport.reportVersion,
+        evidenceHash: gate.evidenceHash,
+      },
+    });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
