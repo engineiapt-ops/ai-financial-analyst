@@ -1216,6 +1216,73 @@ export const finalizePortfolioRun = (runId: number, summary: PortfolioRunSummary
 export const getPortfolioRun = (runId: number) => createRepository(getDefaultPool()).getPortfolioRun(runId);
 export const getPortfolioEquityCurve = (runId: number, limit = 5000) => createRepository(getDefaultPool()).getPortfolioEquityCurve(runId, limit);
 
+export interface PortfolioPositionRow {
+  id: number;
+  portfolioRunId: number;
+  paperTradeId: number;
+  side: "BUY" | "SELL";
+  allocatedNotional: number;
+  entryPrice: number;
+  exitPrice: number | null;
+  openedAt: Date;
+  closedAt: Date | null;
+  status: "closed" | "liquidated_end" | "rejected";
+  netPnl: number | null;
+  grossPnl: number | null;
+  fees: number | null;
+  slippage: number | null;
+  returnPct: number | null;
+  rejectionReason: string | null;
+}
+
+export const getPortfolioPositions = async (runId: number): Promise<PortfolioPositionRow[]> => {
+  const { rows } = await getDefaultPool().query<{
+    id: number;
+    portfolio_run_id: number;
+    paper_trade_id: number;
+    side: "BUY" | "SELL";
+    allocated_notional: string | number;
+    entry_price: string | number;
+    exit_price: string | number | null;
+    opened_at: Date;
+    closed_at: Date | null;
+    status: "closed" | "liquidated_end" | "rejected";
+    net_pnl: string | number | null;
+    gross_pnl: string | number | null;
+    fees: string | number | null;
+    slippage: string | number | null;
+    return_pct: string | number | null;
+    rejection_reason: string | null;
+  }>(
+    `SELECT id, portfolio_run_id, paper_trade_id, side, allocated_notional,
+            entry_price, exit_price, opened_at, closed_at, status, net_pnl,
+            gross_pnl, fees, slippage, return_pct, rejection_reason
+     FROM portfolio_positions
+     WHERE portfolio_run_id=$1
+     ORDER BY opened_at ASC, id ASC`,
+    [runId],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    portfolioRunId: row.portfolio_run_id,
+    paperTradeId: row.paper_trade_id,
+    side: row.side,
+    allocatedNotional: Number(row.allocated_notional),
+    entryPrice: Number(row.entry_price),
+    exitPrice: row.exit_price === null ? null : Number(row.exit_price),
+    openedAt: new Date(row.opened_at),
+    closedAt: row.closed_at ? new Date(row.closed_at) : null,
+    status: row.status,
+    netPnl: row.net_pnl === null ? null : Number(row.net_pnl),
+    grossPnl: row.gross_pnl === null ? null : Number(row.gross_pnl),
+    fees: row.fees === null ? null : Number(row.fees),
+    slippage: row.slippage === null ? null : Number(row.slippage),
+    returnPct: row.return_pct === null ? null : Number(row.return_pct),
+    rejectionReason: row.rejection_reason,
+  }));
+};
+
 export const saveDecisionLog = (input: DecisionLogInput) => createRepository(getDefaultPool()).saveDecisionLog(input);
 export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => createRepository(getDefaultPool()).settleDecisionLog(id, outcome);
 export const createBenchmarkRun = (input: BenchmarkRunInput) => createRepository(getDefaultPool()).createBenchmarkRun(input);
