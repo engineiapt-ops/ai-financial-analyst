@@ -13,6 +13,7 @@ import { getMetricsByOrigem } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
+import { runBenchmarkSuite } from "../backtest/benchmark.js";
 
 
 
@@ -469,6 +470,23 @@ app.get("/api/metrics", async (req, res) => {
 
 
 
+
+app.get("/api/backtest/benchmark", async (req, res) => {
+  try {
+    const rawRunId = req.query.fromRun;
+    const fromRunId = Number(rawRunId ?? 1);
+    if (!Number.isInteger(fromRunId) || fromRunId <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    const includeJev = String(req.query.includeJev ?? "true").toLowerCase() !== "false";
+    const result = await runBenchmarkSuite(fromRunId, includeJev);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
 
 app.get("/api/backtest/jev", async (req, res) => {
   try {
