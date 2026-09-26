@@ -110,8 +110,12 @@ export class GeminiProvider implements AnalystAiProvider {
           body: JSON.stringify({
             contents: [{ role: "user", parts: [{ text: buildPrompt(packet) }] }],
             generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema,
+              responseFormat: {
+                text: {
+                  mimeType: "application/json",
+                  schema: responseSchema,
+                },
+              },
             },
           }),
           signal: controller.signal,
