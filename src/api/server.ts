@@ -16,6 +16,8 @@ import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
 import { runBenchmarkSuite } from "../backtest/benchmark.js";
 import { runRemoteBaselineBacktest } from "../backtest/remoteBaseline.js";
 import { runWalkForward } from "../backtest/walkForward.js";
+import { runPortfolioEngine } from "../portfolio/engine.js";
+import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
 
 
 
@@ -510,12 +512,56 @@ app.get("/api/backtest/walk-forward", async (req, res) => {
 app.get("/api/backtest/baseline", async (req, res) => {
   try {
     const rawRunId = req.query.fromRun;
-    const fromRunId = Number(rawRunId ?? 1);
-    if (!Number.isInteger(fromRunId) || fromRunId <= 0) {
+    const fromRunId = rawRunId === undefined ? undefined : Number(rawRunId);
+    const candles = Number(req.query.candles ?? 5000);
+    if (fromRunId !== undefined && (!Number.isInteger(fromRunId) || fromRunId <= 0)) {
       return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
     }
-    const result = await runRemoteBaselineBacktest(fromRunId);
+    if (!Number.isInteger(candles) || candles < 1000 || candles > 5000) {
+      return res.status(400).json({ status: "error", error: "candles must be an integer between 1000 and 5000" });
+    }
+    const result = await runRemoteBaselineBacktest(fromRunId, candles);
     res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/portfolio/run", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    const initialCapital = Number(req.query.initialCapital ?? 1000);
+    const positionSizePct = Number(req.query.positionSizePct ?? 2);
+    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? 20);
+    const result = await runPortfolioEngine({
+      sourceRunId: fromRun,
+      initialCapital,
+      positionSizePct,
+      maxGrossExposurePct,
+    });
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/portfolio", async (req, res) => {
+  try {
+    const runId = Number(req.query.runId);
+    if (!Number.isInteger(runId) || runId <= 0) {
+      return res.status(400).json({ status: "error", error: "runId must be a positive integer" });
+    }
+    const run = await getPortfolioRun(runId);
+    if (!run) return res.status(404).json({ status: "error", error: "portfolio run not found" });
+    const curve = await getPortfolioEquityCurve(runId);
+    res.json({ status: "ok", run, equityCurve: curve });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
