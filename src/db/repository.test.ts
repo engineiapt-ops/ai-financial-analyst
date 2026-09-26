@@ -70,6 +70,10 @@ class FakeDb implements RepositoryPool {
           avg_profit_percent: 0.75,
           expectancy_percent: 0.75,
           max_drawdown_percent: 0.5,
+          gross_total_profit_percent: 1.9,
+          total_fee_percent: 0.2,
+          total_slippage_percent: 0.1,
+          avg_candles_held: 4,
         }],
       } as { rows: T[] };
     }
