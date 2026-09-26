@@ -135,6 +135,51 @@ export interface BenchmarkResultInput {
   notas?: string | null;
 }
 
+export interface WalkForwardRunInput {
+  ativo: string;
+  timeframe: Timeframe;
+  datasetStart: Date;
+  datasetEnd: Date;
+  candlesTotal: number;
+  datasetHash: string;
+  initialTrainCandles: number;
+  testCandles: number;
+  stepCandles: number;
+  lookaheadCandles: number;
+  executionModelVersion: string;
+  targetPct: number;
+  stopPct: number;
+  slippagePct: number;
+  feePct: number;
+  thresholdFrozenAt?: Date | null;
+}
+
+export interface WalkForwardFoldInput {
+  walkForwardRunId: number;
+  foldNumber: number;
+  trainStart: Date;
+  trainEnd: Date;
+  testStart: Date;
+  testEnd: Date;
+  estrategia: "baseline" | "buyhold" | "jev";
+  status: "ok" | "unavailable" | "error";
+  testSignals?: number;
+  totalTrades?: number;
+  closedTrades?: number;
+  openTrades?: number;
+  winRate?: number | null;
+  profitFactor?: number | null;
+  totalProfitPercent?: number;
+  avgProfitPercent?: number;
+  expectancyPercent?: number;
+  maxDrawdownPercent?: number;
+  grossTotalProfitPercent?: number;
+  totalFeePercent?: number;
+  totalSlippagePercent?: number;
+  avgCandlesHeld?: number | null;
+  notas?: string | null;
+}
+
 export interface MetricsByOrigem {
   origem: string;
   total: number;
@@ -596,6 +641,110 @@ export function createRepository(db: RepositoryPool) {
       return rows;
     },
 
+
+    async createWalkForwardRun(input: WalkForwardRunInput): Promise<number> {
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO walk_forward_runs
+          (ativo, timeframe, dataset_start, dataset_end, candles_total, dataset_hash,
+           initial_train_candles, test_candles, step_candles, lookahead_candles,
+           execution_model_version, target_pct, stop_pct, slippage_pct, fee_pct, threshold_frozen_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+         RETURNING id`,
+        [
+          input.ativo,
+          input.timeframe,
+          input.datasetStart,
+          input.datasetEnd,
+          input.candlesTotal,
+          input.datasetHash,
+          input.initialTrainCandles,
+          input.testCandles,
+          input.stepCandles,
+          input.lookaheadCandles,
+          input.executionModelVersion,
+          input.targetPct,
+          input.stopPct,
+          input.slippagePct,
+          input.feePct,
+          input.thresholdFrozenAt ?? null,
+        ],
+      );
+      const id = Number(rows[0]?.id);
+      if (!Number.isInteger(id) || id <= 0) throw new Error("Database did not return a valid walk-forward run id");
+      return id;
+    },
+
+    async saveWalkForwardFold(input: WalkForwardFoldInput): Promise<number> {
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO walk_forward_folds
+          (walk_forward_run_id, fold_number, train_start, train_end, test_start, test_end,
+           estrategia, status, test_signals, total_trades, closed_trades, open_trades,
+           win_rate, profit_factor, total_profit_percent, avg_profit_percent, expectancy_percent,
+           max_drawdown_percent, gross_total_profit_percent, total_fee_percent, total_slippage_percent,
+           avg_candles_held, notas)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+         ON CONFLICT (walk_forward_run_id, fold_number, estrategia) DO UPDATE SET
+           status=EXCLUDED.status,
+           test_signals=EXCLUDED.test_signals,
+           total_trades=EXCLUDED.total_trades,
+           closed_trades=EXCLUDED.closed_trades,
+           open_trades=EXCLUDED.open_trades,
+           win_rate=EXCLUDED.win_rate,
+           profit_factor=EXCLUDED.profit_factor,
+           total_profit_percent=EXCLUDED.total_profit_percent,
+           avg_profit_percent=EXCLUDED.avg_profit_percent,
+           expectancy_percent=EXCLUDED.expectancy_percent,
+           max_drawdown_percent=EXCLUDED.max_drawdown_percent,
+           gross_total_profit_percent=EXCLUDED.gross_total_profit_percent,
+           total_fee_percent=EXCLUDED.total_fee_percent,
+           total_slippage_percent=EXCLUDED.total_slippage_percent,
+           avg_candles_held=EXCLUDED.avg_candles_held,
+           notas=EXCLUDED.notas
+         RETURNING id`,
+        [
+          input.walkForwardRunId,
+          input.foldNumber,
+          input.trainStart,
+          input.trainEnd,
+          input.testStart,
+          input.testEnd,
+          input.estrategia,
+          input.status,
+          input.testSignals ?? 0,
+          input.totalTrades ?? 0,
+          input.closedTrades ?? 0,
+          input.openTrades ?? 0,
+          input.winRate ?? null,
+          input.profitFactor ?? null,
+          input.totalProfitPercent ?? 0,
+          input.avgProfitPercent ?? 0,
+          input.expectancyPercent ?? 0,
+          input.maxDrawdownPercent ?? 0,
+          input.grossTotalProfitPercent ?? 0,
+          input.totalFeePercent ?? 0,
+          input.totalSlippagePercent ?? 0,
+          input.avgCandlesHeld ?? null,
+          input.notas ?? null,
+        ],
+      );
+      return Number(rows[0]?.id);
+    },
+
+    async getWalkForwardFolds(walkForwardRunId: number) {
+      const { rows } = await db.query(
+        `SELECT fold_number, train_start, train_end, test_start, test_end, estrategia,
+                status, test_signals, total_trades, closed_trades, open_trades,
+                win_rate, profit_factor, total_profit_percent, avg_profit_percent,
+                expectancy_percent, max_drawdown_percent, gross_total_profit_percent,
+                total_fee_percent, total_slippage_percent, avg_candles_held, notas
+         FROM walk_forward_folds
+         WHERE walk_forward_run_id = $1
+         ORDER BY fold_number, estrategia`,
+        [walkForwardRunId],
+      );
+      return rows;
+    },
+
     async freezeConfigThresholds(userId: string): Promise<void> {
       if (!userId.trim()) throw new Error("userId is required");
       await db.query(
@@ -704,6 +853,10 @@ export const createBacktestRun = (input: BacktestRunInput) =>
 
 export const getBacktestRun = (id: number) =>
   createRepository(getDefaultPool()).getBacktestRun(id);
+
+export const createWalkForwardRun = (input: WalkForwardRunInput) => createRepository(getDefaultPool()).createWalkForwardRun(input);
+export const saveWalkForwardFold = (input: WalkForwardFoldInput) => createRepository(getDefaultPool()).saveWalkForwardFold(input);
+export const getWalkForwardFolds = (walkForwardRunId: number) => createRepository(getDefaultPool()).getWalkForwardFolds(walkForwardRunId);
 
 export const saveDecisionLog = (input: DecisionLogInput) => createRepository(getDefaultPool()).saveDecisionLog(input);
 export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => createRepository(getDefaultPool()).settleDecisionLog(id, outcome);
