@@ -54,6 +54,7 @@ export interface OosRobustnessReport {
     validationFrom: string;
     validationTo: string;
     datasetHash: string | null;
+    walkForwardDatasetHash: string | null;
   };
   methodology: {
     bootstrap: "resample-with-replacement";
@@ -245,6 +246,7 @@ export function buildOosRobustnessReport(input: {
     | "datasetHash"
   >;
   walkForwardRunId: number;
+  walkForwardDatasetHash?: string | null;
   folds: OosFoldRow[];
   iterations?: number;
   confidenceLevel?: number;
@@ -292,6 +294,14 @@ export function buildOosRobustnessReport(input: {
   ]);
   const warnings: string[] = [];
 
+  if (
+    input.backtestRun.datasetHash &&
+    input.walkForwardDatasetHash &&
+    input.backtestRun.datasetHash !== input.walkForwardDatasetHash
+  ) {
+    warnings.push("Backtest and walk-forward dataset hashes do not match.");
+  }
+
   if (scopedFolds.length === 0) {
     warnings.push("No usable walk-forward folds fall completely inside the OOS validation window.");
   }
@@ -330,6 +340,7 @@ export function buildOosRobustnessReport(input: {
       validationFrom: validationFrom.toISOString(),
       validationTo: validationTo.toISOString(),
       datasetHash: input.backtestRun.datasetHash,
+      walkForwardDatasetHash: input.walkForwardDatasetHash ?? null,
     },
     methodology: {
       bootstrap: "resample-with-replacement",
@@ -339,6 +350,7 @@ export function buildOosRobustnessReport(input: {
       noParameterOptimization: true,
       notes: [
         "Bootstrap intervals resample persisted walk-forward fold returns; they do not simulate new market paths.",
+        "Fold dependence and time-series autocorrelation are not modeled by this bootstrap.",
         "Leave-one-fold-out sensitivity shows how much aggregate fold return changes when a single validation fold is excluded.",
         "Confidence intervals are uncertainty diagnostics, not guarantees about future performance.",
       ],
