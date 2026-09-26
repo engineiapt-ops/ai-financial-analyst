@@ -67,10 +67,6 @@ export interface OosRobustnessReport {
   warnings: string[];
 }
 
-function finite(value: number | null | undefined): number | null {
-  return value !== null && value !== undefined && Number.isFinite(value) ? value : null;
-}
-
 function mean(values: number[]): number | null {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
