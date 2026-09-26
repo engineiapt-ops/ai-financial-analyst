@@ -25,6 +25,7 @@ function listen(): Promise<number> {
 function close(): Promise<void> {
   return new Promise((resolve, reject) => {
     server.close((error) => (error ? reject(error) : resolve()));
+    server.closeAllConnections();
   });
 }
 
