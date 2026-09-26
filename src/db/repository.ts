@@ -180,6 +180,79 @@ export interface WalkForwardFoldInput {
   notas?: string | null;
 }
 
+export interface PortfolioRunInput {
+  sourceBacktestRunId: number;
+  ativo: string;
+  timeframe: Timeframe;
+  initialCapital: number;
+  positionSizePct: number;
+  maxGrossExposurePct: number;
+  portfolioModelVersion: string;
+  datasetHash: string;
+}
+
+export interface PortfolioRunSummary {
+  finalEquity: number;
+  totalReturnPct: number;
+  cagrPct?: number | null;
+  maxDrawdownPct: number;
+  sharpe?: number | null;
+  sortino?: number | null;
+  totalTrades: number;
+  closedTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  rejectedTrades: number;
+  totalRealizedPnl: number;
+  totalUnrealizedPnl: number;
+  totalFees: number;
+  totalSlippage: number;
+}
+
+export interface PortfolioPositionInput {
+  portfolioRunId: number;
+  paperTradeId: number;
+  side: "BUY" | "SELL";
+  allocatedNotional: number;
+  entryPrice: number;
+  exitPrice?: number | null;
+  openedAt: Date;
+  closedAt?: Date | null;
+  status: "closed" | "liquidated_end" | "rejected";
+  netPnl?: number;
+  grossPnl?: number;
+  fees?: number;
+  slippage?: number;
+  returnPct?: number;
+  rejectionReason?: string | null;
+}
+
+export interface PortfolioEquityPointInput {
+  portfolioRunId: number;
+  asOf: Date;
+  equity: number;
+  cash: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  grossExposure: number;
+  openPositions: number;
+  drawdownPct: number;
+}
+
+export interface PortfolioSourceTrade {
+  paperTradeId: number;
+  side: "BUY" | "SELL";
+  entryPrice: number;
+  exitPrice: number | null;
+  outcome: "win" | "loss" | "open";
+  profitPercent: number;
+  grossProfitPercent: number | null;
+  feePercent: number | null;
+  slippagePercent: number | null;
+  openedAt: Date;
+  closedAt: Date | null;
+}
+
 export interface MetricsByOrigem {
   origem: string;
   total: number;
@@ -745,6 +818,204 @@ export function createRepository(db: RepositoryPool) {
       return rows;
     },
 
+
+    async getPortfolioSourceTrades(backtestRunId: number): Promise<PortfolioSourceTrade[]> {
+      const { rows } = await db.query<{
+        paper_trade_id: string | number;
+        side: "BUY" | "SELL";
+        entry_price: string | number;
+        exit_price: string | number | null;
+        outcome: "win" | "loss" | "open";
+        profit_percent: string | number;
+        gross_profit_percent: string | number | null;
+        fee_percent: string | number | null;
+        slippage_percent: string | number | null;
+        opened_at: Date;
+        closed_at: Date | null;
+      }>(
+        `SELECT t.id AS paper_trade_id,
+                s.recomendacao AS side,
+                t.entry_price,
+                t.exit_price,
+                t.outcome,
+                t.profit_percent,
+                t.gross_profit_percent,
+                t.fee_percent,
+                t.slippage_percent,
+                t.opened_at,
+                t.closed_at
+         FROM signals s
+         INNER JOIN paper_trades t ON t.signal_id = s.id
+         WHERE s.backtest_run_id = $1
+           AND s.recomendacao IN ('BUY', 'SELL')
+         ORDER BY t.opened_at ASC, t.id ASC`,
+        [backtestRunId],
+      );
+      return rows.map((row) => ({
+        paperTradeId: Number(row.paper_trade_id),
+        side: row.side,
+        entryPrice: Number(row.entry_price),
+        exitPrice: row.exit_price === null ? null : Number(row.exit_price),
+        outcome: row.outcome,
+        profitPercent: Number(row.profit_percent),
+        grossProfitPercent: row.gross_profit_percent === null ? null : Number(row.gross_profit_percent),
+        feePercent: row.fee_percent === null ? null : Number(row.fee_percent),
+        slippagePercent: row.slippage_percent === null ? null : Number(row.slippage_percent),
+        openedAt: new Date(row.opened_at),
+        closedAt: row.closed_at ? new Date(row.closed_at) : null,
+      }));
+    },
+
+    async createPortfolioRun(input: PortfolioRunInput): Promise<number> {
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO portfolio_runs
+          (source_backtest_run_id, ativo, timeframe, initial_capital, final_equity,
+           position_size_pct, max_gross_exposure_pct, portfolio_model_version,
+           dataset_hash, total_return_pct, max_drawdown_pct)
+         VALUES ($1,$2,$3,$4,$4,$5,$6,$7,$8,$9,0,0)
+         RETURNING id`,
+        [
+          input.sourceBacktestRunId,
+          input.ativo,
+          input.timeframe,
+          input.initialCapital,
+          input.positionSizePct,
+          input.maxGrossExposurePct,
+          input.portfolioModelVersion,
+          input.datasetHash,
+        ],
+      );
+      const id = Number(rows[0]?.id);
+      if (!Number.isInteger(id) || id <= 0) throw new Error("Database did not return a valid portfolio run id");
+      return id;
+    },
+
+    async savePortfolioPosition(input: PortfolioPositionInput): Promise<number> {
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO portfolio_positions
+          (portfolio_run_id, paper_trade_id, side, allocated_notional, entry_price, exit_price,
+           opened_at, closed_at, status, net_pnl, gross_pnl, fees, slippage, return_pct, rejection_reason)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         RETURNING id`,
+        [
+          input.portfolioRunId,
+          input.paperTradeId,
+          input.side,
+          input.allocatedNotional,
+          input.entryPrice,
+          input.exitPrice ?? null,
+          input.openedAt,
+          input.closedAt ?? null,
+          input.status,
+          input.netPnl ?? 0,
+          input.grossPnl ?? 0,
+          input.fees ?? 0,
+          input.slippage ?? 0,
+          input.returnPct ?? 0,
+          input.rejectionReason ?? null,
+        ],
+      );
+      return Number(rows[0]?.id);
+    },
+
+    async savePortfolioEquityPoint(input: PortfolioEquityPointInput): Promise<number> {
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO portfolio_equity_curve
+          (portfolio_run_id, as_of, equity, cash, realized_pnl, unrealized_pnl,
+           gross_exposure, open_positions, drawdown_pct)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         ON CONFLICT (portfolio_run_id, as_of) DO UPDATE SET
+           equity=EXCLUDED.equity,
+           cash=EXCLUDED.cash,
+           realized_pnl=EXCLUDED.realized_pnl,
+           unrealized_pnl=EXCLUDED.unrealized_pnl,
+           gross_exposure=EXCLUDED.gross_exposure,
+           open_positions=EXCLUDED.open_positions,
+           drawdown_pct=EXCLUDED.drawdown_pct
+         RETURNING id`,
+        [
+          input.portfolioRunId,
+          input.asOf,
+          input.equity,
+          input.cash,
+          input.realizedPnl,
+          input.unrealizedPnl,
+          input.grossExposure,
+          input.openPositions,
+          input.drawdownPct,
+        ],
+      );
+      return Number(rows[0]?.id);
+    },
+
+    async finalizePortfolioRun(runId: number, summary: PortfolioRunSummary): Promise<void> {
+      await db.query(
+        `UPDATE portfolio_runs
+         SET final_equity=$2,
+             total_return_pct=$3,
+             cagr_pct=$4,
+             max_drawdown_pct=$5,
+             sharpe=$6,
+             sortino=$7,
+             total_trades=$8,
+             closed_trades=$9,
+             winning_trades=$10,
+             losing_trades=$11,
+             rejected_trades=$12,
+             total_realized_pnl=$13,
+             total_unrealized_pnl=$14,
+             total_fees=$15,
+             total_slippage=$16
+         WHERE id=$1`,
+        [
+          runId,
+          summary.finalEquity,
+          summary.totalReturnPct,
+          summary.cagrPct ?? null,
+          summary.maxDrawdownPct,
+          summary.sharpe ?? null,
+          summary.sortino ?? null,
+          summary.totalTrades,
+          summary.closedTrades,
+          summary.winningTrades,
+          summary.losingTrades,
+          summary.rejectedTrades,
+          summary.totalRealizedPnl,
+          summary.totalUnrealizedPnl,
+          summary.totalFees,
+          summary.totalSlippage,
+        ],
+      );
+    },
+
+    async getPortfolioRun(runId: number) {
+      const { rows } = await db.query(
+        `SELECT id, source_backtest_run_id, ativo, timeframe, initial_capital,
+                final_equity, position_size_pct, max_gross_exposure_pct,
+                portfolio_model_version, dataset_hash, total_return_pct, cagr_pct,
+                max_drawdown_pct, sharpe, sortino, total_trades, closed_trades,
+                winning_trades, losing_trades, rejected_trades, total_realized_pnl,
+                total_unrealized_pnl, total_fees, total_slippage, created_at
+         FROM portfolio_runs WHERE id=$1`,
+        [runId],
+      );
+      return rows[0] ?? null;
+    },
+
+    async getPortfolioEquityCurve(runId: number, limit = 5000) {
+      validateLimit(limit);
+      const { rows } = await db.query(
+        `SELECT as_of, equity, cash, realized_pnl, unrealized_pnl,
+                gross_exposure, open_positions, drawdown_pct
+         FROM portfolio_equity_curve
+         WHERE portfolio_run_id=$1
+         ORDER BY as_of ASC
+         LIMIT $2`,
+        [runId, limit],
+      );
+      return rows;
+    },
+
     async freezeConfigThresholds(userId: string): Promise<void> {
       if (!userId.trim()) throw new Error("userId is required");
       await db.query(
@@ -857,6 +1128,14 @@ export const getBacktestRun = (id: number) =>
 export const createWalkForwardRun = (input: WalkForwardRunInput) => createRepository(getDefaultPool()).createWalkForwardRun(input);
 export const saveWalkForwardFold = (input: WalkForwardFoldInput) => createRepository(getDefaultPool()).saveWalkForwardFold(input);
 export const getWalkForwardFolds = (walkForwardRunId: number) => createRepository(getDefaultPool()).getWalkForwardFolds(walkForwardRunId);
+
+export const getPortfolioSourceTrades = (backtestRunId: number) => createRepository(getDefaultPool()).getPortfolioSourceTrades(backtestRunId);
+export const createPortfolioRun = (input: PortfolioRunInput) => createRepository(getDefaultPool()).createPortfolioRun(input);
+export const savePortfolioPosition = (input: PortfolioPositionInput) => createRepository(getDefaultPool()).savePortfolioPosition(input);
+export const savePortfolioEquityPoint = (input: PortfolioEquityPointInput) => createRepository(getDefaultPool()).savePortfolioEquityPoint(input);
+export const finalizePortfolioRun = (runId: number, summary: PortfolioRunSummary) => createRepository(getDefaultPool()).finalizePortfolioRun(runId, summary);
+export const getPortfolioRun = (runId: number) => createRepository(getDefaultPool()).getPortfolioRun(runId);
+export const getPortfolioEquityCurve = (runId: number, limit = 5000) => createRepository(getDefaultPool()).getPortfolioEquityCurve(runId, limit);
 
 export const saveDecisionLog = (input: DecisionLogInput) => createRepository(getDefaultPool()).saveDecisionLog(input);
 export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => createRepository(getDefaultPool()).settleDecisionLog(id, outcome);
