@@ -841,10 +841,11 @@ export function createRepository(db: RepositoryPool) {
         evidence_hash: string;
         created_at: Date;
         gate: OosValidationGate;
+        evidence: OosValidationGateAuditEvidence | null;
       }>(
         `SELECT id, backtest_run_id, walk_forward_run_id, ativo, timeframe,
                 estrategia, gate_version, status, validation_from, validation_to,
-                evidence_hash, created_at, gate
+                evidence_hash, created_at, gate, evidence
          FROM oos_validation_gate_audits
          ${where}
          ORDER BY created_at DESC, id DESC
@@ -867,6 +868,7 @@ export function createRepository(db: RepositoryPool) {
         evidenceHash: row.evidence_hash,
         createdAt: new Date(row.created_at),
         gate: row.gate,
+        evidence: row.evidence ?? null,
       }));
     },
 
