@@ -821,6 +821,8 @@ app.get("/api/evaluation/overview", async (req, res) => {
       getDecisionKpis(filters),
       getDecisionCalibrationObservations(filters),
       listOosValidationGateAudits({
+        ativo: query.ativo,
+        timeframe: query.timeframe,
         strategy: undefined,
         limit: query.limit,
       }),
