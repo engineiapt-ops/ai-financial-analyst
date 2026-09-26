@@ -52,6 +52,26 @@ class FakeDb implements RepositoryPool {
       } as { rows: T[] };
     }
 
+    if (text.includes("FROM oos_validation_gate_audits") && text.includes("ORDER BY created_at DESC")) {
+      return {
+        rows: [{
+          id: 17,
+          backtest_run_id: 10,
+          walk_forward_run_id: 20,
+          ativo: "BTCUSDT",
+          timeframe: "1h",
+          estrategia: "baseline",
+          gate_version: "oos-validation-gate.v1",
+          status: "ready",
+          validation_from: new Date("2026-08-01T00:00:00Z"),
+          validation_to: new Date("2026-09-01T00:00:00Z"),
+          evidence_hash: gate.evidenceHash,
+          created_at: new Date("2026-09-26T00:00:00Z"),
+          gate,
+        }],
+      } as { rows: T[] };
+    }
+
     if (text.includes("FROM oos_validation_gate_audits") && text.includes("WHERE id = $1")) {
       return {
         rows: [{
@@ -99,6 +119,14 @@ assert.ok(loaded);
 assert.equal(loaded?.id, 17);
 assert.equal(loaded?.gateVersion, "oos-validation-gate.v1");
 assert.equal(loaded?.gate.evidenceHash, gate.evidenceHash);
+
+const history = await repo.listOosValidationGateAudits({
+  backtestRunId: 10,
+  strategy: "baseline",
+  limit: 10,
+});
+assert.equal(history.length, 1);
+assert.equal(history[0]?.evidenceHash, gate.evidenceHash);
 
 await assert.rejects(
   repo.getOosValidationGateAudit(0),
