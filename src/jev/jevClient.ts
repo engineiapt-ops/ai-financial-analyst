@@ -3,6 +3,8 @@ import { getVercelOidcToken } from "@vercel/oidc";
 
 const BASE_URL = (process.env.JEV_BASE_URL ?? "https://ai-gateway.vercel.sh/typesafe").replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 12_000;
+const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 750;
 const STATIC_API_KEY = process.env.AI_GATEWAY_API_KEY ?? "";
 
 async function getGatewayCredential(): Promise<string> {
@@ -59,40 +61,74 @@ function validateJevResponse(value: any): JevResponse {
   return value as JevResponse;
 }
 
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function retryDelayMs(attempt: number, retryAfterHeader: string | null): number {
+  if (retryAfterHeader) {
+    const seconds = Number(retryAfterHeader);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, 8_000);
+  }
+  return Math.min(RETRY_BASE_MS * 2 ** attempt, 8_000);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function callJev(market: MarketState): Promise<JevResponse> {
   const credential = await getGatewayCredential();
   if (!credential) {
     throw new Error("AI_GATEWAY_API_KEY não configurada.");
   }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-  const res = await fetch(`${BASE_URL}/v1/systemone`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${credential}` },
-    body: JSON.stringify({
-      model: JEV_MODEL, state: buildState(market),
-      questions: {
-        direcao: {
-          type: "choice",
-          instructions: "Qual direção de trade segue o cenário? ALTA, BAIXA, AGUARDAR.",
-          criteria: { ALTA: "Cenário favorece compra", BAIXA: "Cenário favorece venda", AGUARDAR: "Cenário incerto" }
-        },
-        risco_elevado: {
-          type: "noul", instructions: "O mercado apresenta risco elevado?",
-          criteria: { true: "Risco de reversão/volatilidade alta", false: "Risco contínuo ou baixo" }
-        },
-        qualidade: { type: "score", instructions: "Qual a qualidade dessa oportunidade?", criteria: ["Baixa", "Moderada", "Alta"] }
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${BASE_URL}/v1/systemone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${credential}` },
+        body: JSON.stringify({
+          model: JEV_MODEL,
+          state: buildState(market),
+          questions: {
+            direcao: {
+              type: "choice",
+              instructions: "Qual direção de trade segue o cenário? ALTA, BAIXA, AGUARDAR.",
+              criteria: { ALTA: "Cenário favorece compra", BAIXA: "Cenário favorece venda", AGUARDAR: "Cenário incerto" }
+            },
+            risco_elevado: {
+              type: "noul",
+              instructions: "O mercado apresenta risco elevado?",
+              criteria: { true: "Risco de reversão/volatilidade alta", false: "Risco contínuo ou baixo" }
+            },
+            qualidade: {
+              type: "score",
+              instructions: "Qual a qualidade dessa oportunidade?",
+              criteria: ["Baixa", "Moderada", "Alta"]
+            }
+          }
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return validateJevResponse(data.answers ?? data);
       }
-    })
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Jev API error: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 500)}` : ""}`);
+
+      const body = await res.text().catch(() => "");
+      if (attempt < MAX_RETRIES && isRetryableStatus(res.status)) {
+        await sleep(retryDelayMs(attempt, res.headers.get("retry-after")));
+        continue;
+      }
+
+      throw new Error(`Jev API error: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 500)}` : ""}`);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
-  const data = await res.json();
-  return validateJevResponse(data.answers ?? data);
-  } finally {
-    clearTimeout(timeout);
-  }
+
+  throw new Error("Jev request retries exhausted");
 }
