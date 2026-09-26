@@ -13,8 +13,7 @@ export const MIN_GATE_CLOSED_TRADES = 30;
 export type ValidationGateStrategy =
   | "baseline"
   | "baseline_risk"
-  | "jev"
-  | "buyhold";
+  | "jev";
 
 export interface ValidationGateCheck {
   key: string;
@@ -132,45 +131,24 @@ export function buildOosValidationGate(input: {
   );
 
   const validationCandleCount =
-    validationReport.scope.oosStartRatio !== null &&
-    validationReport.scope.datasetHash !== null &&
-    validationReport.decisionKpis.summary.totalDecisions >= 0
-      ? Math.max(
-          0,
-          Math.floor(
-            ((validationReport.scope.oosStartRatio !== null
-              ? 1
-              : 0) *
-              0) +
-            0,
-          ),
-        )
-      : null;
-
-  const derivedValidationCandleCount =
+    validationReport.scope.candlesTotal !== null &&
     validationReport.scope.oosStartRatio !== null
-      ? Math.floor(
-          ((validationReport.scope.oosStartRatio >= 0 &&
-            validationReport.scope.oosStartRatio < 1)
-            ? 1
-            : 0) *
-            0,
+      ? validationReport.scope.candlesTotal -
+        Math.floor(
+          validationReport.scope.candlesTotal *
+            validationReport.scope.oosStartRatio,
         )
       : null;
-
-  // Validation candle count is checked from the persisted boundary metadata
-  // where available; the report itself remains the source of truth for scope.
-  const minimumValidationCheck =
-    validationReport.scope.oosStartRatio !== null &&
-    validationReport.scope.datasetHash !== null;
 
   addCheck(
     "validation-scope",
     minimumValidationCheck,
     true,
     minimumValidationCheck
-      ? `A janela de validação está materializada no relatório OOS; o mínimo formal da política é ${MIN_VALIDATION_CANDLES} candles.`
-      : "O relatório não contém metadados suficientes para auditar a janela de validação.",
+      ? `${validationCandleCount} candles na janela de validação; mínimo formal da política: ${MIN_VALIDATION_CANDLES}.`
+      : validationCandleCount !== null
+        ? `A janela de validação possui ${validationCandleCount} candles; mínimo formal: ${MIN_VALIDATION_CANDLES}.`
+        : "O relatório não contém metadados suficientes para auditar a janela de validação.",
   );
 
   const datasetMatch =
