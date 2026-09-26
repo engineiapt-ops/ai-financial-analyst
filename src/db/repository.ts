@@ -16,6 +16,9 @@ export interface BacktestRunInput {
   periodoInicio: Date;
   periodoFim: Date;
   oosStartRatio?: number | null;
+  calibrationEnd?: Date | null;
+  validationStart?: Date | null;
+  evaluationPolicyVersion?: string | null;
   thresholdsCongeladosEm?: Date | null;
   candlesTotal?: number | null;
   datasetHash?: string | null;
@@ -36,6 +39,9 @@ export interface BacktestRun {
   periodoInicio: Date;
   periodoFim: Date;
   oosStartRatio: number | null;
+  calibrationEnd: Date | null;
+  validationStart: Date | null;
+  evaluationPolicyVersion: string | null;
   thresholdsCongeladosEm: Date | null;
   candlesTotal: number | null;
   datasetHash: string | null;
@@ -468,9 +474,11 @@ export function createRepository(db: RepositoryPool) {
       }
       const { rows } = await db.query<{ id: number }>(
         `INSERT INTO backtest_runs
-          (engine, mode, ativo, timeframe, periodo_inicio, periodo_fim, oos_start_ratio, thresholds_congelados_em, candles_total, dataset_hash,
-           execution_model_version, target_pct, stop_pct, lookahead_candles, slippage_pct, fee_pct)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          (engine, mode, ativo, timeframe, periodo_inicio, periodo_fim, oos_start_ratio,
+           calibration_end, validation_start, evaluation_policy_version, thresholds_congelados_em,
+           candles_total, dataset_hash, execution_model_version, target_pct, stop_pct,
+           lookahead_candles, slippage_pct, fee_pct)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
          RETURNING id`,
         [
           input.engine,
@@ -480,6 +488,9 @@ export function createRepository(db: RepositoryPool) {
           input.periodoInicio,
           input.periodoFim,
           input.oosStartRatio ?? null,
+          input.calibrationEnd ?? null,
+          input.validationStart ?? null,
+          input.evaluationPolicyVersion ?? null,
           input.thresholdsCongeladosEm ?? null,
           input.candlesTotal ?? null,
           input.datasetHash ?? null,
@@ -506,6 +517,9 @@ export function createRepository(db: RepositoryPool) {
         periodo_inicio: Date;
         periodo_fim: Date;
         oos_start_ratio: string | number | null;
+        calibration_end: Date | null;
+        validation_start: Date | null;
+        evaluation_policy_version: string | null;
         thresholds_congelados_em: Date | null;
         candles_total: number | null;
         dataset_hash: string | null;
@@ -518,7 +532,8 @@ export function createRepository(db: RepositoryPool) {
         criado_em: Date;
       }>(
         `SELECT id, engine, mode, ativo, timeframe, periodo_inicio, periodo_fim,
-                oos_start_ratio, thresholds_congelados_em, candles_total, dataset_hash,
+                oos_start_ratio, calibration_end, validation_start, evaluation_policy_version,
+                thresholds_congelados_em, candles_total, dataset_hash,
                 execution_model_version, target_pct, stop_pct, lookahead_candles, slippage_pct, fee_pct, criado_em
          FROM backtest_runs
          WHERE id = $1`,
@@ -535,6 +550,9 @@ export function createRepository(db: RepositoryPool) {
         periodoInicio: new Date(row.periodo_inicio),
         periodoFim: new Date(row.periodo_fim),
         oosStartRatio: row.oos_start_ratio !== null ? Number(row.oos_start_ratio) : null,
+        calibrationEnd: row.calibration_end ? new Date(row.calibration_end) : null,
+        validationStart: row.validation_start ? new Date(row.validation_start) : null,
+        evaluationPolicyVersion: row.evaluation_policy_version ?? null,
         thresholdsCongeladosEm: row.thresholds_congelados_em ? new Date(row.thresholds_congelados_em) : null,
         candlesTotal: row.candles_total !== null ? Number(row.candles_total) : null,
         datasetHash: row.dataset_hash ?? null,
