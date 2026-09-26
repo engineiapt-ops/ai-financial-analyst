@@ -7,6 +7,8 @@ import {
   getMarketDataRange,
   saveSignal,
   saveTrade,
+  saveDecisionLog,
+  settleDecisionLog,
 } from "../db/repository.js";
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
@@ -18,6 +20,16 @@ const STOP_PCT = 0.005;
 const LOOKAHEAD_CANDLES = 20;
 const OOS_START_RATIO = 0.7;
 const CONCURRENCY = 8;
+
+
+function forwardOutcome(signalPrice: number, future: Kline[]) {
+  const finalPrice = future[future.length - 1]?.close ?? signalPrice;
+  const delta = ((finalPrice - signalPrice) / signalPrice) * 100;
+  return {
+    forwardReturnPercent: delta,
+    outcomeDirection: delta > 0 ? "up" as const : delta < 0 ? "down" as const : "flat" as const,
+  };
+}
 
 function getLevels(entryPrice: number, side: "BUY" | "SELL") {
   const direction = side === "BUY" ? 1 : -1;
@@ -148,12 +160,36 @@ export async function runRemoteJevBacktest(fromRunId: number) {
 
   for (let i = 0; i < candidates.length; i++) {
     const decision: DecisionResult = decisions[i];
+    const candidate = candidates[i];
+    const decisionAt = candidate.signalCandle.closeTime ?? candidate.signalCandle.openTime;
+    const decisionLogId = await saveDecisionLog({
+      backtestRunId: runId,
+      ativo: "BTCUSDT",
+      timeframe: "1h",
+      decisionAt,
+      dataAsOf: decisionAt,
+      decision,
+      referencePrice: candidate.signalCandle.close,
+      targetPct: TARGET_PCT,
+      stopPct: STOP_PCT,
+      lookaheadCandles: LOOKAHEAD_CANDLES,
+      executionModelVersion: EXECUTION_MODEL_VERSION,
+    });
+
     if (decision.recomendacao === "WAIT") {
       waitSignals++;
+      const forward = forwardOutcome(candidate.signalCandle.close, candidate.future);
+      await settleDecisionLog(decisionLogId, {
+        outcomeStatus: "settled",
+        outcomeDirection: forward.outcomeDirection,
+        forwardReturnPercent: forward.forwardReturnPercent,
+        evaluatedAt: candidate.future[candidate.future.length - 1]?.closeTime
+          ?? candidate.future[candidate.future.length - 1]?.openTime
+          ?? decisionAt,
+      });
       continue;
     }
 
-    const candidate = candidates[i];
     const trade = simulateTrade(
       decision.recomendacao,
       candidate.signalCandle,
@@ -175,8 +211,35 @@ export async function runRemoteJevBacktest(fromRunId: number) {
       trade.exitPrice,
       trade.outcome,
       trade.profitPercent,
-      { openedAt: candidate.signalCandle.openTime },
+      {
+        openedAt: candidate.signalCandle.closeTime ?? candidate.signalCandle.openTime,
+        closedAt: trade.outcome === "open"
+          ? null
+          : candidate.future[trade.candlesHeld - 1]?.closeTime
+            ?? candidate.future[trade.candlesHeld - 1]?.openTime
+            ?? null,
+        grossProfitPercent: trade.grossProfitPercent,
+        feePercent: trade.feePercent,
+        slippagePercent: trade.slippagePercent,
+        candlesHeld: trade.candlesHeld,
+        executionModelVersion: EXECUTION_MODEL_VERSION,
+        exitReason: trade.exitReason,
+        maxFavorableExcursionPercent: trade.maxFavorableExcursionPct,
+        maxAdverseExcursionPercent: trade.maxAdverseExcursionPct,
+      },
     );
+
+    const forward = forwardOutcome(candidate.signalCandle.close, candidate.future);
+    await settleDecisionLog(decisionLogId, {
+      outcomeStatus: "settled",
+      outcomeDirection: forward.outcomeDirection,
+      forwardReturnPercent: forward.forwardReturnPercent,
+      tradeProfitPercent: trade.profitPercent,
+      exitReason: trade.exitReason,
+      evaluatedAt: candidate.future[trade.candlesHeld - 1]?.closeTime
+        ?? candidate.future[trade.candlesHeld - 1]?.openTime
+        ?? decisionAt,
+    });
 
     savedTrades++;
     if (trade.outcome === "open") openTrades++;
