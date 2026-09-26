@@ -17,8 +17,8 @@ import type { Kline, Timeframe } from "../types.js";
 import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
 import { evaluateRisk } from "../risk/riskEngine.js";
 
-export const PORTFOLIO_MODEL_VERSION = "portfolio-v1.1";
-export const RISK_AWARE_PORTFOLIO_MODEL_VERSION = "portfolio-v1.1-risk-regime-v1";
+export const PORTFOLIO_MODEL_VERSION = "portfolio-v1";
+export const RISK_AWARE_PORTFOLIO_MODEL_VERSION = "portfolio-v1-risk-regime-v1";
 export const DEFAULT_INITIAL_CAPITAL = 1000;
 export const DEFAULT_POSITION_SIZE_PCT = 2;
 export const DEFAULT_MAX_GROSS_EXPOSURE_PCT = 20;
@@ -321,8 +321,9 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
         equity * (maxGrossExposurePct / 100) - grossExposure,
       );
       const requestedNotional = equity * (positionSizePct / 100);
+      const notional = Math.min(requestedNotional, remainingExposure);
 
-      if (remainingExposure < requestedNotional) {
+      if (notional <= 0) {
         rejectedTrades += 1;
         positionResults.push({
           portfolioRunId,
@@ -339,7 +340,6 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
         continue;
       }
 
-      const notional = requestedNotional;
       const entryFee = notional * FEE_PCT;
       cash -= notional + entryFee;
       const quantity = notional / trade.entryPrice;
