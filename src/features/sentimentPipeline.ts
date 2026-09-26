@@ -4,6 +4,7 @@ export interface NewsHeadline {
   source: string;
   title: string;
   publishedAt: Date;
+  url?: string;
 }
 
 export interface NewsSource {
@@ -58,6 +59,7 @@ export class CryptoPanicSource implements NewsSource {
         source: "cryptopanic",
         title: String(r?.title ?? ""),
         publishedAt: new Date(r?.published_at),
+        url: typeof r?.url === "string" ? r.url : undefined,
       }))
       .filter(isValidHeadline);
   }
@@ -78,6 +80,7 @@ export class GdeltSource implements NewsSource {
         source: "gdelt",
         title: String(a?.title ?? ""),
         publishedAt: new Date(a?.seendate),
+        url: typeof a?.url === "string" ? a.url : undefined,
       }))
       .filter(isValidHeadline);
   }
@@ -118,7 +121,7 @@ function phraseMatches(text: string, phrase: string): boolean {
   return text.includes(phrase);
 }
 
-function headlineScore(title: string): number {
+export function scoreHeadline(title: string): number {
   const text = title.toLocaleLowerCase("en-US");
 
   const positiveHits = POSITIVE_PHRASES.filter((phrase) => phraseMatches(text, phrase)).length;
@@ -134,7 +137,7 @@ export function scoreHeadlines(headlines: NewsHeadline[]): number {
   const valid = headlines.filter(isValidHeadline);
   if (!valid.length) return 0;
 
-  const total = valid.reduce((sum, headline) => sum + headlineScore(headline.title), 0);
+  const total = valid.reduce((sum, headline) => sum + scoreHeadline(headline.title), 0);
   return Math.max(-1, Math.min(1, total / valid.length));
 }
 
