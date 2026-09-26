@@ -565,11 +565,13 @@ app.get("/api/portfolio/run", async (req, res) => {
     const initialCapital = Number(req.query.initialCapital ?? 1000);
     const positionSizePct = Number(req.query.positionSizePct ?? 2);
     const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? 20);
+    const riskGate = String(req.query.riskGate ?? "false").toLowerCase() === "true";
     const result = await runPortfolioEngine({
       sourceRunId: fromRun,
       initialCapital,
       positionSizePct,
       maxGrossExposurePct,
+      riskGate,
     });
     res.json({ status: "ok", ...result });
   } catch (err: any) {
