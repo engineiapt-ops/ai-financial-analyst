@@ -14,8 +14,11 @@ import {
 import { assertDatasetMatchesMetadata } from "../marketdata/dataset.js";
 import { FEE_PCT, SLIPPAGE_PCT } from "../papertrading/simulator.js";
 import type { Kline, Timeframe } from "../types.js";
+import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
+import { evaluateRisk } from "../risk/riskEngine.js";
 
 export const PORTFOLIO_MODEL_VERSION = "portfolio-v1";
+export const RISK_AWARE_PORTFOLIO_MODEL_VERSION = "portfolio-v1-risk-regime-v1";
 export const DEFAULT_INITIAL_CAPITAL = 1000;
 export const DEFAULT_POSITION_SIZE_PCT = 2;
 export const DEFAULT_MAX_GROSS_EXPOSURE_PCT = 20;
@@ -144,12 +147,14 @@ export interface PortfolioRunOptions {
   initialCapital?: number;
   positionSizePct?: number;
   maxGrossExposurePct?: number;
+  riskGate?: boolean;
 }
 
 export async function runPortfolioEngine(options: PortfolioRunOptions) {
   const initialCapital = options.initialCapital ?? DEFAULT_INITIAL_CAPITAL;
   const positionSizePct = options.positionSizePct ?? DEFAULT_POSITION_SIZE_PCT;
   const maxGrossExposurePct = options.maxGrossExposurePct ?? DEFAULT_MAX_GROSS_EXPOSURE_PCT;
+  const riskGate = options.riskGate ?? false;
 
   if (!Number.isFinite(initialCapital) || initialCapital <= 0) {
     throw new Error("initialCapital must be greater than zero");
@@ -174,6 +179,19 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
   );
   assertDatasetMatchesMetadata(klines, sourceRun.candlesTotal, sourceRun.datasetHash);
 
+  const riskRegimes = riskGate
+    ? buildRegimeSeries(
+        klines,
+        calibrateRegimeThresholds(
+          klines,
+          Math.floor(klines.length * (sourceRun.oosStartRatio ?? 0.7)),
+          new Date((klines[Math.floor(klines.length * (sourceRun.oosStartRatio ?? 0.7)) - 1].closeTime
+            ?? klines[Math.floor(klines.length * (sourceRun.oosStartRatio ?? 0.7)) - 1].openTime).getTime()),
+        ),
+      )
+    : [];
+  const riskRegimeByTime = new Map(riskRegimes.map((regime) => [regime.dataAsOf.getTime(), regime]));
+
   const trades = await getPortfolioSourceTrades(options.sourceRunId);
   const portfolioRunId = await createPortfolioRun({
     sourceBacktestRunId: options.sourceRunId,
@@ -182,7 +200,7 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     initialCapital,
     positionSizePct,
     maxGrossExposurePct,
-    portfolioModelVersion: PORTFOLIO_MODEL_VERSION,
+    portfolioModelVersion: riskGate ? RISK_AWARE_PORTFOLIO_MODEL_VERSION : PORTFOLIO_MODEL_VERSION,
     datasetHash: sourceRun.datasetHash ?? "",
   });
 
@@ -212,6 +230,7 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
   let rejectedTrades = 0;
   let totalFees = 0;
   let totalSlippage = 0;
+  let riskGateBlocks = 0;
 
   for (const candle of klines) {
     const asOf = candle.closeTime ?? candle.openTime;
@@ -264,6 +283,38 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     // New decisions become positions only after exits are processed.
     for (const trade of entriesByTime.get(asOf.getTime()) ?? []) {
       if (active.has(trade.paperTradeId)) continue;
+
+      if (riskGate) {
+        const regime = riskRegimeByTime.get(asOf.getTime());
+        if (!regime) {
+          throw new Error(`Missing frozen regime for entry timestamp ${asOf.toISOString()}`);
+        }
+        const risk = evaluateRisk(
+          {
+            origem: "baseline",
+            recomendacao: trade.side,
+            tamanhoPosicaoPct: positionSizePct,
+          },
+          regime,
+        );
+        if (!risk.allowed) {
+          riskGateBlocks += 1;
+          rejectedTrades += 1;
+          positionResults.push({
+            portfolioRunId,
+            paperTradeId: trade.paperTradeId,
+            side: trade.side,
+            allocatedNotional: 0,
+            entryPrice: trade.entryPrice,
+            exitPrice: null,
+            openedAt: trade.openedAt,
+            closedAt: null,
+            status: "rejected",
+            rejectionReason: `risk_gate_${risk.reason}`,
+          });
+          continue;
+        }
+      }
 
       const remainingExposure = Math.max(
         0,
@@ -427,7 +478,9 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     ativo: sourceRun.ativo,
     timeframe: sourceRun.timeframe,
     datasetHash: sourceRun.datasetHash,
-    portfolioModelVersion: PORTFOLIO_MODEL_VERSION,
+    portfolioModelVersion: riskGate ? RISK_AWARE_PORTFOLIO_MODEL_VERSION : PORTFOLIO_MODEL_VERSION,
+    riskGate,
+    riskGateBlocks,
     initialCapital,
     positionSizePct,
     maxGrossExposurePct,
