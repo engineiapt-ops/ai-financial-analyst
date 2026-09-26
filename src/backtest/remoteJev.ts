@@ -19,7 +19,7 @@ const TARGET_PCT = 0.01;
 const STOP_PCT = 0.005;
 const LOOKAHEAD_CANDLES = 20;
 const OOS_START_RATIO = 0.7;
-const CONCURRENCY = 8;
+const CONCURRENCY = 2;
 
 
 function forwardOutcome(signalPrice: number, future: Kline[]) {
