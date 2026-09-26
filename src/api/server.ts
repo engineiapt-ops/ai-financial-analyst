@@ -12,7 +12,7 @@ import { evaluateDecisionLog } from "../evaluation/decisionEvaluator.js";
 import { buildCalibrationReport } from "../evaluation/calibration.js";
 import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
 import { buildOosRobustnessReport } from "../evaluation/oosRobustness.js";
-import { buildOosValidationGate } from "../evaluation/oosValidationGate.js";
+import { buildOosValidationGate, computeOosValidationGateEvidenceHash } from "../evaluation/oosValidationGate.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
@@ -857,7 +857,7 @@ app.get("/api/evaluation/oos-gate", async (req, res) => {
       validationReport,
       robustnessReport,
     });
-    const audit = await saveOosValidationGateAudit({ gate });
+    const audit = await saveOosValidationGateAudit({ gate, evidence: { validationReport, robustnessReport } });
 
     res.json({
       status: "ok",
@@ -921,6 +921,50 @@ app.get("/api/evaluation/oos-gate/audits/:id", async (req, res) => {
     }
 
     res.json({ status: "ok", audit });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+app.get("/api/evaluation/oos-gate/audits/:id/verify", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ status: "error", error: "audit id must be a positive integer" });
+    }
+
+    const audit = await getOosValidationGateAudit(id);
+    if (!audit) {
+      return res.status(404).json({ status: "error", error: "OOS validation gate audit not found" });
+    }
+
+    if (!audit.evidence) {
+      return res.status(422).json({
+        status: "unavailable",
+        auditId: audit.id,
+        evidenceHash: audit.evidenceHash,
+        verified: false,
+        reason: "audit was created before persisted evidence bundles were enabled",
+      });
+    }
+
+    const recomputedHash = computeOosValidationGateEvidenceHash({
+      gateVersion: audit.gate.gateVersion,
+      strategy: audit.gate.strategy,
+      validationReport: audit.evidence.validationReport,
+      robustnessReport: audit.evidence.robustnessReport,
+      checks: audit.gate.checks,
+    });
+    const verified = recomputedHash === audit.evidenceHash;
+
+    res.status(verified ? 200 : 409).json({
+      status: verified ? "ok" : "error",
+      auditId: audit.id,
+      verified,
+      storedEvidenceHash: audit.evidenceHash,
+      recomputedEvidenceHash: recomputedHash,
+    });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;

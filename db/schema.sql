@@ -316,6 +316,7 @@ CREATE TABLE IF NOT EXISTS oos_validation_gate_audits (
   validation_to TIMESTAMPTZ NOT NULL,
   evidence_hash TEXT NOT NULL CHECK (evidence_hash ~ '^[0-9a-f]{64}$'),
   gate JSONB NOT NULL,
+  evidence JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (backtest_run_id, walk_forward_run_id, estrategia, evidence_hash)
 );
