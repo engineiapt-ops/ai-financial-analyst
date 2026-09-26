@@ -24,6 +24,12 @@ CREATE TABLE IF NOT EXISTS backtest_runs (
   thresholds_congelados_em TIMESTAMPTZ,
   candles_total INT,
   dataset_hash TEXT,
+  execution_model_version TEXT,
+  target_pct NUMERIC,
+  stop_pct NUMERIC,
+  lookahead_candles INT,
+  slippage_pct NUMERIC,
+  fee_pct NUMERIC,
   criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -54,6 +60,14 @@ CREATE TABLE IF NOT EXISTS paper_trades (
   exit_price NUMERIC,
   outcome TEXT NOT NULL CHECK (outcome IN ('win', 'loss', 'open')),
   profit_percent NUMERIC NOT NULL,
+  gross_profit_percent NUMERIC,
+  fee_percent NUMERIC,
+  slippage_percent NUMERIC,
+  candles_held INT,
+  execution_model_version TEXT,
+  exit_reason TEXT CHECK (exit_reason IN ('target', 'stop', 'end')),
+  max_favorable_excursion_percent NUMERIC,
+  max_adverse_excursion_percent NUMERIC,
   drawdown NUMERIC,
   opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   closed_at TIMESTAMPTZ
