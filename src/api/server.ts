@@ -17,6 +17,7 @@ import { runBenchmarkSuite } from "../backtest/benchmark.js";
 import { runRemoteBaselineBacktest } from "../backtest/remoteBaseline.js";
 import { runWalkForward } from "../backtest/walkForward.js";
 import { runPortfolioEngine } from "../portfolio/engine.js";
+import { runWalkForwardPortfolio } from "../portfolio/walkForwardPortfolio.js";
 import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
 import { runRiskRegimeAnalysis } from "../risk/analysis.js";
 
@@ -572,6 +573,31 @@ app.get("/api/portfolio/run", async (req, res) => {
       positionSizePct,
       maxGrossExposurePct,
       riskGate,
+    });
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/portfolio/walk-forward", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+
+    const initialCapital = Number(req.query.initialCapital ?? 1000);
+    const positionSizePct = Number(req.query.positionSizePct ?? 2);
+    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? 20);
+
+    const result = await runWalkForwardPortfolio({
+      walkForwardRunId: fromRun,
+      initialCapital,
+      positionSizePct,
+      maxGrossExposurePct,
     });
     res.json({ status: "ok", ...result });
   } catch (err: any) {
