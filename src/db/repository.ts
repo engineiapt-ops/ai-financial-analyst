@@ -954,6 +954,89 @@ export function createRepository(db: RepositoryPool) {
       return Number(rows[0]?.id);
     },
 
+
+    async savePortfolioPositions(inputs: PortfolioPositionInput[]): Promise<number> {
+      if (inputs.length === 0) return 0;
+      const client = await db.connect();
+      try {
+        await client.query("BEGIN");
+        let saved = 0;
+        for (let offset = 0; offset < inputs.length; offset += 200) {
+          const chunk = inputs.slice(offset, offset + 200);
+          const values: unknown[] = [];
+          const rowsSql = chunk.map((item, index) => {
+            const base = index * 15;
+            values.push(
+              item.portfolioRunId, item.paperTradeId, item.side, item.allocatedNotional,
+              item.entryPrice, item.exitPrice ?? null, item.openedAt, item.closedAt ?? null,
+              item.status, item.netPnl ?? 0, item.grossPnl ?? 0, item.fees ?? 0,
+              item.slippage ?? 0, item.returnPct ?? 0, item.rejectionReason ?? null,
+            );
+            return `(${base + 1},${base + 2},${base + 3},${base + 4},${base + 5},
+                      ${base + 6},${base + 7},${base + 8},${base + 9},${base + 10},
+                      ${base + 11},${base + 12},${base + 13},${base + 14},${base + 15})`;
+          }).join(",");
+          await client.query(
+            `INSERT INTO portfolio_positions
+              (portfolio_run_id, paper_trade_id, side, allocated_notional, entry_price, exit_price,
+               opened_at, closed_at, status, net_pnl, gross_pnl, fees, slippage, return_pct, rejection_reason)
+             VALUES ${rowsSql}`,
+            values,
+          );
+          saved += chunk.length;
+        }
+        await client.query("COMMIT");
+        return saved;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async savePortfolioEquityPoints(inputs: PortfolioEquityPointInput[]): Promise<number> {
+      if (inputs.length === 0) return 0;
+      const client = await db.connect();
+      try {
+        await client.query("BEGIN");
+        let saved = 0;
+        for (let offset = 0; offset < inputs.length; offset += 500) {
+          const chunk = inputs.slice(offset, offset + 500);
+          const values: unknown[] = [];
+          const rowsSql = chunk.map((item, index) => {
+            const base = index * 9;
+            values.push(
+              item.portfolioRunId, item.asOf, item.equity, item.cash, item.realizedPnl,
+              item.unrealizedPnl, item.grossExposure, item.openPositions, item.drawdownPct,
+            );
+            return `(${base + 1},${base + 2},${base + 3},${base + 4},${base + 5},
+                      ${base + 6},${base + 7},${base + 8},${base + 9})`;
+          }).join(",");
+          await client.query(
+            `INSERT INTO portfolio_equity_curve
+              (portfolio_run_id, as_of, equity, cash, realized_pnl, unrealized_pnl,
+               gross_exposure, open_positions, drawdown_pct)
+             VALUES ${rowsSql}
+             ON CONFLICT (portfolio_run_id, as_of) DO UPDATE SET
+               equity=EXCLUDED.equity, cash=EXCLUDED.cash,
+               realized_pnl=EXCLUDED.realized_pnl, unrealized_pnl=EXCLUDED.unrealized_pnl,
+               gross_exposure=EXCLUDED.gross_exposure, open_positions=EXCLUDED.open_positions,
+               drawdown_pct=EXCLUDED.drawdown_pct`,
+            values,
+          );
+          saved += chunk.length;
+        }
+        await client.query("COMMIT");
+        return saved;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
     async finalizePortfolioRun(runId: number, summary: PortfolioRunSummary): Promise<void> {
       await db.query(
         `UPDATE portfolio_runs
@@ -1139,6 +1222,9 @@ export const getWalkForwardFolds = (walkForwardRunId: number) => createRepositor
 
 export const getPortfolioSourceTrades = (backtestRunId: number) => createRepository(getDefaultPool()).getPortfolioSourceTrades(backtestRunId);
 export const createPortfolioRun = (input: PortfolioRunInput) => createRepository(getDefaultPool()).createPortfolioRun(input);
+
+export const savePortfolioPositions = (inputs: PortfolioPositionInput[]) => createRepository(getDefaultPool()).savePortfolioPositions(inputs);
+export const savePortfolioEquityPoints = (inputs: PortfolioEquityPointInput[]) => createRepository(getDefaultPool()).savePortfolioEquityPoints(inputs);
 export const savePortfolioPosition = (input: PortfolioPositionInput) => createRepository(getDefaultPool()).savePortfolioPosition(input);
 export const savePortfolioEquityPoint = (input: PortfolioEquityPointInput) => createRepository(getDefaultPool()).savePortfolioEquityPoint(input);
 export const finalizePortfolioRun = (runId: number, summary: PortfolioRunSummary) => createRepository(getDefaultPool()).finalizePortfolioRun(runId, summary);
