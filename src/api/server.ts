@@ -1,5 +1,7 @@
 import "dotenv/config";
 import express from "express";
+import { createRateLimitMiddleware, getRequestClientKey, isHeavyApiRequest } from "./rateLimit.js";
+import { requestContextMiddleware } from "./requestContext.js";
 import { z } from "zod";
 import {
   fetchKlines,
@@ -34,7 +36,35 @@ import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
 
 
 export const app = express();
+app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
+
+app.use(requestContextMiddleware);
 app.use(express.json());
+
+const apiRateLimitWindowMs = 60_000;
+const apiRateLimitMax = Number(process.env.RATE_LIMIT_MAX ?? 120);
+const heavyRateLimitMax = Number(process.env.RATE_LIMIT_HEAVY_MAX ?? 20);
+
+app.use(
+  createRateLimitMiddleware({
+    windowMs: apiRateLimitWindowMs,
+    max: apiRateLimitMax,
+    key: (req) => `api:${getRequestClientKey(req)}`,
+  }),
+);
+
+app.use((req, res, next) => {
+  if (!isHeavyApiRequest(req)) {
+    next();
+    return;
+  }
+
+  createRateLimitMiddleware({
+    windowMs: apiRateLimitWindowMs,
+    max: heavyRateLimitMax,
+    key: (request) => `heavy:${getRequestClientKey(request)}`,
+  })(req, res, next);
+});
 
 const HTML_DASHBOARD = `<!DOCTYPE html>
 <html lang="en">
