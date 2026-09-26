@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS walk_forward_folds (
   train_end TIMESTAMPTZ NOT NULL,
   test_start TIMESTAMPTZ NOT NULL,
   test_end TIMESTAMPTZ NOT NULL,
-  estrategia TEXT NOT NULL CHECK (estrategia IN ('baseline', 'buyhold', 'jev')),
+  estrategia TEXT NOT NULL CHECK (estrategia IN ('baseline', 'baseline_risk', 'buyhold', 'jev')),
   status TEXT NOT NULL CHECK (status IN ('ok', 'unavailable', 'error')),
   test_signals INT NOT NULL DEFAULT 0,
   total_trades INT NOT NULL DEFAULT 0,
@@ -302,6 +302,78 @@ CREATE TABLE IF NOT EXISTS portfolio_equity_curve (
 CREATE INDEX IF NOT EXISTS idx_portfolio_runs_source ON portfolio_runs(source_backtest_run_id);
 CREATE INDEX IF NOT EXISTS idx_portfolio_positions_run ON portfolio_positions(portfolio_run_id);
 CREATE INDEX IF NOT EXISTS idx_portfolio_curve_run_time ON portfolio_equity_curve(portfolio_run_id, as_of);
+
+CREATE TABLE IF NOT EXISTS oos_validation_gate_audits (
+  id BIGSERIAL PRIMARY KEY,
+  backtest_run_id BIGINT NOT NULL REFERENCES backtest_runs(id) ON DELETE RESTRICT,
+  walk_forward_run_id BIGINT REFERENCES walk_forward_runs(id) ON DELETE RESTRICT,
+  estrategia TEXT NOT NULL CHECK (estrategia IN ('baseline', 'baseline_risk', 'jev')),
+  gate_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('ready', 'blocked')),
+  validation_from TIMESTAMPTZ NOT NULL,
+  validation_to TIMESTAMPTZ NOT NULL,
+  evidence_hash TEXT NOT NULL CHECK (evidence_hash ~ '^[0-9a-f]{64}
+CREATE TABLE IF NOT EXISTS research_snapshots (
+  snapshot_id TEXT PRIMARY KEY,
+  schema_version TEXT NOT NULL,
+  content_hash TEXT NOT NULL UNIQUE CHECK (content_hash ~ '^[0-9a-f]{64}$'),
+  signal_id BIGINT NOT NULL REFERENCES signals(id) ON DELETE RESTRICT,
+  decision_log_id BIGINT REFERENCES decision_log(id) ON DELETE SET NULL,
+  ativo TEXT NOT NULL,
+  timeframe TEXT NOT NULL CHECK (timeframe IN ('1h', '4h', '1d')),
+  data_as_of TIMESTAMPTZ NOT NULL,
+  snapshot JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (signal_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_research_snapshots_signal
+  ON research_snapshots(signal_id);
+CREATE INDEX IF NOT EXISTS idx_research_snapshots_decision_log
+  ON research_snapshots(decision_log_id);
+CREATE INDEX IF NOT EXISTS idx_research_snapshots_asset_time
+  ON research_snapshots(ativo, timeframe, data_as_of);
+
+CREATE OR REPLACE FUNCTION reject_research_snapshot_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'research_snapshots are immutable';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS research_snapshots_immutable ON research_snapshots;
+CREATE TRIGGER research_snapshots_immutable
+  BEFORE UPDATE OR DELETE ON research_snapshots
+  FOR EACH ROW EXECUTE FUNCTION reject_research_snapshot_mutation();
+
+
+
+),
+  gate JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (backtest_run_id, walk_forward_run_id, estrategia, evidence_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_oos_gate_audit_backtest
+  ON oos_validation_gate_audits(backtest_run_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_oos_gate_audit_scope
+  ON oos_validation_gate_audits(ativo);
+CREATE OR REPLACE FUNCTION reject_oos_validation_gate_audit_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+BEGIN
+  RAISE EXCEPTION 'oos_validation_gate_audits are immutable';
+END;
+$;
+
+DROP TRIGGER IF EXISTS oos_validation_gate_audits_immutable ON oos_validation_gate_audits;
+CREATE TRIGGER oos_validation_gate_audits_immutable
+  BEFORE UPDATE OR DELETE ON oos_validation_gate_audits
+  FOR EACH ROW EXECUTE FUNCTION reject_oos_validation_gate_audit_mutation();
+
 
 CREATE TABLE IF NOT EXISTS research_snapshots (
   snapshot_id TEXT PRIMARY KEY,
