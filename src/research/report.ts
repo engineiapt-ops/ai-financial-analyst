@@ -116,94 +116,10 @@ export async function collectResearchEvidence(ativo: string, asOf: Date): Promis
   }
 }
 
-function extractResponseText(payload: any): string {
-  if (typeof payload?.output_text === "string") return payload.output_text;
-
-  const chunks = Array.isArray(payload?.output)
-    ? payload.output.flatMap((item: any) =>
-        Array.isArray(item?.content)
-          ? item.content
-              .filter((content: any) => content?.type === "output_text" && typeof content?.text === "string")
-              .map((content: any) => content.text)
-          : []
-      )
-    : [];
-
-  return chunks.join("\n");
-}
-
-function parseStructuredReport(text: string): AnalystReport {
-  const normalized = text.trim().replace(/^\`\`\`json\s*/i, "").replace(/\s*\`\`\`$/i, "");
-  return AnalystReportSchema.parse(JSON.parse(normalized));
-}
-
-async function enrichWithOpenAI(
-  input: AnalyzeOutput,
-  research: { sentiment: number; evidence: ResearchEvidence[] },
-  fallback: AnalystReport,
-): Promise<AnalystReport> {
-  if (process.env.OPENAI_ANALYST_ENABLED !== "true") return fallback;
-
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) return fallback;
-
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-5.6-luna";
-  const context = {
-    market: input.market,
-    decision: input.decision,
-    risk: input.risk,
-    research,
-  };
-
-  const system = [
-    "Você é a camada de explicação de um sistema de análise quantitativa.",
-    "Não altere a recomendação recebida e não invente dados.",
-    "Não transforme contexto de notícias em causalidade.",
-    "Produza um relatório curto, factual e auditável em português do Brasil.",
-    "Retorne SOMENTE JSON válido com as chaves: titulo, resumo, drivers, riscos, invalidacao, recomendacao, confianca, fonteDecisao.",
-    "recomendacao deve ser exatamente a recomendação quantitativa recebida.",
-    "confianca deve ser um número entre 0 e 1 e não pode ser maior que a confiança quantitativa recebida.",
-    "fonteDecisao deve ser quantitativo ou quantitativo_com_contexto.",
-  ].join("\n");
-
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      tools: [{ type: "web_search" }],
-      input: [
-        { role: "system", content: system },
-        {
-          role: "user",
-          content: `Contexto factual do sistema:\n${JSON.stringify(context)}`,
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI Responses API error: ${response.status}`);
-  }
-
-  const payload = await response.json();
-  return parseStructuredReport(extractResponseText(payload));
-}
-
 export async function generateAnalystReport(input: AnalyzeOutput): Promise<AnalystResearchResult> {
   const asOf = new Date(input.market.dataAsOf);
   const research = await collectResearchEvidence(input.market.ativo, asOf);
-  const fallback = buildDeterministicReport(input, research.sentiment, research.evidence);
-  let report = fallback;
-
-  try {
-    report = await enrichWithOpenAI(input, research, fallback);
-  } catch {
-    report = fallback;
-  }
+  const report = buildDeterministicReport(input, research.sentiment, research.evidence);
 
   return {
     asOf: asOf.toISOString(),
