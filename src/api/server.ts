@@ -28,6 +28,7 @@ import { runPortfolioEngine } from "../portfolio/engine.js";
 import { runWalkForwardPortfolio } from "../portfolio/walkForwardPortfolio.js";
 import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
 import { runRiskRegimeAnalysis } from "../risk/analysis.js";
+import { buildEvaluationOverview } from "../product/evaluationOverview.js";
 import { listAiProviders, runOnlineAnalysis } from "../online/service.js";
 import { GeminiProviderError } from "../ai/geminiProvider.js";
 
@@ -743,6 +744,54 @@ app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
     const status = message.includes("DATABASE_URL") ? 503
       : message.includes("Insufficient future closed candles") ? 422
       : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/overview", async (req, res) => {
+  try {
+    const query = z.object({
+      ativo: z.string().min(1).optional(),
+      timeframe: z.enum(["1h", "4h", "1d"]).optional(),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(30),
+      limit: z.coerce.number().int().min(1).max(50).default(10),
+    }).parse(req.query);
+
+    const now = new Date();
+    const from = new Date(now.getTime() - query.lookbackDays * 24 * 60 * 60 * 1000);
+    const to = now;
+    const filters = {
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      from,
+      to,
+    };
+
+    const [kpis, observations, audits] = await Promise.all([
+      getDecisionKpis(filters),
+      getDecisionCalibrationObservations(filters),
+      listOosValidationGateAudits({
+        strategy: undefined,
+        limit: query.limit,
+      }),
+    ]);
+
+    const calibration = buildCalibrationReport(observations, filters);
+    const overview = buildEvaluationOverview({
+      generatedAt: now,
+      from,
+      to,
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      kpis,
+      calibration,
+      audits,
+    });
+
+    res.json({ status: "ok", ...overview });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
   }
 });
