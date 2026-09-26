@@ -14,7 +14,7 @@ import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds } from "../db/repository.js";
+import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -25,6 +25,7 @@ import { runPortfolioEngine } from "../portfolio/engine.js";
 import { runWalkForwardPortfolio } from "../portfolio/walkForwardPortfolio.js";
 import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
 import { runRiskRegimeAnalysis } from "../risk/analysis.js";
+import { buildEvaluationOverview } from "../product/evaluationOverview.js";
 import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForwardReport.js";
 import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDiagnostics.js";
 
@@ -159,6 +160,12 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
     .rec-BUY { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
     .rec-SELL { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #dc2626; }
     .rec-WAIT { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #d97706; }
+    .overview-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; }
+    @media (max-width: 900px) { .overview-grid { grid-template-columns: repeat(2, 1fr); } }
+    .overview-item { background:#0f172a; padding:0.65rem; border-radius:0.25rem; }
+    .overview-label { color:var(--text-muted); font-size:0.72rem; display:block; margin-bottom:0.15rem; }
+    .overview-value { font-size:0.95rem; font-weight:700; }
+    .overview-note { color:var(--text-muted); font-size:0.75rem; }
     .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; }
     .stat-item {
       background: #0f172a;
@@ -306,6 +313,22 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         </ul>
       </div>
     </div>
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title">
+        <span>Quantitative Quality & Governance</span>
+        <button type="button" onclick="refreshEvaluationOverview()" style="width:auto;padding:0.25rem 0.6rem;font-size:0.75rem;">Refresh</button>
+      </div>
+      <div class="overview-grid">
+        <div class="overview-item"><span class="overview-label">Decisions</span><span class="overview-value" id="ovTotal">-</span><span class="overview-note">30-day window</span></div>
+        <div class="overview-item"><span class="overview-label">Settled</span><span class="overview-value" id="ovSettled">-</span><span class="overview-note">historical evaluation</span></div>
+        <div class="overview-item"><span class="overview-label">Win rate</span><span class="overview-value" id="ovWinRate">-</span><span class="overview-note">settled decisions</span></div>
+        <div class="overview-item"><span class="overview-label">Avg trade P&amp;L</span><span class="overview-value" id="ovAvgPnl">-</span><span class="overview-note">settled decisions</span></div>
+        <div class="overview-item"><span class="overview-label">Brier</span><span class="overview-value" id="ovBrier">-</span><span class="overview-note">confidence calibration</span></div>
+        <div class="overview-item"><span class="overview-label">ECE</span><span class="overview-value" id="ovEce">-</span><span class="overview-note">expected calibration error</span></div>
+        <div class="overview-item"><span class="overview-label">OOS audits</span><span class="overview-value" id="ovAudits">-</span><span class="overview-note">persisted gate evaluations</span></div>
+        <div class="overview-item"><span class="overview-label">Latest governance</span><span class="overview-value" id="ovGovernance" style="font-size:0.8rem;">-</span><span class="overview-note">latest audit per strategy</span></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -323,7 +346,35 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         }
       } catch (e) {}
     }
+    async function refreshEvaluationOverview() {
+      try {
+        const params = new URLSearchParams({
+          ativo: document.getElementById('ativo').value,
+          timeframe: document.getElementById('timeframe').value,
+          lookbackDays: '30'
+        });
+        const overview = await fetch('/api/evaluation/overview?' + params.toString()).then(r => r.json());
+        if (!overview || overview.status !== 'ok') return;
+
+        const q = overview.decisionQuality || {};
+        const cal = overview.calibration || {};
+        const gov = overview.governance || {};
+
+        document.getElementById('ovTotal').textContent = q.totalDecisions ?? '-';
+        document.getElementById('ovSettled').textContent = q.settledDecisions ?? '-';
+        document.getElementById('ovWinRate').textContent = q.winRate == null ? '-' : Number(q.winRate).toFixed(2) + '%';
+        document.getElementById('ovAvgPnl').textContent = q.avgTradeProfitPercent == null ? '-' : Number(q.avgTradeProfitPercent).toFixed(3) + '%';
+        document.getElementById('ovBrier').textContent = cal.brierScore == null ? '-' : Number(cal.brierScore).toFixed(4);
+        document.getElementById('ovEce').textContent = cal.expectedCalibrationError == null ? '-' : Number(cal.expectedCalibrationError).toFixed(4);
+        document.getElementById('ovAudits').textContent = gov.auditCount ?? '0';
+        const latest = (gov.latestByStrategy || []).map(item => item.strategy + ': ' + item.status).join(' · ');
+        document.getElementById('ovGovernance').textContent = latest || 'Sem auditorias OOS';
+      } catch (e) {
+        document.getElementById('ovGovernance').textContent = 'Overview indisponível';
+      }
+    }
     refreshStatus();
+    refreshEvaluationOverview();
 
     const form = document.getElementById('analyzeForm');
     const analyzeBtn = document.getElementById('analyzeBtn');
@@ -587,6 +638,55 @@ app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
   }
 });
 
+app.get("/api/evaluation/overview", async (req, res) => {
+  try {
+    const query = z.object({
+      ativo: z.string().min(1).optional(),
+      timeframe: z.enum(["1h", "4h", "1d"]).optional(),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(30),
+      limit: z.coerce.number().int().min(1).max(50).default(10),
+    }).parse(req.query);
+
+    const now = new Date();
+    const from = new Date(now.getTime() - query.lookbackDays * 24 * 60 * 60 * 1000);
+    const to = now;
+    const filters = {
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      from,
+      to,
+    };
+
+    const [kpis, observations, audits] = await Promise.all([
+      getDecisionKpis(filters),
+      getDecisionCalibrationObservations(filters),
+      listOosValidationGateAudits({
+        ativo: query.ativo,
+        timeframe: query.timeframe,
+        strategy: undefined,
+        limit: query.limit,
+      }),
+    ]);
+
+    const calibration = buildCalibrationReport(observations, filters);
+    const overview = buildEvaluationOverview({
+      generatedAt: now,
+      from,
+      to,
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      kpis,
+      calibration,
+      audits,
+    });
+
+    res.json({ status: "ok", ...overview });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
 app.get("/api/evaluation/kpis", async (req, res) => {
   try {
     const query = z.object({

@@ -11,7 +11,7 @@
     "start": "node dist/api/server.js",
     "test:indicators": "tsx src/features/indicators.test.ts",
     "test:sentiment": "tsx src/features/sentimentPipeline.test.ts",
-    "test": "npm run test:indicators && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:gemini && npm run test:pit && npm run test:market-data-quality && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:dataset && npm run test:repository && npm run test:server",
+    "test": "npm run test:indicators && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:evaluation-overview && npm run test:gemini && npm run test:pit && npm run test:market-data-quality && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:dataset && npm run test:repository && npm run test:server",
     "test:decision": "tsx src/decision/decisionEngine.test.ts",
     "test:baseline": "tsx src/decision/baselineEngine.test.ts",
     "test:paper": "tsx src/papertrading/simulator.test.ts",
@@ -34,7 +34,8 @@
     "test:oos-gate": "tsx src/evaluation/oosValidationGate.test.ts",
     "test:oos-gate-repository": "tsx src/evaluation/oosValidationGateRepository.test.ts",
     "test:online": "tsx src/online/provenance.test.ts",
-    "test:gemini": "tsx src/ai/geminiProvider.test.ts"
+    "test:gemini": "tsx src/ai/geminiProvider.test.ts",
+    "test:evaluation-overview": "tsx src/product/evaluationOverview.test.ts"
   },
   "dependencies": {
     "express": "^4.19.2",

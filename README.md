@@ -55,3 +55,7 @@ GEMINI_TIMEOUT_MS=30000
 The current Gemini adapter uses the official REST `generateContent` API and structured JSON output. See the Google Gemini API documentation for the current API contract and model availability. The default model in this project is `gemini-3.8-flash`.
 
 The dashboard at `/` now surfaces decision state, market-data freshness, snapshot provenance, packet identity and optional Gemini contextual analysis.
+
+## Quantitative quality cockpit
+
+The product dashboard also exposes `GET /api/evaluation/overview`, which consolidates decision-quality KPIs, confidence calibration and recent OOS validation-gate audits for the selected asset/timeframe. This layer is diagnostic/governance-only: it does not alter strategy thresholds or produce a new trading signal.
