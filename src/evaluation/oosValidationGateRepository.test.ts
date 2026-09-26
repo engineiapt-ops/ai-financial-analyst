@@ -93,6 +93,7 @@ class FakeDb implements RepositoryPool {
           evidence_hash: gate.evidenceHash,
           created_at: new Date("2026-09-26T00:00:00Z"),
           gate,
+          evidence,
         }],
       } as { rows: T[] };
     }
@@ -143,7 +144,8 @@ await assert.rejects(
 
 await assert.rejects(
   repo.saveOosValidationGateAudit({
-    ...({ gate: { ...gate, evidenceHash: "invalid" } } as const),
+    gate: { ...gate, evidenceHash: "invalid" },
+    evidence,
   }),
   /evidenceHash must be a 64-character lowercase SHA-256 hex string/,
 );
