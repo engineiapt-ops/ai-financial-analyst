@@ -218,6 +218,7 @@ export function simulateWalkForwardPortfolio(options: {
   let peakEquity = initialCapital;
   let maxOpenPositions = 0;
   let maxGrossExposure = 0;
+  const realizedResults: number[] = [];
 
   for (let index = 0; index < klines.length; index += 1) {
     const candle = klines[index];
@@ -231,6 +232,7 @@ export function simulateWalkForwardPortfolio(options: {
       cash += position.notional + result.grossPnl
         - Math.max(0, result.totalFees - position.entryFee);
       realizedPnl += result.netPnl;
+      realizedResults.push(result.netPnl);
       totalFees += result.totalFees;
       totalSlippage += result.slippage;
       active.delete(trade.id);
@@ -326,6 +328,7 @@ export function simulateWalkForwardPortfolio(options: {
     cash += position.notional + result.grossPnl
       - Math.max(0, result.totalFees - position.entryFee);
     realizedPnl += result.netPnl;
+    realizedResults.push(result.netPnl);
     totalFees += result.totalFees;
     totalSlippage += result.slippage;
     active.delete(position.trade.id);
@@ -358,9 +361,10 @@ export function simulateWalkForwardPortfolio(options: {
     if (previous > 0) returns.push(equityCurve[index].equity / previous - 1);
   }
 
-  const closedTrades = trades.filter((trade) => trade.outcome.outcome !== "open");
-  const winningTrades = closedTrades.filter((trade) => trade.outcome.profitPercent > 0).length;
-  const losingTrades = closedTrades.filter((trade) => trade.outcome.profitPercent < 0).length;
+  const executedTrades = trades.length;
+  const closedTrades = realizedResults.length;
+  const winningTrades = realizedResults.filter((pnl) => pnl > 0).length;
+  const losingTrades = realizedResults.filter((pnl) => pnl < 0).length;
   const maxDrawdownPct = equityCurve.reduce(
     (max, point) => Math.max(max, point.drawdownPct),
     0,
@@ -377,7 +381,7 @@ export function simulateWalkForwardPortfolio(options: {
     sharpe: annualizedSharpe(returns),
     sortino: annualizedSortino(returns),
     totalSignals,
-    executedTrades: trades.length,
+    executedTrades,
     closedTrades: closedTrades.length,
     rejectedTrades: exposureRejectedTrades,
     exposureRejectedTrades,
