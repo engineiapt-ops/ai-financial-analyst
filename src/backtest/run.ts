@@ -19,6 +19,12 @@ import {
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds } from "../config/thresholds.js";
+import {
+  assertOosTimestampsSeparated,
+  buildOosEvaluationPlan,
+  DEFAULT_OOS_START_RATIO,
+  OOS_EVALUATION_POLICY_VERSION,
+} from "../evaluation/oosPolicy.js";
 import type { MarketState, Timeframe, DecisionResult, Kline } from "../types.js";
 
 const ATIVO = "BTCUSDT";
@@ -26,7 +32,7 @@ const TIMEFRAME: Timeframe = "1h";
 const TARGET_PCT = 0.01;
 const STOP_PCT = 0.005;
 const LOOKAHEAD_CANDLES = 20;
-const OOS_START_RATIO = 0.7;
+const OOS_START_RATIO = DEFAULT_OOS_START_RATIO;
 
 type Engine = "both" | "baseline" | "jev";
 
@@ -104,9 +110,19 @@ async function run() {
   assertKlinesAvailableAsOf(klines, datasetAsOf);
   const datasetHash = computeDatasetHash(klines);
   const indicatorsSeries = computeIndicatorsSeries(klines);
-  const evaluationStart = mode === "oos"
-    ? Math.floor(klines.length * OOS_START_RATIO)
-    : 0;
+  const oosPlan = mode === "oos" ? buildOosEvaluationPlan(klines.length, OOS_START_RATIO) : null;
+  const calibrationEnd =
+    oosPlan
+      ? (klines[oosPlan.calibrationEndIndex].closeTime ?? klines[oosPlan.calibrationEndIndex].openTime)
+      : null;
+  const validationStart =
+    oosPlan
+      ? (klines[oosPlan.validationStartIndex].closeTime ?? klines[oosPlan.validationStartIndex].openTime)
+      : null;
+  if (calibrationEnd && validationStart) {
+    assertOosTimestampsSeparated(calibrationEnd, validationStart);
+  }
+  const evaluationStart = oosPlan?.validationStartIndex ?? 0;
   const runId = await createBacktestRun({
     engine,
     mode,
@@ -115,6 +131,9 @@ async function run() {
     periodoInicio: klines[0].openTime,
     periodoFim: klines[klines.length - 1].openTime,
     oosStartRatio: mode === "oos" ? OOS_START_RATIO : null,
+    calibrationEnd,
+    validationStart,
+    evaluationPolicyVersion: mode === "oos" ? OOS_EVALUATION_POLICY_VERSION : null,
     thresholdsCongeladosEm: mode === "oos" ? new Date() : null,
     candlesTotal: klines.length,
     datasetHash,
@@ -235,7 +254,10 @@ async function run() {
   }
 
   console.log(
-    `Backtest concluído (runId=${runId}, modo=${mode}, engine=${engine}). Dataset hash: ${datasetHash} (${klines.length} candles). Candles processados: ${processed}, pulados por aquecimento: ${skippedWarmup}, posições geradas: ${savedTrades}, fechadas: ${closedTrades}, abertas: ${openTrades}.`,
+    `Backtest concluído (runId=${runId}, modo=${mode}, engine=${engine}). Dataset hash: ${datasetHash} (${klines.length} candles). Candles processados: ${processed}, pulados por aquecimento: ${skippedWarmup}, posições geradas: ${savedTrades}, fechadas: ${closedTrades}, abertas: ${openTrades}.\n` +
+    (oosPlan
+      ? `OOS policy=${oosPlan.policyVersion}; calibração até índice ${oosPlan.calibrationEndIndex}; validação inicia no índice ${oosPlan.validationStartIndex}.`
+      : `Modo DEV sem separação OOS.`),
   );
   console.log(`Consulte GET /api/metrics?runId=${runId} para os resultados desta execução.`);
 }
