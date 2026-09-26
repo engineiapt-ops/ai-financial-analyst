@@ -35,3 +35,23 @@ Health:
 GET /health
 
 O MVP não executa ordens reais.
+
+## Online analysis, provenance and Gemini
+
+The product layer exposes:
+- `POST /api/online-analysis` for the complete online pipeline: quantitative decision, point-in-time research, persisted snapshot and provenance packet.
+- `GET /api/ai/providers` for configured AI provider status without exposing secrets.
+
+Gemini is integrated through a provider-agnostic interface. The deterministic quantitative decision remains authoritative; Gemini only adds contextual narrative, risk flags and watch items.
+
+Configuration:
+```env
+GEMINI_API_KEY=your-key
+GEMINI_MODEL=gemini-3.8-flash
+GEMINI_API_BASE=https://generativelanguage.googleapis.com/v1beta
+GEMINI_TIMEOUT_MS=30000
+```
+
+The current Gemini adapter uses the official REST `generateContent` API and structured JSON output. See the Google Gemini API documentation for the current API contract and model availability. The default model in this project is `gemini-3.8-flash`.
+
+The dashboard at `/` now surfaces decision state, market-data freshness, snapshot provenance, packet identity and optional Gemini contextual analysis.
