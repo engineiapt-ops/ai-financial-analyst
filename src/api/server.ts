@@ -265,6 +265,13 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
             <input type="checkbox" id="news" checked />
             <label for="news" style="margin-bottom:0;cursor:pointer">Include News Sentiment (GDELT)</label>
           </div>
+          <div class="form-group">
+            <label for="aiProvider">AI Analyst Layer</label>
+            <select id="aiProvider">
+              <option value="none" selected>Deterministic only</option>
+              <option value="gemini">Gemini contextual analysis</option>
+            </select>
+          </div>
           <button type="submit" id="analyzeBtn">Analyze Market</button>
         </form>
 
@@ -279,6 +286,23 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
             <div class="stat-item"><div class="stat-label">High Risk</div><div class="stat-val" id="resRisk">-</div></div>
           </div>
           <p id="resObs" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;"></p>
+          <div class="provenance-grid">
+            <div class="provenance-item"><span class="provenance-label">Data As Of</span><span id="resDataAsOf">-</span></div>
+            <div class="provenance-item"><span class="provenance-label">Data Quality</span><span id="resDataQuality">-</span></div>
+            <div class="provenance-item"><span class="provenance-label">Snapshot</span><span id="resSnapshot">-</span></div>
+            <div class="provenance-item"><span class="provenance-label">Packet</span><span id="resPacket">-</span></div>
+          </div>
+          <div id="aiBox" class="ai-box" style="display:none;">
+            <h3 id="aiTitle">AI Analyst</h3>
+            <p id="aiSummary"></p>
+            <strong style="font-size:0.78rem;">Drivers</strong>
+            <ul id="aiDrivers"></ul>
+            <strong style="font-size:0.78rem;">Risk flags</strong>
+            <ul id="aiRisks"></ul>
+            <strong style="font-size:0.78rem;">Watch</strong>
+            <ul id="aiWatch"></ul>
+            <p id="aiConfidence"></p>
+          </div>
           <pre id="resJson"></pre>
         </div>
       </div>
@@ -316,6 +340,14 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
           <li class="endpoint-item">
             <div><span class="method method-post">POST</span> <span style="font-family:monospace">/api/analyze</span></div>
             <span style="color:var(--text-muted)">Decision Engine Pipeline</span>
+          </li>
+          <li class="endpoint-item">
+            <div><span class="method method-post">POST</span> <span style="font-family:monospace">/api/online-analysis</span></div>
+            <span id="aiProviderText" style="color:var(--text-muted)">Checking AI provider...</span>
+          </li>
+          <li class="endpoint-item">
+            <div><span class="method method-get">GET</span> <a href="/api/ai/providers" target="_blank">/api/ai/providers</a></div>
+            <span style="color:var(--text-muted)">Provider configuration</span>
           </li>
         </ul>
       </div>
@@ -375,7 +407,8 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
           timeframe: document.getElementById('timeframe').value,
           valorInvestimento: Number(document.getElementById('valorInvestimento').value),
           engine: document.getElementById('engine').value,
-          news: document.getElementById('news').checked,\n          aiProvider: document.getElementById('aiProvider').value,
+          news: document.getElementById('news').checked,
+          aiProvider: document.getElementById('aiProvider').value,
         };
 
         const res = await fetch('/api/online-analysis', {
@@ -387,21 +420,1822 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Request failed');
 
+        const analysis = data.analysis || data;
         const badge = document.getElementById('recBadge');
-        badge.textContent = data.decision.recomendacao;
-        badge.className = 'rec-badge rec-' + data.decision.recomendacao;
+        badge.textContent = analysis.decision.recomendacao;
+        badge.className = 'rec-badge rec-' + analysis.decision.recomendacao;
 
-        document.getElementById('resPrice').textContent = '$' + Number(data.market.precoAtual).toLocaleString();
-        document.getElementById('resPos').textContent = data.decision.tamanhoPosicaoPct + '%';
-        document.getElementById('resExposed').textContent = '$' + Number(data.valorExposto).toFixed(2);
+        document.getElementById('resPrice').textContent = '
 
-        const ema9 = data.market.indicators.ema9 ? Number(data.market.indicators.ema9).toFixed(1) : '-';
-        const ema21 = data.market.indicators.ema21 ? Number(data.market.indicators.ema21).toFixed(1) : '-';
+        resultBox.style.display = 'block';
+      } catch (err) {
+        alert('Analysis Error: ' + err.message);
+      } finally {
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = 'Analyze Market';
+      }
+    });
+  </script>
+</body>
+</html>`;
+
+app.get("/", (req, res) => {
+  if (req.headers.accept?.includes("text/html") && !req.query.format) {
+    return res.type("html").send(HTML_DASHBOARD);
+  }
+  res.json({
+    status: "ok",
+    service: "ai-financial-analyst-api",
+    endpoints: [
+      "/health",
+      "/api/analyze",
+      "/api/metrics",
+      "/api/market/ping",
+      "/api/market/time",
+      "/api/market/info",
+      "/api/market/klines",
+    ],
+  });
+});
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", service: "ai-financial-analyst-api" });
+});
+
+app.get("/api/market/ping", async (_req, res) => {
+  try {
+    const isAlive = await pingBinance();
+    res.json({ status: "ok", ping: isAlive });
+  } catch (err: any) {
+    res.status(502).json({ status: "error", error: err.message });
+  }
+});
+
+app.get("/api/market/time", async (_req, res) => {
+  try {
+    const serverTime = await getServerTime();
+    res.json({ status: "ok", serverTime, serverTimeUTC: new Date(serverTime).toISOString() });
+  } catch (err: any) {
+    res.status(502).json({ status: "error", error: err.message });
+  }
+});
+
+app.get("/api/market/info", async (req, res) => {
+  try {
+    const symbol = String(req.query.symbol ?? "BTCUSDT");
+    const info = await getExchangeInfo(symbol);
+    res.json({ status: "ok", info });
+  } catch (err: any) {
+    res.status(400).json({ status: "error", error: err.message });
+  }
+});
+
+const KlinesQuerySchema = z.object({
+  symbol: z.string().default("BTCUSDT"),
+  timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+  limit: z.coerce.number().min(1).max(1000).default(10),
+});
+
+app.get("/api/market/klines", async (req, res) => {
+  try {
+    const query = KlinesQuerySchema.parse(req.query);
+    const klines = await fetchKlines(query.symbol, query.timeframe as Timeframe, query.limit);
+    res.json({
+      status: "ok",
+      symbol: query.symbol.toUpperCase(),
+      timeframe: query.timeframe,
+      count: klines.length,
+      klines,
+    });
+  } catch (err: any) {
+    res.status(400).json({ status: "error", error: err.message });
+  }
+});
+
+export const AnalyzeSchema = z.object({
+  ativo: z.string().min(1).default("BTCUSDT"),
+  timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+  valorInvestimento: z.coerce.number().positive().default(100),
+  engine: z.enum(["baseline", "jev"]).default("baseline"),
+  news: z.boolean().default(true),
+});
+
+
+app.get("/api/ai/providers", (_req, res) => {
+  res.json({
+    status: "ok",
+    providers: listAiProviders(),
+  });
+});
+
+app.post("/api/online-analysis", async (req, res) => {
+  try {
+    const parsed = z.object({
+      ...AnalyzeSchema.shape,
+      aiProvider: z.enum(["none", "gemini"]).default("none"),
+    }).parse(req.body);
+
+    const result = await runOnlineAnalysis(
+      {
+        ativo: parsed.ativo,
+        timeframe: parsed.timeframe,
+        valorInvestimento: parsed.valorInvestimento,
+        engine: parsed.engine,
+        news: parsed.news,
+      },
+      parsed.aiProvider,
+    );
+
+    res.json({
+      status: "ok",
+      ...result,
+      provenance: {
+        packetId: result.packet.packetId,
+        snapshotId: result.snapshot.snapshotId,
+        snapshotContentHash: result.snapshot.contentHash,
+        decisionLogId: result.analysis.decisionLogId,
+        signalId: result.analysis.signalId,
+        dataAsOf: result.analysis.market.dataAsOf,
+        marketDataQuality: result.analysis.marketDataQuality,
+        deterministicRecommendation: result.analysis.decision.recomendacao,
+        aiProvider: result.ai?.provider ?? "none",
+        aiModel: result.ai?.model ?? null,
+        aiInputPacketHash: result.ai?.inputPacketHash ?? null,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status =
+      message.includes("DATABASE_URL") ||
+      err instanceof MarketDataQualityError ||
+      err instanceof GeminiProviderError
+        ? 503
+        : 400;
+
+    res.status(status).json({
+      status: "error",
+      error: message,
+      ...(err instanceof MarketDataQualityError ? { code: err.code, quality: err.quality } : {}),
+      ...(err instanceof GeminiProviderError ? { code: err.code } : {}),
+    });
+  }
+});
+
+app.post("/api/report", async (req, res) => {
+  try {
+    const parsed = AnalyzeSchema.parse(req.body);
+    const analysis = await analyzeMarket(parsed);
+    const research = await generateAnalystReport(analysis);
+    const snapshot = buildResearchSnapshot(analysis, research);
+    const stored = await saveResearchSnapshot({ snapshot, decisionLogId: analysis.decisionLogId });
+    res.json({
+      status: "ok",
+      analysis,
+      research,
+      snapshot: stored.snapshot,
+      persistence: {
+        snapshotId: stored.snapshotId,
+        contentHash: stored.contentHash,
+        signalId: stored.signalId,
+        decisionLogId: stored.decisionLogId,
+        createdAt: stored.createdAt,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/research/snapshots/:snapshotId", async (req, res) => {
+  try {
+    const snapshotId = String(req.params.snapshotId ?? "").trim();
+    if (!/^rs_[a-f0-9]{24}$/.test(snapshotId)) {
+      return res.status(400).json({ status: "error", error: "invalid snapshotId" });
+    }
+
+    const stored = await getResearchSnapshot(snapshotId);
+    if (!stored) {
+      return res.status(404).json({ status: "error", error: "research snapshot not found" });
+    }
+
+    res.json({
+      status: "ok",
+      snapshot: stored.snapshot,
+      persistence: {
+        snapshotId: stored.snapshotId,
+        contentHash: stored.contentHash,
+        signalId: stored.signalId,
+        decisionLogId: stored.decisionLogId,
+        createdAt: stored.createdAt,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+
+app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
+  try {
+    const decisionLogId = Number(req.params.decisionLogId);
+    if (!Number.isInteger(decisionLogId) || decisionLogId <= 0) {
+      return res.status(400).json({ status: "error", error: "decisionLogId must be a positive integer" });
+    }
+
+    const body = z.object({
+      lookaheadCandles: z.coerce.number().int().min(1).max(5000).default(24),
+      flatThresholdPct: z.coerce.number().min(0).max(100).default(0.1),
+      evaluatedAt: z.string().datetime().optional(),
+    }).parse(req.body);
+
+    const decision = await getDecisionLog(decisionLogId);
+    if (!decision) {
+      return res.status(404).json({ status: "error", error: "decision log not found" });
+    }
+    if (decision.outcomeStatus !== "pending") {
+      return res.status(409).json({ status: "error", error: "decision log is already settled" });
+    }
+
+    const evaluatedAt = body.evaluatedAt ? new Date(body.evaluatedAt) : new Date();
+    const candles = await getMarketDataRange(
+      decision.ativo,
+      decision.timeframe,
+      decision.dataAsOf,
+      evaluatedAt,
+    );
+
+    const evaluation = evaluateDecisionLog(
+      decision,
+      candles,
+      evaluatedAt,
+      {
+        lookaheadCandles: body.lookaheadCandles,
+        flatThresholdPct: body.flatThresholdPct,
+      },
+    );
+
+    await settleDecisionLog(decisionLogId, evaluation.outcome);
+
+    res.json({
+      status: "ok",
+      decisionLogId,
+      evaluation: {
+        referencePrice: evaluation.referencePrice,
+        evaluationCandleClose: evaluation.evaluationCandleClose,
+        evaluationPrice: evaluation.evaluationPrice,
+        lookaheadCandles: evaluation.lookaheadCandles,
+        forwardReturnPercent: evaluation.forwardReturnPercent,
+        outcomeDirection: evaluation.outcomeDirection,
+        tradeProfitPercent: evaluation.tradeProfitPercent,
+        outcomeStatus: evaluation.outcome.outcomeStatus,
+        evaluatedAt,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503
+      : message.includes("Insufficient future closed candles") ? 422
+      : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/kpis", async (req, res) => {
+  try {
+    const query = z.object({
+      ativo: z.string().min(1).optional(),
+      timeframe: z.enum(["1h", "4h", "1d"]).optional(),
+      origem: z.enum(["baseline", "jev"]).optional(),
+      recomendacao: z.enum(["BUY", "WAIT", "SELL"]).optional(),
+      riskRegime: z.string().min(1).max(64).optional(),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(30),
+      from: z.string().datetime().optional(),
+      to: z.string().datetime().optional(),
+    }).parse(req.query);
+
+    const now = new Date();
+    const from = query.from
+      ? new Date(query.from)
+      : new Date(now.getTime() - query.lookbackDays * 24 * 60 * 60 * 1000);
+    const to = query.to ? new Date(query.to) : now;
+
+    if (to.getTime() < from.getTime()) {
+      return res.status(400).json({ status: "error", error: "to must be after from" });
+    }
+
+    const kpis = await getDecisionKpis({
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      origem: query.origem,
+      recomendacao: query.recomendacao,
+      riskRegime: query.riskRegime,
+      from,
+      to,
+    });
+
+    res.json({
+      status: "ok",
+      generatedAt: now.toISOString(),
+      period: {
+        from: from.toISOString(),
+        to: to.toISOString(),
+      },
+      ...kpis,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/calibration", async (req, res) => {
+  try {
+    const query = z.object({
+      ativo: z.string().min(1).optional(),
+      timeframe: z.enum(["1h", "4h", "1d"]).optional(),
+      origem: z.enum(["baseline", "jev"]).optional(),
+      recomendacao: z.enum(["BUY", "WAIT", "SELL"]).optional(),
+      riskRegime: z.string().min(1).max(64).optional(),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(90),
+      from: z.string().datetime().optional(),
+      to: z.string().datetime().optional(),
+    }).parse(req.query);
+
+    const now = new Date();
+    const from = query.from
+      ? new Date(query.from)
+      : new Date(now.getTime() - query.lookbackDays * 24 * 60 * 60 * 1000);
+    const to = query.to ? new Date(query.to) : now;
+
+    if (to.getTime() < from.getTime()) {
+      return res.status(400).json({ status: "error", error: "to must be after from" });
+    }
+
+    const filters = {
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      origem: query.origem,
+      recomendacao: query.recomendacao,
+      riskRegime: query.riskRegime,
+      from,
+      to,
+    };
+
+    const observations = await getDecisionCalibrationObservations(filters);
+    const calibration = buildCalibrationReport(observations, filters);
+
+    res.json({
+      status: "ok",
+      generatedAt: now.toISOString(),
+      period: {
+        from: from.toISOString(),
+        to: to.toISOString(),
+      },
+      ...calibration,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-report", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive(),
+      walkForwardRunId: z.coerce.number().int().positive().optional(),
+    }).parse(req.query);
+
+    const backtestRun = await getBacktestRun(query.backtestRunId);
+    if (!backtestRun) {
+      return res.status(404).json({ status: "error", error: "backtest run not found" });
+    }
+
+    if (backtestRun.mode !== "oos") {
+      return res.status(422).json({ status: "error", error: "backtestRunId must reference an oos run" });
+    }
+
+    if (!backtestRun.validationStart || !backtestRun.calibrationEnd) {
+      return res.status(422).json({ status: "error", error: "backtest run is missing OOS calibration/validation boundaries" });
+    }
+
+    const validationFrom = backtestRun.validationStart;
+    const validationTo = backtestRun.periodoFim;
+    const filters = {
+      ativo: backtestRun.ativo,
+      timeframe: backtestRun.timeframe,
+      from: validationFrom,
+      to: validationTo,
+    };
+
+    const [decisionKpis, observations, walkForwardRun] = await Promise.all([
+      getDecisionKpis(filters),
+      getDecisionCalibrationObservations(filters),
+      query.walkForwardRunId ? getWalkForwardRun(query.walkForwardRunId) : Promise.resolve(null),
+    ]);
+
+    if (query.walkForwardRunId && !walkForwardRun) {
+      return res.status(404).json({ status: "error", error: "walk-forward run not found" });
+    }
+
+    const folds = walkForwardRun
+      ? await getWalkForwardFolds(walkForwardRun.id)
+      : [];
+
+    const calibration = buildCalibrationReport(observations, filters);
+    const report = buildOosValidationReport({
+      backtestRun,
+      walkForwardRun,
+      folds,
+      calibration,
+      decisionKpis,
+    });
+
+    res.json({ status: "ok", ...report });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-robustness", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive(),
+      walkForwardRunId: z.coerce.number().int().positive(),
+      iterations: z.coerce.number().int().min(1000).max(100000).default(10000),
+      confidenceLevel: z.coerce.number().gt(0).lt(1).default(0.95),
+    }).parse(req.query);
+
+    const backtestRun = await getBacktestRun(query.backtestRunId);
+    if (!backtestRun) {
+      return res.status(404).json({ status: "error", error: "backtest run not found" });
+    }
+    if (backtestRun.mode !== "oos") {
+      return res.status(422).json({ status: "error", error: "backtestRunId must reference an oos run" });
+    }
+    if (!backtestRun.validationStart) {
+      return res.status(422).json({ status: "error", error: "backtest run is missing validationStart" });
+    }
+
+    const walkForwardRun = await getWalkForwardRun(query.walkForwardRunId);
+    if (!walkForwardRun) {
+      return res.status(404).json({ status: "error", error: "walk-forward run not found" });
+    }
+    if (walkForwardRun.ativo !== backtestRun.ativo || walkForwardRun.timeframe !== backtestRun.timeframe) {
+      return res.status(422).json({ status: "error", error: "backtest and walk-forward asset/timeframe scopes do not match" });
+    }
+
+    const folds = await getWalkForwardFolds(walkForwardRun.id);
+    const report = buildOosRobustnessReport({
+      backtestRun,
+      walkForwardRunId: walkForwardRun.id,
+      walkForwardDatasetHash: walkForwardRun.datasetHash,
+      folds,
+      iterations: query.iterations,
+      confidenceLevel: query.confidenceLevel,
+    });
+
+    res.json({ status: "ok", ...report });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-gate", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive(),
+      walkForwardRunId: z.coerce.number().int().positive(),
+      strategy: z.enum(["baseline", "baseline_risk", "jev"]),
+      iterations: z.coerce.number().int().min(1000).max(100000).default(10000),
+    }).parse(req.query);
+
+    const backtestRun = await getBacktestRun(query.backtestRunId);
+    if (!backtestRun) {
+      return res.status(404).json({ status: "error", error: "backtest run not found" });
+    }
+    if (backtestRun.mode !== "oos") {
+      return res.status(422).json({ status: "error", error: "backtestRunId must reference an oos run" });
+    }
+    if (!backtestRun.validationStart || !backtestRun.calibrationEnd) {
+      return res.status(422).json({ status: "error", error: "backtest run is missing OOS boundaries" });
+    }
+
+    const walkForwardRun = await getWalkForwardRun(query.walkForwardRunId);
+    if (!walkForwardRun) {
+      return res.status(404).json({ status: "error", error: "walk-forward run not found" });
+    }
+    if (walkForwardRun.ativo !== backtestRun.ativo || walkForwardRun.timeframe !== backtestRun.timeframe) {
+      return res.status(422).json({ status: "error", error: "backtest and walk-forward asset/timeframe scopes do not match" });
+    }
+
+    const validationFrom = backtestRun.validationStart;
+    const validationTo = backtestRun.periodoFim;
+    const filters = {
+      ativo: backtestRun.ativo,
+      timeframe: backtestRun.timeframe,
+      from: validationFrom,
+      to: validationTo,
+    };
+
+    const [decisionKpis, observations, folds] = await Promise.all([
+      getDecisionKpis(filters),
+      getDecisionCalibrationObservations(filters),
+      getWalkForwardFolds(walkForwardRun.id),
+    ]);
+
+    const calibration = buildCalibrationReport(observations, filters);
+    const validationReport = buildOosValidationReport({
+      backtestRun,
+      walkForwardRun,
+      folds,
+      calibration,
+      decisionKpis,
+    });
+    const robustnessReport = buildOosRobustnessReport({
+      backtestRun,
+      walkForwardRunId: walkForwardRun.id,
+      walkForwardDatasetHash: walkForwardRun.datasetHash,
+      folds,
+      iterations: query.iterations,
+    });
+    const gate = buildOosValidationGate({
+      strategy: query.strategy,
+      validationReport,
+      robustnessReport,
+    });
+    const audit = await saveOosValidationGateAudit({ gate, evidence: { validationReport, robustnessReport } });
+
+    res.json({
+      status: "ok",
+      gate,
+      audit: {
+        id: audit.id,
+        createdAt: audit.createdAt,
+        evidenceHash: audit.evidenceHash,
+      },
+      evidence: {
+        validationReportVersion: validationReport.reportVersion,
+        robustnessReportVersion: robustnessReport.reportVersion,
+        evidenceHash: gate.evidenceHash,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-gate/audits", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive().optional(),
+      walkForwardRunId: z.coerce.number().int().positive().optional(),
+      strategy: z.enum(["baseline", "baseline_risk", "jev"]).optional(),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+    }).parse(req.query);
+
+    const audits = await listOosValidationGateAudits({
+      backtestRunId: query.backtestRunId,
+      walkForwardRunId: query.walkForwardRunId,
+      strategy: query.strategy,
+      limit: query.limit,
+    });
+
+    res.json({
+      status: "ok",
+      count: audits.length,
+      audits,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-gate/audits/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ status: "error", error: "audit id must be a positive integer" });
+    }
+
+    const audit = await getOosValidationGateAudit(id);
+    if (!audit) {
+      return res.status(404).json({ status: "error", error: "OOS validation gate audit not found" });
+    }
+
+    res.json({ status: "ok", audit });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+app.get("/api/evaluation/oos-gate/audits/:id/verify", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ status: "error", error: "audit id must be a positive integer" });
+    }
+
+    const audit = await getOosValidationGateAudit(id);
+    if (!audit) {
+      return res.status(404).json({ status: "error", error: "OOS validation gate audit not found" });
+    }
+
+    if (!audit.evidence) {
+      return res.status(422).json({
+        status: "unavailable",
+        auditId: audit.id,
+        evidenceHash: audit.evidenceHash,
+        verified: false,
+        reason: "audit was created before persisted evidence bundles were enabled",
+      });
+    }
+
+    const recomputedHash = computeOosValidationGateEvidenceHash({
+      gateVersion: audit.gate.gateVersion,
+      strategy: audit.gate.strategy,
+      validationReport: audit.evidence.validationReport,
+      robustnessReport: audit.evidence.robustnessReport,
+      checks: audit.gate.checks,
+    });
+    const verified = recomputedHash === audit.evidenceHash;
+
+    res.status(verified ? 200 : 409).json({
+      status: verified ? "ok" : "error",
+      auditId: audit.id,
+      verified,
+      storedEvidenceHash: audit.evidenceHash,
+      recomputedEvidenceHash: recomputedHash,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/metrics", async (req, res) => {
+  try {
+    const rawRunId = req.query.runId;
+    const runId = rawRunId === undefined ? undefined : Number(rawRunId);
+    if (runId !== undefined && (!Number.isInteger(runId) || runId <= 0)) {
+      return res.status(400).json({ status: "error", error: "runId must be a positive integer" });
+    }
+    const metrics = await getMetricsByOrigem(runId);
+    res.json({ status: "ok", metrics });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+
+
+
+
+app.get("/api/backtest/walk-forward", async (req, res) => {
+  try {
+    const ativo = String(req.query.symbol ?? "BTCUSDT").toUpperCase();
+    const timeframe = String(req.query.timeframe ?? "1h");
+    const candles = Number(req.query.candles ?? 5000);
+    const initialTrainCandles = Number(req.query.initialTrain ?? 2000);
+    const testCandles = Number(req.query.test ?? 500);
+    const stepCandles = Number(req.query.step ?? 500);
+    const includeJev = String(req.query.includeJev ?? "false").toLowerCase() === "true";
+
+    if (!["1h", "4h", "1d"].includes(timeframe)) {
+      return res.status(400).json({ status: "error", error: "timeframe must be 1h, 4h or 1d" });
+    }
+    if (![candles, initialTrainCandles, testCandles, stepCandles].every(Number.isInteger)) {
+      return res.status(400).json({ status: "error", error: "walk-forward parameters must be integers" });
+    }
+
+    const result = await runWalkForward({
+      ativo,
+      timeframe: timeframe as "1h" | "4h" | "1d",
+      candles,
+      initialTrainCandles,
+      testCandles,
+      stepCandles,
+      includeJev,
+    });
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("Insufficient market_data") ? 422 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/backtest/baseline", async (req, res) => {
+  try {
+    const rawRunId = req.query.fromRun;
+    const fromRunId = rawRunId === undefined ? undefined : Number(rawRunId);
+    const candles = Number(req.query.candles ?? 5000);
+    if (fromRunId !== undefined && (!Number.isInteger(fromRunId) || fromRunId <= 0)) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    if (!Number.isInteger(candles) || candles < 1000 || candles > 5000) {
+      return res.status(400).json({ status: "error", error: "candles must be an integer between 1000 and 5000" });
+    }
+    const result = await runRemoteBaselineBacktest(fromRunId, candles);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/risk/regimes", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    const rawPortfolioRun = req.query.portfolioRun;
+    const portfolioRun =
+      rawPortfolioRun === undefined ? undefined : Number(rawPortfolioRun);
+
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    if (
+      portfolioRun !== undefined &&
+      (!Number.isInteger(portfolioRun) || portfolioRun <= 0)
+    ) {
+      return res.status(400).json({ status: "error", error: "portfolioRun must be a positive integer" });
+    }
+
+    const result = await runRiskRegimeAnalysis(fromRun, portfolioRun);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/portfolio/run", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    const initialCapital = Number(req.query.initialCapital ?? 1000);
+    const positionSizePct = Number(req.query.positionSizePct ?? 2);
+    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? 20);
+    const riskGate = String(req.query.riskGate ?? "false").toLowerCase() === "true";
+    const result = await runPortfolioEngine({
+      sourceRunId: fromRun,
+      initialCapital,
+      positionSizePct,
+      maxGrossExposurePct,
+      riskGate,
+    });
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/portfolio/walk-forward", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+
+    const initialCapital = Number(req.query.initialCapital ?? 1000);
+    const positionSizePct = Number(req.query.positionSizePct ?? 2);
+    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? 20);
+
+    const result = await runWalkForwardPortfolio({
+      walkForwardRunId: fromRun,
+      initialCapital,
+      positionSizePct,
+      maxGrossExposurePct,
+    });
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/portfolio", async (req, res) => {
+  try {
+    const runId = Number(req.query.runId);
+    if (!Number.isInteger(runId) || runId <= 0) {
+      return res.status(400).json({ status: "error", error: "runId must be a positive integer" });
+    }
+    const run = await getPortfolioRun(runId);
+    if (!run) return res.status(404).json({ status: "error", error: "portfolio run not found" });
+    const curve = await getPortfolioEquityCurve(runId);
+    res.json({ status: "ok", run, equityCurve: curve });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/backtest/benchmark", async (req, res) => {
+  try {
+    const rawRunId = req.query.fromRun;
+    const fromRunId = Number(rawRunId ?? 1);
+    if (!Number.isInteger(fromRunId) || fromRunId <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    const includeJev = String(req.query.includeJev ?? "true").toLowerCase() !== "false";
+    const result = await runBenchmarkSuite(fromRunId, includeJev);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/backtest/jev", async (req, res) => {
+  try {
+    const rawRunId = req.query.fromRun;
+    const fromRunId = Number(rawRunId ?? 1);
+    if (!Number.isInteger(fromRunId) || fromRunId <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    const result = await runRemoteJevBacktest(fromRunId);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.post("/api/analyze", async (req, res) => {
+  try {
+    const parsed = AnalyzeSchema.parse(req.body);
+    const result = await analyzeMarket(parsed);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") || err instanceof MarketDataQualityError ? 503 : 400;
+    res.status(status).json({
+      status: "error",
+      error: message,
+      ...(err instanceof MarketDataQualityError ? { code: err.code, quality: err.quality } : {}),
+    });
+  }
+});
+
+const port = Number(process.env.PORT ?? 3000);
+
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
+  app.listen(port, "0.0.0.0", () =>
+    console.log(`AI Financial Analyst API rodando na porta ${port}`),
+  );
+}
+ + Number(analysis.market.precoAtual).toLocaleString();
+        document.getElementById('resPos').textContent = analysis.decision.tamanhoPosicaoPct + '%';
+        document.getElementById('resExposed').textContent = '
+
+        resultBox.style.display = 'block';
+      } catch (err) {
+        alert('Analysis Error: ' + err.message);
+      } finally {
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = 'Analyze Market';
+      }
+    });
+  </script>
+</body>
+</html>`;
+
+app.get("/", (req, res) => {
+  if (req.headers.accept?.includes("text/html") && !req.query.format) {
+    return res.type("html").send(HTML_DASHBOARD);
+  }
+  res.json({
+    status: "ok",
+    service: "ai-financial-analyst-api",
+    endpoints: [
+      "/health",
+      "/api/analyze",
+      "/api/metrics",
+      "/api/market/ping",
+      "/api/market/time",
+      "/api/market/info",
+      "/api/market/klines",
+    ],
+  });
+});
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", service: "ai-financial-analyst-api" });
+});
+
+app.get("/api/market/ping", async (_req, res) => {
+  try {
+    const isAlive = await pingBinance();
+    res.json({ status: "ok", ping: isAlive });
+  } catch (err: any) {
+    res.status(502).json({ status: "error", error: err.message });
+  }
+});
+
+app.get("/api/market/time", async (_req, res) => {
+  try {
+    const serverTime = await getServerTime();
+    res.json({ status: "ok", serverTime, serverTimeUTC: new Date(serverTime).toISOString() });
+  } catch (err: any) {
+    res.status(502).json({ status: "error", error: err.message });
+  }
+});
+
+app.get("/api/market/info", async (req, res) => {
+  try {
+    const symbol = String(req.query.symbol ?? "BTCUSDT");
+    const info = await getExchangeInfo(symbol);
+    res.json({ status: "ok", info });
+  } catch (err: any) {
+    res.status(400).json({ status: "error", error: err.message });
+  }
+});
+
+const KlinesQuerySchema = z.object({
+  symbol: z.string().default("BTCUSDT"),
+  timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+  limit: z.coerce.number().min(1).max(1000).default(10),
+});
+
+app.get("/api/market/klines", async (req, res) => {
+  try {
+    const query = KlinesQuerySchema.parse(req.query);
+    const klines = await fetchKlines(query.symbol, query.timeframe as Timeframe, query.limit);
+    res.json({
+      status: "ok",
+      symbol: query.symbol.toUpperCase(),
+      timeframe: query.timeframe,
+      count: klines.length,
+      klines,
+    });
+  } catch (err: any) {
+    res.status(400).json({ status: "error", error: err.message });
+  }
+});
+
+export const AnalyzeSchema = z.object({
+  ativo: z.string().min(1).default("BTCUSDT"),
+  timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+  valorInvestimento: z.coerce.number().positive().default(100),
+  engine: z.enum(["baseline", "jev"]).default("baseline"),
+  news: z.boolean().default(true),
+});
+
+
+app.get("/api/ai/providers", (_req, res) => {
+  res.json({
+    status: "ok",
+    providers: listAiProviders(),
+  });
+});
+
+app.post("/api/online-analysis", async (req, res) => {
+  try {
+    const parsed = z.object({
+      ...AnalyzeSchema.shape,
+      aiProvider: z.enum(["none", "gemini"]).default("none"),
+    }).parse(req.body);
+
+    const result = await runOnlineAnalysis(
+      {
+        ativo: parsed.ativo,
+        timeframe: parsed.timeframe,
+        valorInvestimento: parsed.valorInvestimento,
+        engine: parsed.engine,
+        news: parsed.news,
+      },
+      parsed.aiProvider,
+    );
+
+    res.json({
+      status: "ok",
+      ...result,
+      provenance: {
+        packetId: result.packet.packetId,
+        snapshotId: result.snapshot.snapshotId,
+        snapshotContentHash: result.snapshot.contentHash,
+        decisionLogId: result.analysis.decisionLogId,
+        signalId: result.analysis.signalId,
+        dataAsOf: result.analysis.market.dataAsOf,
+        marketDataQuality: result.analysis.marketDataQuality,
+        deterministicRecommendation: result.analysis.decision.recomendacao,
+        aiProvider: result.ai?.provider ?? "none",
+        aiModel: result.ai?.model ?? null,
+        aiInputPacketHash: result.ai?.inputPacketHash ?? null,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status =
+      message.includes("DATABASE_URL") ||
+      err instanceof MarketDataQualityError ||
+      err instanceof GeminiProviderError
+        ? 503
+        : 400;
+
+    res.status(status).json({
+      status: "error",
+      error: message,
+      ...(err instanceof MarketDataQualityError ? { code: err.code, quality: err.quality } : {}),
+      ...(err instanceof GeminiProviderError ? { code: err.code } : {}),
+    });
+  }
+});
+
+app.post("/api/report", async (req, res) => {
+  try {
+    const parsed = AnalyzeSchema.parse(req.body);
+    const analysis = await analyzeMarket(parsed);
+    const research = await generateAnalystReport(analysis);
+    const snapshot = buildResearchSnapshot(analysis, research);
+    const stored = await saveResearchSnapshot({ snapshot, decisionLogId: analysis.decisionLogId });
+    res.json({
+      status: "ok",
+      analysis,
+      research,
+      snapshot: stored.snapshot,
+      persistence: {
+        snapshotId: stored.snapshotId,
+        contentHash: stored.contentHash,
+        signalId: stored.signalId,
+        decisionLogId: stored.decisionLogId,
+        createdAt: stored.createdAt,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/research/snapshots/:snapshotId", async (req, res) => {
+  try {
+    const snapshotId = String(req.params.snapshotId ?? "").trim();
+    if (!/^rs_[a-f0-9]{24}$/.test(snapshotId)) {
+      return res.status(400).json({ status: "error", error: "invalid snapshotId" });
+    }
+
+    const stored = await getResearchSnapshot(snapshotId);
+    if (!stored) {
+      return res.status(404).json({ status: "error", error: "research snapshot not found" });
+    }
+
+    res.json({
+      status: "ok",
+      snapshot: stored.snapshot,
+      persistence: {
+        snapshotId: stored.snapshotId,
+        contentHash: stored.contentHash,
+        signalId: stored.signalId,
+        decisionLogId: stored.decisionLogId,
+        createdAt: stored.createdAt,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+
+app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
+  try {
+    const decisionLogId = Number(req.params.decisionLogId);
+    if (!Number.isInteger(decisionLogId) || decisionLogId <= 0) {
+      return res.status(400).json({ status: "error", error: "decisionLogId must be a positive integer" });
+    }
+
+    const body = z.object({
+      lookaheadCandles: z.coerce.number().int().min(1).max(5000).default(24),
+      flatThresholdPct: z.coerce.number().min(0).max(100).default(0.1),
+      evaluatedAt: z.string().datetime().optional(),
+    }).parse(req.body);
+
+    const decision = await getDecisionLog(decisionLogId);
+    if (!decision) {
+      return res.status(404).json({ status: "error", error: "decision log not found" });
+    }
+    if (decision.outcomeStatus !== "pending") {
+      return res.status(409).json({ status: "error", error: "decision log is already settled" });
+    }
+
+    const evaluatedAt = body.evaluatedAt ? new Date(body.evaluatedAt) : new Date();
+    const candles = await getMarketDataRange(
+      decision.ativo,
+      decision.timeframe,
+      decision.dataAsOf,
+      evaluatedAt,
+    );
+
+    const evaluation = evaluateDecisionLog(
+      decision,
+      candles,
+      evaluatedAt,
+      {
+        lookaheadCandles: body.lookaheadCandles,
+        flatThresholdPct: body.flatThresholdPct,
+      },
+    );
+
+    await settleDecisionLog(decisionLogId, evaluation.outcome);
+
+    res.json({
+      status: "ok",
+      decisionLogId,
+      evaluation: {
+        referencePrice: evaluation.referencePrice,
+        evaluationCandleClose: evaluation.evaluationCandleClose,
+        evaluationPrice: evaluation.evaluationPrice,
+        lookaheadCandles: evaluation.lookaheadCandles,
+        forwardReturnPercent: evaluation.forwardReturnPercent,
+        outcomeDirection: evaluation.outcomeDirection,
+        tradeProfitPercent: evaluation.tradeProfitPercent,
+        outcomeStatus: evaluation.outcome.outcomeStatus,
+        evaluatedAt,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503
+      : message.includes("Insufficient future closed candles") ? 422
+      : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/kpis", async (req, res) => {
+  try {
+    const query = z.object({
+      ativo: z.string().min(1).optional(),
+      timeframe: z.enum(["1h", "4h", "1d"]).optional(),
+      origem: z.enum(["baseline", "jev"]).optional(),
+      recomendacao: z.enum(["BUY", "WAIT", "SELL"]).optional(),
+      riskRegime: z.string().min(1).max(64).optional(),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(30),
+      from: z.string().datetime().optional(),
+      to: z.string().datetime().optional(),
+    }).parse(req.query);
+
+    const now = new Date();
+    const from = query.from
+      ? new Date(query.from)
+      : new Date(now.getTime() - query.lookbackDays * 24 * 60 * 60 * 1000);
+    const to = query.to ? new Date(query.to) : now;
+
+    if (to.getTime() < from.getTime()) {
+      return res.status(400).json({ status: "error", error: "to must be after from" });
+    }
+
+    const kpis = await getDecisionKpis({
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      origem: query.origem,
+      recomendacao: query.recomendacao,
+      riskRegime: query.riskRegime,
+      from,
+      to,
+    });
+
+    res.json({
+      status: "ok",
+      generatedAt: now.toISOString(),
+      period: {
+        from: from.toISOString(),
+        to: to.toISOString(),
+      },
+      ...kpis,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/calibration", async (req, res) => {
+  try {
+    const query = z.object({
+      ativo: z.string().min(1).optional(),
+      timeframe: z.enum(["1h", "4h", "1d"]).optional(),
+      origem: z.enum(["baseline", "jev"]).optional(),
+      recomendacao: z.enum(["BUY", "WAIT", "SELL"]).optional(),
+      riskRegime: z.string().min(1).max(64).optional(),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(90),
+      from: z.string().datetime().optional(),
+      to: z.string().datetime().optional(),
+    }).parse(req.query);
+
+    const now = new Date();
+    const from = query.from
+      ? new Date(query.from)
+      : new Date(now.getTime() - query.lookbackDays * 24 * 60 * 60 * 1000);
+    const to = query.to ? new Date(query.to) : now;
+
+    if (to.getTime() < from.getTime()) {
+      return res.status(400).json({ status: "error", error: "to must be after from" });
+    }
+
+    const filters = {
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      origem: query.origem,
+      recomendacao: query.recomendacao,
+      riskRegime: query.riskRegime,
+      from,
+      to,
+    };
+
+    const observations = await getDecisionCalibrationObservations(filters);
+    const calibration = buildCalibrationReport(observations, filters);
+
+    res.json({
+      status: "ok",
+      generatedAt: now.toISOString(),
+      period: {
+        from: from.toISOString(),
+        to: to.toISOString(),
+      },
+      ...calibration,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-report", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive(),
+      walkForwardRunId: z.coerce.number().int().positive().optional(),
+    }).parse(req.query);
+
+    const backtestRun = await getBacktestRun(query.backtestRunId);
+    if (!backtestRun) {
+      return res.status(404).json({ status: "error", error: "backtest run not found" });
+    }
+
+    if (backtestRun.mode !== "oos") {
+      return res.status(422).json({ status: "error", error: "backtestRunId must reference an oos run" });
+    }
+
+    if (!backtestRun.validationStart || !backtestRun.calibrationEnd) {
+      return res.status(422).json({ status: "error", error: "backtest run is missing OOS calibration/validation boundaries" });
+    }
+
+    const validationFrom = backtestRun.validationStart;
+    const validationTo = backtestRun.periodoFim;
+    const filters = {
+      ativo: backtestRun.ativo,
+      timeframe: backtestRun.timeframe,
+      from: validationFrom,
+      to: validationTo,
+    };
+
+    const [decisionKpis, observations, walkForwardRun] = await Promise.all([
+      getDecisionKpis(filters),
+      getDecisionCalibrationObservations(filters),
+      query.walkForwardRunId ? getWalkForwardRun(query.walkForwardRunId) : Promise.resolve(null),
+    ]);
+
+    if (query.walkForwardRunId && !walkForwardRun) {
+      return res.status(404).json({ status: "error", error: "walk-forward run not found" });
+    }
+
+    const folds = walkForwardRun
+      ? await getWalkForwardFolds(walkForwardRun.id)
+      : [];
+
+    const calibration = buildCalibrationReport(observations, filters);
+    const report = buildOosValidationReport({
+      backtestRun,
+      walkForwardRun,
+      folds,
+      calibration,
+      decisionKpis,
+    });
+
+    res.json({ status: "ok", ...report });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-robustness", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive(),
+      walkForwardRunId: z.coerce.number().int().positive(),
+      iterations: z.coerce.number().int().min(1000).max(100000).default(10000),
+      confidenceLevel: z.coerce.number().gt(0).lt(1).default(0.95),
+    }).parse(req.query);
+
+    const backtestRun = await getBacktestRun(query.backtestRunId);
+    if (!backtestRun) {
+      return res.status(404).json({ status: "error", error: "backtest run not found" });
+    }
+    if (backtestRun.mode !== "oos") {
+      return res.status(422).json({ status: "error", error: "backtestRunId must reference an oos run" });
+    }
+    if (!backtestRun.validationStart) {
+      return res.status(422).json({ status: "error", error: "backtest run is missing validationStart" });
+    }
+
+    const walkForwardRun = await getWalkForwardRun(query.walkForwardRunId);
+    if (!walkForwardRun) {
+      return res.status(404).json({ status: "error", error: "walk-forward run not found" });
+    }
+    if (walkForwardRun.ativo !== backtestRun.ativo || walkForwardRun.timeframe !== backtestRun.timeframe) {
+      return res.status(422).json({ status: "error", error: "backtest and walk-forward asset/timeframe scopes do not match" });
+    }
+
+    const folds = await getWalkForwardFolds(walkForwardRun.id);
+    const report = buildOosRobustnessReport({
+      backtestRun,
+      walkForwardRunId: walkForwardRun.id,
+      walkForwardDatasetHash: walkForwardRun.datasetHash,
+      folds,
+      iterations: query.iterations,
+      confidenceLevel: query.confidenceLevel,
+    });
+
+    res.json({ status: "ok", ...report });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-gate", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive(),
+      walkForwardRunId: z.coerce.number().int().positive(),
+      strategy: z.enum(["baseline", "baseline_risk", "jev"]),
+      iterations: z.coerce.number().int().min(1000).max(100000).default(10000),
+    }).parse(req.query);
+
+    const backtestRun = await getBacktestRun(query.backtestRunId);
+    if (!backtestRun) {
+      return res.status(404).json({ status: "error", error: "backtest run not found" });
+    }
+    if (backtestRun.mode !== "oos") {
+      return res.status(422).json({ status: "error", error: "backtestRunId must reference an oos run" });
+    }
+    if (!backtestRun.validationStart || !backtestRun.calibrationEnd) {
+      return res.status(422).json({ status: "error", error: "backtest run is missing OOS boundaries" });
+    }
+
+    const walkForwardRun = await getWalkForwardRun(query.walkForwardRunId);
+    if (!walkForwardRun) {
+      return res.status(404).json({ status: "error", error: "walk-forward run not found" });
+    }
+    if (walkForwardRun.ativo !== backtestRun.ativo || walkForwardRun.timeframe !== backtestRun.timeframe) {
+      return res.status(422).json({ status: "error", error: "backtest and walk-forward asset/timeframe scopes do not match" });
+    }
+
+    const validationFrom = backtestRun.validationStart;
+    const validationTo = backtestRun.periodoFim;
+    const filters = {
+      ativo: backtestRun.ativo,
+      timeframe: backtestRun.timeframe,
+      from: validationFrom,
+      to: validationTo,
+    };
+
+    const [decisionKpis, observations, folds] = await Promise.all([
+      getDecisionKpis(filters),
+      getDecisionCalibrationObservations(filters),
+      getWalkForwardFolds(walkForwardRun.id),
+    ]);
+
+    const calibration = buildCalibrationReport(observations, filters);
+    const validationReport = buildOosValidationReport({
+      backtestRun,
+      walkForwardRun,
+      folds,
+      calibration,
+      decisionKpis,
+    });
+    const robustnessReport = buildOosRobustnessReport({
+      backtestRun,
+      walkForwardRunId: walkForwardRun.id,
+      walkForwardDatasetHash: walkForwardRun.datasetHash,
+      folds,
+      iterations: query.iterations,
+    });
+    const gate = buildOosValidationGate({
+      strategy: query.strategy,
+      validationReport,
+      robustnessReport,
+    });
+    const audit = await saveOosValidationGateAudit({ gate, evidence: { validationReport, robustnessReport } });
+
+    res.json({
+      status: "ok",
+      gate,
+      audit: {
+        id: audit.id,
+        createdAt: audit.createdAt,
+        evidenceHash: audit.evidenceHash,
+      },
+      evidence: {
+        validationReportVersion: validationReport.reportVersion,
+        robustnessReportVersion: robustnessReport.reportVersion,
+        evidenceHash: gate.evidenceHash,
+      },
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-gate/audits", async (req, res) => {
+  try {
+    const query = z.object({
+      backtestRunId: z.coerce.number().int().positive().optional(),
+      walkForwardRunId: z.coerce.number().int().positive().optional(),
+      strategy: z.enum(["baseline", "baseline_risk", "jev"]).optional(),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+    }).parse(req.query);
+
+    const audits = await listOosValidationGateAudits({
+      backtestRunId: query.backtestRunId,
+      walkForwardRunId: query.walkForwardRunId,
+      strategy: query.strategy,
+      limit: query.limit,
+    });
+
+    res.json({
+      status: "ok",
+      count: audits.length,
+      audits,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/oos-gate/audits/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ status: "error", error: "audit id must be a positive integer" });
+    }
+
+    const audit = await getOosValidationGateAudit(id);
+    if (!audit) {
+      return res.status(404).json({ status: "error", error: "OOS validation gate audit not found" });
+    }
+
+    res.json({ status: "ok", audit });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+app.get("/api/evaluation/oos-gate/audits/:id/verify", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ status: "error", error: "audit id must be a positive integer" });
+    }
+
+    const audit = await getOosValidationGateAudit(id);
+    if (!audit) {
+      return res.status(404).json({ status: "error", error: "OOS validation gate audit not found" });
+    }
+
+    if (!audit.evidence) {
+      return res.status(422).json({
+        status: "unavailable",
+        auditId: audit.id,
+        evidenceHash: audit.evidenceHash,
+        verified: false,
+        reason: "audit was created before persisted evidence bundles were enabled",
+      });
+    }
+
+    const recomputedHash = computeOosValidationGateEvidenceHash({
+      gateVersion: audit.gate.gateVersion,
+      strategy: audit.gate.strategy,
+      validationReport: audit.evidence.validationReport,
+      robustnessReport: audit.evidence.robustnessReport,
+      checks: audit.gate.checks,
+    });
+    const verified = recomputedHash === audit.evidenceHash;
+
+    res.status(verified ? 200 : 409).json({
+      status: verified ? "ok" : "error",
+      auditId: audit.id,
+      verified,
+      storedEvidenceHash: audit.evidenceHash,
+      recomputedEvidenceHash: recomputedHash,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/metrics", async (req, res) => {
+  try {
+    const rawRunId = req.query.runId;
+    const runId = rawRunId === undefined ? undefined : Number(rawRunId);
+    if (runId !== undefined && (!Number.isInteger(runId) || runId <= 0)) {
+      return res.status(400).json({ status: "error", error: "runId must be a positive integer" });
+    }
+    const metrics = await getMetricsByOrigem(runId);
+    res.json({ status: "ok", metrics });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+
+
+
+
+app.get("/api/backtest/walk-forward", async (req, res) => {
+  try {
+    const ativo = String(req.query.symbol ?? "BTCUSDT").toUpperCase();
+    const timeframe = String(req.query.timeframe ?? "1h");
+    const candles = Number(req.query.candles ?? 5000);
+    const initialTrainCandles = Number(req.query.initialTrain ?? 2000);
+    const testCandles = Number(req.query.test ?? 500);
+    const stepCandles = Number(req.query.step ?? 500);
+    const includeJev = String(req.query.includeJev ?? "false").toLowerCase() === "true";
+
+    if (!["1h", "4h", "1d"].includes(timeframe)) {
+      return res.status(400).json({ status: "error", error: "timeframe must be 1h, 4h or 1d" });
+    }
+    if (![candles, initialTrainCandles, testCandles, stepCandles].every(Number.isInteger)) {
+      return res.status(400).json({ status: "error", error: "walk-forward parameters must be integers" });
+    }
+
+    const result = await runWalkForward({
+      ativo,
+      timeframe: timeframe as "1h" | "4h" | "1d",
+      candles,
+      initialTrainCandles,
+      testCandles,
+      stepCandles,
+      includeJev,
+    });
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("Insufficient market_data") ? 422 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/backtest/baseline", async (req, res) => {
+  try {
+    const rawRunId = req.query.fromRun;
+    const fromRunId = rawRunId === undefined ? undefined : Number(rawRunId);
+    const candles = Number(req.query.candles ?? 5000);
+    if (fromRunId !== undefined && (!Number.isInteger(fromRunId) || fromRunId <= 0)) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    if (!Number.isInteger(candles) || candles < 1000 || candles > 5000) {
+      return res.status(400).json({ status: "error", error: "candles must be an integer between 1000 and 5000" });
+    }
+    const result = await runRemoteBaselineBacktest(fromRunId, candles);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/risk/regimes", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    const rawPortfolioRun = req.query.portfolioRun;
+    const portfolioRun =
+      rawPortfolioRun === undefined ? undefined : Number(rawPortfolioRun);
+
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    if (
+      portfolioRun !== undefined &&
+      (!Number.isInteger(portfolioRun) || portfolioRun <= 0)
+    ) {
+      return res.status(400).json({ status: "error", error: "portfolioRun must be a positive integer" });
+    }
+
+    const result = await runRiskRegimeAnalysis(fromRun, portfolioRun);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/portfolio/run", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    const initialCapital = Number(req.query.initialCapital ?? 1000);
+    const positionSizePct = Number(req.query.positionSizePct ?? 2);
+    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? 20);
+    const riskGate = String(req.query.riskGate ?? "false").toLowerCase() === "true";
+    const result = await runPortfolioEngine({
+      sourceRunId: fromRun,
+      initialCapital,
+      positionSizePct,
+      maxGrossExposurePct,
+      riskGate,
+    });
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/portfolio/walk-forward", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+
+    const initialCapital = Number(req.query.initialCapital ?? 1000);
+    const positionSizePct = Number(req.query.positionSizePct ?? 2);
+    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? 20);
+
+    const result = await runWalkForwardPortfolio({
+      walkForwardRunId: fromRun,
+      initialCapital,
+      positionSizePct,
+      maxGrossExposurePct,
+    });
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/portfolio", async (req, res) => {
+  try {
+    const runId = Number(req.query.runId);
+    if (!Number.isInteger(runId) || runId <= 0) {
+      return res.status(400).json({ status: "error", error: "runId must be a positive integer" });
+    }
+    const run = await getPortfolioRun(runId);
+    if (!run) return res.status(404).json({ status: "error", error: "portfolio run not found" });
+    const curve = await getPortfolioEquityCurve(runId);
+    res.json({ status: "ok", run, equityCurve: curve });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/backtest/benchmark", async (req, res) => {
+  try {
+    const rawRunId = req.query.fromRun;
+    const fromRunId = Number(rawRunId ?? 1);
+    if (!Number.isInteger(fromRunId) || fromRunId <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    const includeJev = String(req.query.includeJev ?? "true").toLowerCase() !== "false";
+    const result = await runBenchmarkSuite(fromRunId, includeJev);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/backtest/jev", async (req, res) => {
+  try {
+    const rawRunId = req.query.fromRun;
+    const fromRunId = Number(rawRunId ?? 1);
+    if (!Number.isInteger(fromRunId) || fromRunId <= 0) {
+      return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
+    }
+    const result = await runRemoteJevBacktest(fromRunId);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.post("/api/analyze", async (req, res) => {
+  try {
+    const parsed = AnalyzeSchema.parse(req.body);
+    const result = await analyzeMarket(parsed);
+    res.json({ status: "ok", ...result });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") || err instanceof MarketDataQualityError ? 503 : 400;
+    res.status(status).json({
+      status: "error",
+      error: message,
+      ...(err instanceof MarketDataQualityError ? { code: err.code, quality: err.quality } : {}),
+    });
+  }
+});
+
+const port = Number(process.env.PORT ?? 3000);
+
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
+  app.listen(port, "0.0.0.0", () =>
+    console.log(`AI Financial Analyst API rodando na porta ${port}`),
+  );
+}
+ + Number(analysis.valorExposto).toFixed(2);
+
+        const ema9 = analysis.market.indicators.ema9 ? Number(analysis.market.indicators.ema9).toFixed(1) : '-';
+        const ema21 = analysis.market.indicators.ema21 ? Number(analysis.market.indicators.ema21).toFixed(1) : '-';
         document.getElementById('resEMA').textContent = ema9 + ' / ' + ema21;
 
-        document.getElementById('resRSI').textContent = data.market.indicators.rsi ? Number(data.market.indicators.rsi).toFixed(1) : '-';
-        document.getElementById('resRisk').textContent = data.decision.riscoElevado ? 'YES (High)' : 'Normal';
-        document.getElementById('resObs').textContent = data.decision.observacao || '';
+        document.getElementById('resRSI').textContent = analysis.market.indicators.rsi ? Number(analysis.market.indicators.rsi).toFixed(1) : '-';
+        document.getElementById('resRisk').textContent = analysis.decision.riscoElevado ? 'YES (High)' : 'Normal';
+        document.getElementById('resObs').textContent = analysis.decision.observacao || '';
+
+        const quality = analysis.marketDataQuality;
+        document.getElementById('resDataAsOf').textContent = new Date(analysis.market.dataAsOf).toLocaleString();
+        document.getElementById('resDataQuality').textContent = quality ? (quality.status + ' · age ' + Math.round(quality.ageMs / 1000) + 's') : '-';
+        document.getElementById('resSnapshot').textContent = data.snapshot ? data.snapshot.snapshotId + ' · ' + data.snapshot.contentHash.slice(0, 16) : '-';
+        document.getElementById('resPacket').textContent = data.packet ? data.packet.packetId : '-';
+
+        const aiBox = document.getElementById('aiBox');
+        if (data.ai && data.ai.narrative) {
+          aiBox.style.display = 'block';
+          document.getElementById('aiTitle').textContent = 'AI Analyst · ' + data.ai.model;
+          document.getElementById('aiSummary').textContent = data.ai.narrative.summary;
+          const renderList = (id, values) => {
+            document.getElementById(id).innerHTML = (values || []).map(value => {
+              const safe = String(value).replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]));
+              return '<li>' + safe + '</li>';
+            }).join('');
+          };
+          renderList('aiDrivers', data.ai.narrative.keyDrivers);
+          renderList('aiRisks', data.ai.narrative.riskFlags);
+          renderList('aiWatch', data.ai.narrative.watchItems);
+          document.getElementById('aiConfidence').textContent = data.ai.narrative.confidenceNote;
+        } else {
+          aiBox.style.display = 'none';
+        }
+
         document.getElementById('resJson').textContent = JSON.stringify(data, null, 2);
 
         resultBox.style.display = 'block';
