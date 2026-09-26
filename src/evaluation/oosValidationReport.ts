@@ -420,6 +420,7 @@ export function buildOosValidationReport(input: {
       calibrationEnd: backtestRun.calibrationEnd.toISOString(),
       policyVersion: backtestRun.evaluationPolicyVersion,
       oosStartRatio: backtestRun.oosStartRatio,
+      candlesTotal: backtestRun.candlesTotal,
       datasetHash: backtestRun.datasetHash,
       walkForwardDatasetHash: walkForwardRun?.datasetHash ?? null,
     },
