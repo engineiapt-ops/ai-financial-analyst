@@ -231,6 +231,7 @@ export function runFeatureEngineTests() {
       ativo: "BTCUSDT",
       timeframe: "1h",
       timestamp: Date.now(),
+      dataAsOf: Date.now(),
       precoAtual: 84000,
       indicators: {
         vwap: 84000,
