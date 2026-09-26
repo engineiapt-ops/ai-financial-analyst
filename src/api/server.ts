@@ -33,6 +33,7 @@ import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDi
 import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernanceOverview.js";
 import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
 import { listAiProviders } from "../ai/providers.js";
+import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
 
 
 
@@ -69,6 +70,15 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   if (isHeavyApiRequest(req)) {
     heavyRateLimiter(req, res, next);
+    return;
+  }
+  next();
+});
+
+const apiAuthMiddleware = requireApiAuth();
+app.use((req, res, next) => {
+  if (isProtectedApiRequest(req)) {
+    apiAuthMiddleware(req, res, next);
     return;
   }
   next();
@@ -294,6 +304,10 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
               </select>
             </div>
           </div>
+          <div class="form-group">
+            <label for="apiKey">API Key (protected analysis endpoints)</label>
+            <input type="password" id="apiKey" placeholder="X-API-Key" autocomplete="off" />
+          </div>
           <div class="checkbox-row">
             <input type="checkbox" id="news" checked />
             <label for="news" style="margin-bottom:0;cursor:pointer">Include News Sentiment (GDELT)</label>
@@ -417,6 +431,12 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         document.getElementById('ovGovernance').textContent = 'Overview indisponível';
       }
     }
+    const apiKeyInput = document.getElementById('apiKey');
+    apiKeyInput.value = sessionStorage.getItem('ai-financial-analyst-api-key') || '';
+    apiKeyInput.addEventListener('input', () => {
+      sessionStorage.setItem('ai-financial-analyst-api-key', apiKeyInput.value.trim());
+    });
+
     refreshStatus();
     refreshEvaluationOverview();
 
@@ -439,9 +459,13 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
           news: document.getElementById('news').checked,
         };
 
+        const apiKey = apiKeyInput.value.trim();
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKey) headers['X-API-Key'] = apiKey;
+
         const res = await fetch('/api/analyze', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(body),
         });
 
@@ -518,6 +542,7 @@ app.get("/api/system/readiness", async (_req, res) => {
     database: databaseCheck,
     aiProviders: listAiProviders(),
     paperTradingOnly: true,
+    apiAuthenticationConfigured: Boolean(process.env.API_AUTH_TOKEN?.trim()),
     governanceContracts: [
       "evaluation-overview.v1",
       "portfolio-governance-overview.v1",
