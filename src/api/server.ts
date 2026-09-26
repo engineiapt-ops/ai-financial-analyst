@@ -8,6 +8,7 @@ import {
   ping as pingBinance,
 } from "../marketdata/binanceClient.js";
 import { analyzeMarket } from "./analyze.js";
+import { MarketDataQualityError } from "../marketdata/quality.js";
 import { evaluateDecisionLog } from "../evaluation/decisionEvaluator.js";
 import { buildCalibrationReport } from "../evaluation/calibration.js";
 import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
@@ -1179,8 +1180,12 @@ app.post("/api/analyze", async (req, res) => {
     res.json({ status: "ok", ...result });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
-    const status = message.includes("DATABASE_URL") ? 503 : 400;
-    res.status(status).json({ status: "error", error: message });
+    const status = message.includes("DATABASE_URL") || err instanceof MarketDataQualityError ? 503 : 400;
+    res.status(status).json({
+      status: "error",
+      error: message,
+      ...(err instanceof MarketDataQualityError ? { code: err.code, quality: err.quality } : {}),
+    });
   }
 });
 
