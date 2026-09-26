@@ -1,5 +1,6 @@
 import pg, { type Pool, type PoolClient, type QueryResultRow } from "pg";
 import type { DecisionResult, Kline, Timeframe } from "../types.js";
+import type { ResearchSnapshot } from "../research/snapshot.js";
 
 export interface RepositoryPool {
   query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
@@ -73,6 +74,24 @@ export interface SaveTradeInput {
   maxAdverseExcursionPercent?: number | null;
   openedAt?: Date;
   closedAt?: Date | null;
+}
+
+export interface ResearchSnapshotRecord {
+  snapshotId: string;
+  schemaVersion: string;
+  contentHash: string;
+  signalId: number;
+  decisionLogId: number | null;
+  ativo: string;
+  timeframe: Timeframe;
+  dataAsOf: Date;
+  createdAt: Date;
+  snapshot: ResearchSnapshot;
+}
+
+export interface SaveResearchSnapshotInput {
+  snapshot: ResearchSnapshot;
+  decisionLogId?: number | null;
 }
 
 export interface DecisionLogInput {
@@ -489,6 +508,137 @@ export function createRepository(db: RepositoryPool) {
       const id = Number(rows[0]?.id);
       if (!Number.isInteger(id) || id <= 0) throw new Error("Database did not return a valid signal id");
       return id;
+    },
+
+    async saveResearchSnapshot(input: SaveResearchSnapshotInput): Promise<ResearchSnapshotRecord> {
+      const snapshot = input.snapshot;
+      const { rows } = await db.query<{
+        snapshot_id: string;
+        schema_version: string;
+        content_hash: string;
+        signal_id: number;
+        decision_log_id: number | null;
+        ativo: string;
+        timeframe: Timeframe;
+        data_as_of: Date;
+        created_at: Date;
+        snapshot: ResearchSnapshot;
+      }>(
+        `INSERT INTO research_snapshots
+          (snapshot_id, schema_version, content_hash, signal_id, decision_log_id,
+           ativo, timeframe, data_as_of, snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
+         ON CONFLICT (snapshot_id) DO NOTHING
+         RETURNING snapshot_id, schema_version, content_hash, signal_id,
+                   decision_log_id, ativo, timeframe, data_as_of, created_at, snapshot`,
+        [
+          snapshot.snapshotId,
+          snapshot.schemaVersion,
+          snapshot.contentHash,
+          snapshot.analysis.signalId,
+          input.decisionLogId ?? null,
+          snapshot.analysis.ativo,
+          snapshot.analysis.timeframe,
+          snapshot.analysis.dataAsOf,
+          JSON.stringify(snapshot),
+        ],
+      );
+
+      const row = rows[0];
+      if (row) {
+        return {
+          snapshotId: row.snapshot_id,
+          schemaVersion: row.schema_version,
+          contentHash: row.content_hash,
+          signalId: Number(row.signal_id),
+          decisionLogId: row.decision_log_id === null ? null : Number(row.decision_log_id),
+          ativo: row.ativo,
+          timeframe: row.timeframe,
+          dataAsOf: new Date(row.data_as_of),
+          createdAt: new Date(row.created_at),
+          snapshot: row.snapshot,
+        };
+      }
+
+      const existing = await db.query<{
+        snapshot_id: string;
+        schema_version: string;
+        content_hash: string;
+        signal_id: number;
+        decision_log_id: number | null;
+        ativo: string;
+        timeframe: Timeframe;
+        data_as_of: Date;
+        created_at: Date;
+        snapshot: ResearchSnapshot;
+      }>(
+        `SELECT snapshot_id, schema_version, content_hash, signal_id,
+                decision_log_id, ativo, timeframe, data_as_of, created_at, snapshot
+         FROM research_snapshots
+         WHERE snapshot_id = $1`,
+        [snapshot.snapshotId],
+      );
+
+      const existingRow = existing.rows[0];
+      if (!existingRow) {
+        throw new Error("Research snapshot could not be persisted");
+      }
+      if (existingRow.content_hash !== snapshot.contentHash) {
+        throw new Error("Research snapshot ID collision with different content");
+      }
+
+      return {
+        snapshotId: existingRow.snapshot_id,
+        schemaVersion: existingRow.schema_version,
+        contentHash: existingRow.content_hash,
+        signalId: Number(existingRow.signal_id),
+        decisionLogId: existingRow.decision_log_id === null ? null : Number(existingRow.decision_log_id),
+        ativo: existingRow.ativo,
+        timeframe: existingRow.timeframe,
+        dataAsOf: new Date(existingRow.data_as_of),
+        createdAt: new Date(existingRow.created_at),
+        snapshot: existingRow.snapshot,
+      };
+    },
+
+    async getResearchSnapshot(snapshotId: string): Promise<ResearchSnapshotRecord | null> {
+      const normalized = snapshotId.trim();
+      if (!normalized) throw new Error("snapshotId is required");
+
+      const { rows } = await db.query<{
+        snapshot_id: string;
+        schema_version: string;
+        content_hash: string;
+        signal_id: number;
+        decision_log_id: number | null;
+        ativo: string;
+        timeframe: Timeframe;
+        data_as_of: Date;
+        created_at: Date;
+        snapshot: ResearchSnapshot;
+      }>(
+        `SELECT snapshot_id, schema_version, content_hash, signal_id,
+                decision_log_id, ativo, timeframe, data_as_of, created_at, snapshot
+         FROM research_snapshots
+         WHERE snapshot_id = $1`,
+        [normalized],
+      );
+
+      const row = rows[0];
+      if (!row) return null;
+
+      return {
+        snapshotId: row.snapshot_id,
+        schemaVersion: row.schema_version,
+        contentHash: row.content_hash,
+        signalId: Number(row.signal_id),
+        decisionLogId: row.decision_log_id === null ? null : Number(row.decision_log_id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        dataAsOf: new Date(row.data_as_of),
+        createdAt: new Date(row.created_at),
+        snapshot: row.snapshot,
+      };
     },
 
     async saveTrade(input: SaveTradeInput): Promise<number> {
@@ -1575,6 +1725,11 @@ export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => cr
 export const createBenchmarkRun = (input: BenchmarkRunInput) => createRepository(getDefaultPool()).createBenchmarkRun(input);
 export const saveBenchmarkResult = (input: BenchmarkResultInput) => createRepository(getDefaultPool()).saveBenchmarkResult(input);
 export const getBenchmarkResults = (benchmarkRunId: number) => createRepository(getDefaultPool()).getBenchmarkResults(benchmarkRunId);
+
+export const saveResearchSnapshot = (input: SaveResearchSnapshotInput) =>
+  createRepository(getDefaultPool()).saveResearchSnapshot(input);
+export const getResearchSnapshot = (snapshotId: string) =>
+  createRepository(getDefaultPool()).getResearchSnapshot(snapshotId);
 
 export const saveSignal = (
   ativo: string,
