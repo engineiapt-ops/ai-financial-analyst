@@ -117,7 +117,7 @@ export interface BenchmarkRunInput {
 
 export interface BenchmarkResultInput {
   benchmarkRunId: number;
-  estrategia: "baseline" | "buyhold" | "jev";
+  estrategia: "baseline" | "baseline_risk" | "buyhold" | "jev";
   status: "ok" | "unavailable" | "error";
   totalTrades?: number;
   closedTrades?: number;
