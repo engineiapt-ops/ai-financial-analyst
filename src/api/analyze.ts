@@ -5,6 +5,9 @@ import { evaluateBaseline } from "../decision/baselineEngine.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
 import { saveMarketData, saveSignal } from "../db/repository.js";
 import { filterKlinesByAsOf } from "../marketdata/pointInTime.js";
+import { calibrateRegimeThresholds, classifyRegime } from "../risk/regime.js";
+import { applyRiskToDecision, evaluateRisk } from "../risk/riskEngine.js";
+import { computeIndicatorsSeries } from "../features/indicators.js";
 import type { MarketState, Timeframe, DecisionResult } from "../types.js";
 
 export interface AnalyzeInput {
@@ -22,6 +25,7 @@ export interface AnalyzeOutput {
   valorInvestimento: number;
   valorExposto: number;
   candlesAnalisados: number;
+  risk: ReturnType<typeof evaluateRisk>;
 }
 
 export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput> {
@@ -57,10 +61,22 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
     noticiaSentimento,
   };
 
-  const decision =
+  const rawDecision =
     input.engine === "jev"
       ? await decideWithJev(market)
       : evaluateBaseline(market);
+
+  // Risk calibration uses only candles strictly before the decision candle.
+  const calibrationCandles = Math.max(30, klines.length - 1);
+  const regimeThresholds = calibrateRegimeThresholds(
+    klines,
+    calibrationCandles,
+    new Date(dataAsOf.getTime()),
+  );
+  const indicatorsSeries = computeIndicatorsSeries(klines);
+  const regime = classifyRegime(last, indicatorsSeries[indicatorsSeries.length - 1], regimeThresholds);
+  const risk = evaluateRisk(rawDecision, regime);
+  const decision = applyRiskToDecision(rawDecision, risk);
 
   const valorExposto =
     input.valorInvestimento * (decision.tamanhoPosicaoPct / 100);
@@ -78,5 +94,6 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
     valorInvestimento: input.valorInvestimento,
     valorExposto,
     candlesAnalisados: klines.length,
+    risk,
   };
 }
