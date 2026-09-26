@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createRateLimitMiddleware, getRequestClientKey, isHeavyApiRequest } from "./rateLimit.js";
 import { requestContextMiddleware } from "./requestContext.js";
+import { requestObservabilityMiddleware, requestErrorHandler } from "./observability.js";
 import { z } from "zod";
 import {
   fetchKlines,
@@ -41,6 +42,7 @@ export const app = express();
 app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
 
 app.use(requestContextMiddleware);
+app.use(requestObservabilityMiddleware);
 app.use(express.json());
 
 const apiRateLimitWindowMs = 60_000;
@@ -1227,6 +1229,8 @@ app.post("/api/analyze", async (req, res) => {
     res.status(status).json({ status: "error", error: message });
   }
 });
+
+app.use(requestErrorHandler);
 
 const port = Number(process.env.PORT ?? 3000);
 
