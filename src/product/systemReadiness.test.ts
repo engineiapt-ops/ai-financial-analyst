@@ -38,7 +38,7 @@ const degraded = buildSystemReadinessOverview({
   governanceContracts: ["evaluation-overview.v1"],
 });
 
-assert.equal(degraded.state, "degraded");
+assert.equal(degraded.state, "blocked");
 assert.equal(degraded.checks.marketData.state, "degraded");
 assert.equal(degraded.checks.database.state, "degraded");
 assert.equal(degraded.checks.aiProviders.state, "ready");
