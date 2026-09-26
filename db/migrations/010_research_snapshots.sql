@@ -34,3 +34,17 @@ DROP TRIGGER IF EXISTS research_snapshots_immutable ON research_snapshots;
 CREATE TRIGGER research_snapshots_immutable
   BEFORE UPDATE OR DELETE ON research_snapshots
   FOR EACH ROW EXECUTE FUNCTION reject_research_snapshot_mutation();
+
+CREATE OR REPLACE FUNCTION reject_research_snapshot_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'research_snapshots are immutable';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS research_snapshots_immutable ON research_snapshots;
+CREATE TRIGGER research_snapshots_immutable
+  BEFORE UPDATE OR DELETE ON research_snapshots
+  FOR EACH ROW EXECUTE FUNCTION reject_research_snapshot_mutation();
