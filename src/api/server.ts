@@ -9,6 +9,7 @@ import {
 } from "../marketdata/binanceClient.js";
 import { analyzeMarket } from "./analyze.js";
 import { generateAnalystReport } from "../research/report.js";
+import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
 import { getMetricsByOrigem } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
@@ -463,7 +464,8 @@ app.post("/api/report", async (req, res) => {
     const parsed = AnalyzeSchema.parse(req.body);
     const analysis = await analyzeMarket(parsed);
     const research = await generateAnalystReport(analysis);
-    res.json({ status: "ok", analysis, research });
+    const snapshot = buildResearchSnapshot(analysis, research);
+    res.json({ status: "ok", analysis, research, snapshot });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
