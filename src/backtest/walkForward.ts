@@ -239,6 +239,8 @@ export async function runWalkForward(options = getOptions()) {
     const baselineTrades: EvaluatedTrade[] = [];
     const baselineRiskTrades: EvaluatedTrade[] = [];
     let riskGateBlocks = 0;
+    const evaluationRegimes = regimeSeries.slice(testStart, testEnd + 1);
+    const highVolatilityCandles = evaluationRegimes.filter((regime) => regime.volatility === "HIGH").length;
 
     // Calibrate regime thresholds strictly on the fold's training window.
     const trainKlines = klines.slice(trainStart, testStart);
@@ -447,6 +449,8 @@ export async function runWalkForward(options = getOptions()) {
       baseline,
       baselineRisk,
       riskGateBlocks,
+      highVolatilityCandles,
+      highVolatilityPct: (highVolatilityCandles / testCandles) * 100,
       buyhold: buyHoldSummary,
       jev: jevResult ?? { status: "unavailable", notas: jevNote },
     });
