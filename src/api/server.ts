@@ -516,31 +516,6 @@ app.get("/api/research/snapshots/:snapshotId", async (req, res) => {
   }
 });
 
-app.get("/api/research/snapshots/:snapshotId", async (req, res) => {
-  try {
-    const snapshotId = String(req.params.snapshotId ?? "").trim();
-    if (!/^rs_[a-f0-9]{24}$/.test(snapshotId)) {
-      return res.status(400).json({ status: "error", error: "invalid snapshotId" });
-    }
-    const stored = await getResearchSnapshot(snapshotId);
-    if (!stored) return res.status(404).json({ status: "error", error: "research snapshot not found" });
-    res.json({
-      status: "ok",
-      snapshot: stored.snapshot,
-      persistence: {
-        snapshotId: stored.snapshotId,
-        contentHash: stored.contentHash,
-        signalId: stored.signalId,
-        decisionLogId: stored.decisionLogId,
-        createdAt: stored.createdAt,
-      },
-    });
-  } catch (err: any) {
-    const message = err instanceof Error ? err.message : String(err);
-    const status = message.includes("DATABASE_URL") ? 503 : 500;
-    res.status(status).json({ status: "error", error: message });
-  }
-});
 
 app.get("/api/metrics", async (req, res) => {
   try {
