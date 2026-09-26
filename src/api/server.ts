@@ -45,25 +45,26 @@ const apiRateLimitWindowMs = 60_000;
 const apiRateLimitMax = Number(process.env.RATE_LIMIT_MAX ?? 120);
 const heavyRateLimitMax = Number(process.env.RATE_LIMIT_HEAVY_MAX ?? 20);
 
-app.use(
-  createRateLimitMiddleware({
-    windowMs: apiRateLimitWindowMs,
-    max: apiRateLimitMax,
-    key: (req) => `api:${getRequestClientKey(req)}`,
-  }),
-);
+const apiRateLimiter = createRateLimitMiddleware({
+  windowMs: apiRateLimitWindowMs,
+  max: apiRateLimitMax,
+  key: (req) => `api:${getRequestClientKey(req)}`,
+});
+
+const heavyRateLimiter = createRateLimitMiddleware({
+  windowMs: apiRateLimitWindowMs,
+  max: heavyRateLimitMax,
+  key: (req) => `heavy:${getRequestClientKey(req)}`,
+});
+
+app.use(apiRateLimiter);
 
 app.use((req, res, next) => {
-  if (!isHeavyApiRequest(req)) {
-    next();
+  if (isHeavyApiRequest(req)) {
+    heavyRateLimiter(req, res, next);
     return;
   }
-
-  createRateLimitMiddleware({
-    windowMs: apiRateLimitWindowMs,
-    max: heavyRateLimitMax,
-    key: (request) => `heavy:${getRequestClientKey(request)}`,
-  })(req, res, next);
+  next();
 });
 
 const HTML_DASHBOARD = `<!DOCTYPE html>
