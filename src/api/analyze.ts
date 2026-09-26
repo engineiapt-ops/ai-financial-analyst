@@ -8,6 +8,7 @@ import { filterKlinesByAsOf } from "../marketdata/pointInTime.js";
 import { calibrateRegimeThresholds, classifyRegime } from "../risk/regime.js";
 import { applyRiskToDecision, evaluateRisk } from "../risk/riskEngine.js";
 import { computeIndicatorsSeries } from "../features/indicators.js";
+import { assertMarketDataFresh, type MarketDataQuality } from "../marketdata/quality.js";
 import type { MarketState, Timeframe, DecisionResult } from "../types.js";
 
 export interface AnalyzeInput {
@@ -26,6 +27,7 @@ export interface AnalyzeOutput {
   valorInvestimento: number;
   valorExposto: number;
   candlesAnalisados: number;
+  marketDataQuality: MarketDataQuality;
   risk: ReturnType<typeof evaluateRisk>;
 }
 
@@ -44,6 +46,12 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
   if (klines.length < 21) {
     throw new Error("Insufficient closed market candles for EMA21");
   }
+
+  const marketDataQuality = assertMarketDataFresh({
+    timeframe: input.timeframe,
+    candles: klines,
+    checkedAt: now,
+  });
 
   const last = klines[klines.length - 1];
   const dataAsOf = last.closeTime ?? last.openTime;
@@ -105,6 +113,7 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
     valorInvestimento: input.valorInvestimento,
     valorExposto,
     candlesAnalisados: klines.length,
+    marketDataQuality,
     risk,
   };
 }
