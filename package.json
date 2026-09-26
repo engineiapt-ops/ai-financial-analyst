@@ -19,7 +19,9 @@
     "test:repository": "tsx src/db/repository.test.ts",
     "test:server": "tsx src/api/server.test.ts",
     "db:migrate": "tsx src/db/migrate.ts",
-    "test:pit": "tsx src/marketdata/pointInTime.test.ts"
+    "test:pit": "tsx src/marketdata/pointInTime.test.ts",
+    "market:backfill": "tsx src/marketdata/backfill.ts",
+    "backtest:walk-forward": "tsx src/backtest/walkForward.ts"
   },
   "dependencies": {
     "express": "^4.19.2",
