@@ -5,6 +5,7 @@ import {
   createBacktestRun,
   getBacktestRun,
   getMarketDataRange,
+  getMarketData,
   saveSignal,
   saveTrade,
   saveDecisionLog,
@@ -38,23 +39,23 @@ function getLevels(entryPrice: number, side: "BUY" | "SELL") {
   };
 }
 
-export async function runRemoteBaselineBacktest(fromRunId: number) {
+export async function runRemoteBaselineBacktest(fromRunId?: number, requestedCandles = 5000) {
   freezeThresholds();
 
-  const sourceRun = await getBacktestRun(fromRunId);
-  if (!sourceRun) throw new Error(`Run ${fromRunId} não encontrado no banco de dados`);
-  if (sourceRun.ativo !== "BTCUSDT" || sourceRun.timeframe !== "1h") {
+  const sourceRun = fromRunId ? await getBacktestRun(fromRunId) : null;
+  if (fromRunId && !sourceRun) throw new Error(`Run ${fromRunId} não encontrado no banco de dados`);
+  if (sourceRun && (sourceRun.ativo !== "BTCUSDT" || sourceRun.timeframe !== "1h")) {
     throw new Error(`Run ${fromRunId} não é compatível com o backtest baseline remoto`);
   }
 
-  const klines = await getMarketDataRange(
-    sourceRun.ativo,
-    sourceRun.timeframe,
-    sourceRun.periodoInicio,
-    sourceRun.periodoFim,
-  );
-  if (!klines.length) throw new Error("Nenhum candle encontrado para reproduzir o run");
-  assertDatasetMatchesMetadata(klines, sourceRun.candlesTotal, sourceRun.datasetHash);
+  const klines = sourceRun
+    ? await getMarketDataRange(sourceRun.ativo, sourceRun.timeframe, sourceRun.periodoInicio, sourceRun.periodoFim)
+    : await getMarketData("BTCUSDT", "1h", requestedCandles);
+
+  if (!klines.length) throw new Error("Nenhum candle encontrado para o backtest baseline");
+  if (sourceRun) {
+    assertDatasetMatchesMetadata(klines, sourceRun.candlesTotal, sourceRun.datasetHash);
+  }
 
   const datasetAsOf = klines[klines.length - 1].closeTime ?? klines[klines.length - 1].openTime;
   assertKlinesAvailableAsOf(klines, datasetAsOf);
@@ -189,7 +190,7 @@ export async function runRemoteBaselineBacktest(fromRunId: number) {
 
   return {
     runId,
-    sourceRunId: fromRunId,
+    sourceRunId: fromRunId ?? null,
     engine: "baseline",
     mode: "oos",
     asset: "BTCUSDT",
