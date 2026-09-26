@@ -10,7 +10,7 @@ import { evaluateBaseline } from "../decision/baselineEngine.js";
 import { computeIndicatorsSeries } from "../features/indicators.js";
 import { assertDatasetMatchesMetadata } from "../marketdata/dataset.js";
 import { simulateTrade, FEE_PCT, SLIPPAGE_PCT, type TradeOutcome } from "../papertrading/simulator.js";
-import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
+import { calibrateRegimeThresholds, classifyRegime, type RegimeSnapshot } from "../risk/regime.js";
 import { evaluateRisk } from "../risk/riskEngine.js";
 import type { Kline, MarketState } from "../types.js";
 
@@ -47,6 +47,14 @@ interface EquityPoint {
   grossExposure: number;
   openPositions: number;
   drawdownPct: number;
+}
+
+interface PreparedFold {
+  foldNumber: number;
+  testStartIndex: number;
+  testEndIndex: number;
+  candidates: CandidateTrade[];
+  regimes: Map<number, RegimeSnapshot>;
 }
 
 interface PortfolioStats {
@@ -238,21 +246,11 @@ function buildCandidates(
 
 function simulatePortfolio(
   klines: Kline[],
-  folds: Array<{
-    foldNumber: number;
-    testStart: Date;
-    testEnd: Date;
-  }>,
-  indicatorsSeries: ReturnType<typeof computeIndicatorsSeries>,
+  preparedFolds: PreparedFold[],
   initialCapital: number,
   positionSizePct: number,
   maxGrossExposurePct: number,
   riskGate: boolean,
-  lookaheadCandles: number,
-  targetPct: number,
-  stopPct: number,
-  ativo: string,
-  timeframe: "1h" | "4h" | "1d",
 ): PortfolioStats {
   let capital = initialCapital;
   let totalSignals = 0;
@@ -272,48 +270,19 @@ function simulatePortfolio(
   const allEquity: EquityPoint[] = [];
   const foldSummaries: PortfolioStats["folds"] = [];
 
-  for (const fold of folds) {
-    const testStartIndex = klines.findIndex(
-      (candle) => (candle.closeTime ?? candle.openTime).getTime() >= fold.testStart.getTime(),
-    );
-    const testEndIndex = klines.findIndex(
-      (candle) => (candle.closeTime ?? candle.openTime).getTime() >= fold.testEnd.getTime(),
-    );
-    if (testStartIndex < 0 || testEndIndex < 0 || testEndIndex <= testStartIndex) {
-      throw new Error(`Invalid fold ${fold.foldNumber} boundaries`);
-    }
-
-    const trainKlines = klines.slice(0, testStartIndex);
-    const thresholds = calibrateRegimeThresholds(
-      trainKlines,
-      trainKlines.length,
-      klines[testStartIndex - 1].closeTime ?? klines[testStartIndex - 1].openTime,
-    );
-    const regimes = buildRegimeSeries(klines, thresholds);
-    const candidates = buildCandidates(
-      klines,
-      indicatorsSeries,
-      testStartIndex,
-      testEndIndex,
-      lookaheadCandles,
-      targetPct,
-      stopPct,
-      ativo,
-      timeframe,
-    );
-
+  for (const fold of preparedFolds) {
     const entriesByTime = new Map<number, CandidateTrade[]>();
     const exitsByTime = new Map<number, CandidateTrade[]>();
-    for (const candidate of candidates) {
+
+    for (const candidate of fold.candidates) {
       const entryTime = candidate.openedAt.getTime();
       const entries = entriesByTime.get(entryTime) ?? [];
       entries.push(candidate);
       entriesByTime.set(entryTime, entries);
 
       if (candidate.trade.outcome !== "open") {
-        const exitTime = (
-          klines[candidate.exitIndex].closeTime ?? klines[candidate.exitIndex].openTime
-        ).getTime();
+        const exitCandle = klines[candidate.exitIndex];
+        const exitTime = (exitCandle.closeTime ?? exitCandle.openTime).getTime();
         const exits = exitsByTime.get(exitTime) ?? [];
         exits.push(candidate);
         exitsByTime.set(exitTime, exits);
@@ -338,13 +307,14 @@ function simulatePortfolio(
     const active = new Map<number, ActivePosition>();
     const foldEquity: EquityPoint[] = [];
 
-    for (let i = testStartIndex; i <= testEndIndex; i += 1) {
+    for (let i = fold.testStartIndex; i <= fold.testEndIndex; i += 1) {
       const candle = klines[i];
       const asOf = candle.closeTime ?? candle.openTime;
 
       for (const candidate of exitsByTime.get(asOf.getTime()) ?? []) {
         const position = active.get(candidate.signalIndex);
         if (!position) continue;
+
         const result = closeStoredTrade(position);
         cash += position.notional + result.grossPnl - result.exitFee;
         realizedPnl += result.netPnl;
@@ -361,29 +331,30 @@ function simulatePortfolio(
       }
 
       let grossExposure = 0;
-      let unrealizedPnl = 0;
       for (const position of active.values()) {
-        const mark = markPosition(position, candle.close);
         grossExposure += position.notional;
-        unrealizedPnl += mark.netPnl;
       }
 
       let equity = cash + [...active.values()].reduce((sum, position) => {
-        const mark = markPosition(position, candle.close);
-        return sum + position.notional + mark.netPnl;
+        return sum + position.notional + markPosition(position, candle.close).netPnl;
       }, 0);
 
       for (const candidate of entriesByTime.get(asOf.getTime()) ?? []) {
         if (active.has(candidate.signalIndex)) continue;
 
-        const decision = {
-          origem: "baseline" as const,
-          recomendacao: candidate.side,
-          tamanhoPosicaoPct: positionSizePct,
-        };
-
         if (riskGate) {
-          const risk = evaluateRisk(decision, regimes[candidate.signalIndex]);
+          const regime = fold.regimes.get(candidate.signalIndex);
+          if (!regime) {
+            throw new Error(`Missing regime for signal index ${candidate.signalIndex}`);
+          }
+          const risk = evaluateRisk(
+            {
+              origem: "baseline",
+              recomendacao: candidate.side,
+              tamanhoPosicaoPct: positionSizePct,
+            },
+            regime,
+          );
           if (!risk.allowed) {
             rejectedTrades += 1;
             rejects += 1;
@@ -420,21 +391,20 @@ function simulatePortfolio(
         slippage += notional * SLIPPAGE_PCT;
 
         equity = cash + [...active.values()].reduce((sum, position) => {
-          const mark = markPosition(position, candle.close);
-          return sum + position.notional + mark.netPnl;
+          return sum + position.notional + markPosition(position, candle.close).netPnl;
         }, 0);
       }
 
       grossExposure = 0;
-      unrealizedPnl = 0;
+      let unrealizedPnl = 0;
       for (const position of active.values()) {
         const mark = markPosition(position, candle.close);
         grossExposure += position.notional;
         unrealizedPnl += mark.netPnl;
       }
+
       equity = cash + [...active.values()].reduce((sum, position) => {
-        const mark = markPosition(position, candle.close);
-        return sum + position.notional + mark.netPnl;
+        return sum + position.notional + markPosition(position, candle.close).netPnl;
       }, 0);
 
       peakEquity = Math.max(peakEquity, equity);
@@ -445,6 +415,7 @@ function simulatePortfolio(
       const drawdownPct = globalPeakEquity > 0
         ? ((globalPeakEquity - equity) / globalPeakEquity) * 100
         : 0;
+
       foldMaxDrawdown = Math.max(foldMaxDrawdown, foldDrawdownPct);
       foldMaxOpen = Math.max(foldMaxOpen, active.size);
       foldMaxGross = Math.max(foldMaxGross, grossExposure);
@@ -466,7 +437,8 @@ function simulatePortfolio(
       allEquity.push(point);
     }
 
-    const finalCandle = klines[testEndIndex];
+    const finalCandle = klines[fold.testEndIndex];
+
     for (const position of [...active.values()]) {
       const result = closeAtEnd(position, finalCandle.close);
       cash += position.notional + result.grossPnl - result.exitFee;
@@ -481,13 +453,19 @@ function simulatePortfolio(
 
     const finalEquity = cash;
     const finalAsOf = new Date(
-      (klines[testEndIndex].closeTime ?? klines[testEndIndex].openTime).getTime() + 1,
+      (finalCandle.closeTime ?? finalCandle.openTime).getTime() + 1,
     );
     globalPeakEquity = Math.max(globalPeakEquity, finalEquity);
     const finalDrawdownPct = globalPeakEquity > 0
       ? ((globalPeakEquity - finalEquity) / globalPeakEquity) * 100
       : 0;
-    const finalFoldPoint = {
+
+    foldMaxDrawdown = Math.max(
+      foldMaxDrawdown,
+      peakEquity > 0 ? ((peakEquity - finalEquity) / peakEquity) * 100 : 0,
+    );
+
+    const finalPoint = {
       foldNumber: fold.foldNumber,
       asOf: finalAsOf,
       equity: finalEquity,
@@ -498,12 +476,8 @@ function simulatePortfolio(
       openPositions: 0,
       drawdownPct: finalDrawdownPct,
     };
-    foldEquity.push(finalFoldPoint);
-    allEquity.push(finalFoldPoint);
-    foldMaxDrawdown = Math.max(
-      foldMaxDrawdown,
-      peakEquity > 0 ? ((peakEquity - finalEquity) / peakEquity) * 100 : 0,
-    );
+    foldEquity.push(finalPoint);
+    allEquity.push(finalPoint);
 
     const foldReturns: number[] = [];
     for (let index = 1; index < foldEquity.length; index += 1) {
@@ -519,7 +493,7 @@ function simulatePortfolio(
       maxDrawdownPct: foldMaxDrawdown,
       sharpe: annualizedSharpe(foldReturns),
       sortino: annualizedSortino(foldReturns),
-      totalSignals: candidates.length,
+      totalSignals: fold.candidates.length,
       executedTrades: executed,
       closedTrades: closed,
       rejectedTrades: rejects,
@@ -534,14 +508,13 @@ function simulatePortfolio(
       equityCurve: foldEquity,
     });
 
-    totalSignals += candidates.length;
+    totalSignals += fold.candidates.length;
     capital = finalEquity;
     totalRealizedPnl += realizedPnl;
     totalFees += fees;
     totalSlippage += slippage;
     executedTrades += executed;
     closedTrades += closed;
-    rejectedTrades += rejects;
     winningTrades += wins;
     losingTrades += losses;
     riskGateBlocks += riskBlocks;
@@ -552,6 +525,7 @@ function simulatePortfolio(
     const previous = allEquity[index - 1].equity;
     if (previous > 0) returns.push(allEquity[index].equity / previous - 1);
   }
+
   const maxDrawdownPct = allEquity.reduce(
     (max, point) => Math.max(max, point.drawdownPct),
     0,
@@ -617,6 +591,59 @@ export async function runWalkForwardPortfolio(options: WalkForwardPortfolioOptio
   assertDatasetMatchesMetadata(klines, sourceRun.candlesTotal, sourceRun.datasetHash);
 
   const indicatorsSeries = computeIndicatorsSeries(klines);
+  const preparedFolds: PreparedFold[] = [];
+
+  for (const fold of baselineFolds) {
+    const testStartIndex = klines.findIndex(
+      (candle) => (candle.closeTime ?? candle.openTime).getTime() >= fold.testStart.getTime(),
+    );
+    const testEndIndex = klines.findIndex(
+      (candle) => (candle.closeTime ?? candle.openTime).getTime() >= fold.testEnd.getTime(),
+    );
+    if (testStartIndex < 1 || testEndIndex <= testStartIndex) {
+      throw new Error(`Invalid fold ${fold.foldNumber} boundaries`);
+    }
+
+    const trainKlines = klines.slice(0, testStartIndex);
+    const thresholds = calibrateRegimeThresholds(
+      trainKlines,
+      trainKlines.length,
+      klines[testStartIndex - 1].closeTime ?? klines[testStartIndex - 1].openTime,
+    );
+
+    const candidates = buildCandidates(
+      klines,
+      indicatorsSeries,
+      testStartIndex,
+      testEndIndex,
+      sourceRun.lookaheadCandles,
+      sourceRun.targetPct,
+      sourceRun.stopPct,
+      sourceRun.ativo,
+      sourceRun.timeframe,
+    );
+
+    const regimes = new Map<number, RegimeSnapshot>();
+    for (const candidate of candidates) {
+      regimes.set(
+        candidate.signalIndex,
+        classifyRegime(
+          klines[candidate.signalIndex],
+          indicatorsSeries[candidate.signalIndex],
+          thresholds,
+        ),
+      );
+    }
+
+    preparedFolds.push({
+      foldNumber: fold.foldNumber,
+      testStartIndex,
+      testEndIndex,
+      candidates,
+      regimes,
+    });
+  }
+
   const initialCapital = options.initialCapital ?? DEFAULT_INITIAL_CAPITAL;
   const positionSizePct = options.positionSizePct ?? DEFAULT_POSITION_SIZE_PCT;
   const maxGrossExposurePct =
@@ -637,31 +664,19 @@ export async function runWalkForwardPortfolio(options: WalkForwardPortfolioOptio
 
   const baseline = simulatePortfolio(
     klines,
-    baselineFolds,
-    indicatorsSeries,
+    preparedFolds,
     initialCapital,
     positionSizePct,
     maxGrossExposurePct,
     false,
-    sourceRun.lookaheadCandles,
-    sourceRun.targetPct,
-    sourceRun.stopPct,
-    sourceRun.ativo,
-    sourceRun.timeframe,
   );
   const risk = simulatePortfolio(
     klines,
-    baselineFolds,
-    indicatorsSeries,
+    preparedFolds,
     initialCapital,
     positionSizePct,
     maxGrossExposurePct,
     true,
-    sourceRun.lookaheadCandles,
-    sourceRun.targetPct,
-    sourceRun.stopPct,
-    sourceRun.ativo,
-    sourceRun.timeframe,
   );
 
   const firstTest = baselineFolds[0].testStart;
