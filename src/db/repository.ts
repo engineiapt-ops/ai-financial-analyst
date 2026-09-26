@@ -119,6 +119,50 @@ export interface DecisionLogRecord {
   evaluatedAt: Date | null;
 }
 
+export interface DecisionKpiFilters {
+  ativo?: string | null;
+  timeframe?: Timeframe | null;
+  origem?: DecisionResult["origem"] | null;
+  recomendacao?: DecisionResult["recomendacao"] | null;
+  riskRegime?: string | null;
+  from?: Date | null;
+  to?: Date | null;
+}
+
+export interface DecisionKpiSummary {
+  totalDecisions: number;
+  settledDecisions: number;
+  pendingDecisions: number;
+  notApplicableDecisions: number;
+  profitableDecisions: number;
+  losingDecisions: number;
+  flatDecisions: number;
+  winRate: number | null;
+  avgForwardReturnPercent: number | null;
+  avgTradeProfitPercent: number | null;
+  totalTradeProfitPercent: number;
+  avgConfidence: number | null;
+  avgQualityScore: number | null;
+  riskElevatedDecisions: number;
+  buyDecisions: number;
+  sellDecisions: number;
+  waitDecisions: number;
+}
+
+export interface DecisionKpiBreakdown extends DecisionKpiSummary {
+  origem: string;
+  ativo: string;
+  timeframe: Timeframe;
+  recomendacao: DecisionResult["recomendacao"];
+  riskRegime: string;
+}
+
+export interface DecisionKpis {
+  filters: DecisionKpiFilters;
+  summary: DecisionKpiSummary;
+  breakdown: DecisionKpiBreakdown[];
+}
+
 export interface DecisionLogInput {
   backtestRunId?: number | null;
   ativo: string;
@@ -905,6 +949,192 @@ export function createRepository(db: RepositoryPool) {
         tradeProfitPercent: row.trade_profit_percent === null ? null : Number(row.trade_profit_percent),
         exitReason: row.exit_reason,
         evaluatedAt: row.evaluated_at ? new Date(row.evaluated_at) : null,
+      };
+    },
+
+    async getDecisionKpis(filters: DecisionKpiFilters = {}): Promise<DecisionKpis> {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+      const add = (condition: string, value: unknown) => {
+        values.push(value);
+        conditions.push(condition.replace("?", `${values.length}`));
+      };
+
+      if (filters.ativo) add("ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("timeframe = ?", filters.timeframe);
+      if (filters.origem) add("origem = ?", filters.origem);
+      if (filters.recomendacao) add("recomendacao = ?", filters.recomendacao);
+      if (filters.from) add("decision_at >= ?", filters.from);
+      if (filters.to) add("decision_at <= ?", filters.to);
+
+      const baseWhere = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const commonCte = `
+        WITH base AS (
+          SELECT
+            dl.*,
+            COALESCE(rs.snapshot->'risk'->'regime'->>'key', 'unknown') AS risk_regime
+          FROM decision_log dl
+          LEFT JOIN research_snapshots rs ON rs.decision_log_id = dl.id
+          ${baseWhere}
+        )
+      `;
+
+      const summaryResult = await db.query<{
+        total_decisions: string;
+        settled_decisions: string;
+        pending_decisions: string;
+        not_applicable_decisions: string;
+        profitable_decisions: string;
+        losing_decisions: string;
+        flat_decisions: string;
+        win_rate: string | null;
+        avg_forward_return_percent: string | null;
+        avg_trade_profit_percent: string | null;
+        total_trade_profit_percent: string;
+        avg_confidence: string | null;
+        avg_quality_score: string | null;
+        risk_elevated_decisions: string;
+        buy_decisions: string;
+        sell_decisions: string;
+        wait_decisions: string;
+      }>(
+        `${commonCte}
+         SELECT
+           COUNT(*)::int AS total_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'settled')::int AS settled_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'pending')::int AS pending_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'not_applicable')::int AS not_applicable_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'settled' AND trade_profit_percent > 0)::int AS profitable_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'settled' AND trade_profit_percent < 0)::int AS losing_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'settled' AND ABS(COALESCE(trade_profit_percent, 0)) < 0.0000001)::int AS flat_decisions,
+           ROUND(
+             100.0 * COUNT(*) FILTER (WHERE outcome_status = 'settled' AND trade_profit_percent > 0) /
+             NULLIF(COUNT(*) FILTER (WHERE outcome_status = 'settled'), 0),
+             2
+           )::float AS win_rate,
+           ROUND(AVG(forward_return_percent) FILTER (WHERE outcome_status = 'settled'), 4)::float AS avg_forward_return_percent,
+           ROUND(AVG(trade_profit_percent) FILTER (WHERE outcome_status = 'settled'), 4)::float AS avg_trade_profit_percent,
+           ROUND(COALESCE(SUM(trade_profit_percent) FILTER (WHERE outcome_status = 'settled'), 0), 4)::float AS total_trade_profit_percent,
+           ROUND(AVG(confidence) FILTER (WHERE confidence IS NOT NULL), 4)::float AS avg_confidence,
+           ROUND(AVG(quality_score) FILTER (WHERE quality_score IS NOT NULL), 4)::float AS avg_quality_score,
+           COUNT(*) FILTER (WHERE risco_elevado = true)::int AS risk_elevated_decisions,
+           COUNT(*) FILTER (WHERE recomendacao = 'BUY')::int AS buy_decisions,
+           COUNT(*) FILTER (WHERE recomendacao = 'SELL')::int AS sell_decisions,
+           COUNT(*) FILTER (WHERE recomendacao = 'WAIT')::int AS wait_decisions
+         FROM base`,
+        values,
+      );
+
+      const breakdownResult = await db.query<{
+        origem: string;
+        ativo: string;
+        timeframe: Timeframe;
+        recomendacao: DecisionResult["recomendacao"];
+        risk_regime: string;
+        total_decisions: string;
+        settled_decisions: string;
+        pending_decisions: string;
+        not_applicable_decisions: string;
+        profitable_decisions: string;
+        losing_decisions: string;
+        flat_decisions: string;
+        win_rate: string | null;
+        avg_forward_return_percent: string | null;
+        avg_trade_profit_percent: string | null;
+        total_trade_profit_percent: string;
+        avg_confidence: string | null;
+        avg_quality_score: string | null;
+        risk_elevated_decisions: string;
+        buy_decisions: string;
+        sell_decisions: string;
+        wait_decisions: string;
+      }>(
+        `${commonCte}
+         SELECT
+           origem,
+           ativo,
+           timeframe,
+           recomendacao,
+           risk_regime,
+           COUNT(*)::int AS total_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'settled')::int AS settled_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'pending')::int AS pending_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'not_applicable')::int AS not_applicable_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'settled' AND trade_profit_percent > 0)::int AS profitable_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'settled' AND trade_profit_percent < 0)::int AS losing_decisions,
+           COUNT(*) FILTER (WHERE outcome_status = 'settled' AND ABS(COALESCE(trade_profit_percent, 0)) < 0.0000001)::int AS flat_decisions,
+           ROUND(
+             100.0 * COUNT(*) FILTER (WHERE outcome_status = 'settled' AND trade_profit_percent > 0) /
+             NULLIF(COUNT(*) FILTER (WHERE outcome_status = 'settled'), 0),
+             2
+           )::float AS win_rate,
+           ROUND(AVG(forward_return_percent) FILTER (WHERE outcome_status = 'settled'), 4)::float AS avg_forward_return_percent,
+           ROUND(AVG(trade_profit_percent) FILTER (WHERE outcome_status = 'settled'), 4)::float AS avg_trade_profit_percent,
+           ROUND(COALESCE(SUM(trade_profit_percent) FILTER (WHERE outcome_status = 'settled'), 0), 4)::float AS total_trade_profit_percent,
+           ROUND(AVG(confidence) FILTER (WHERE confidence IS NOT NULL), 4)::float AS avg_confidence,
+           ROUND(AVG(quality_score) FILTER (WHERE quality_score IS NOT NULL), 4)::float AS avg_quality_score,
+           COUNT(*) FILTER (WHERE risco_elevado = true)::int AS risk_elevated_decisions,
+           COUNT(*) FILTER (WHERE recomendacao = 'BUY')::int AS buy_decisions,
+           COUNT(*) FILTER (WHERE recomendacao = 'SELL')::int AS sell_decisions,
+           COUNT(*) FILTER (WHERE recomendacao = 'WAIT')::int AS wait_decisions
+         FROM base
+         GROUP BY origem, ativo, timeframe, recomendacao, risk_regime
+         ORDER BY total_decisions DESC
+         LIMIT 500`,
+        values,
+      );
+
+      const mapSummary = (row: typeof summaryResult.rows[number]): DecisionKpiSummary => ({
+        totalDecisions: Number(row.total_decisions),
+        settledDecisions: Number(row.settled_decisions),
+        pendingDecisions: Number(row.pending_decisions),
+        notApplicableDecisions: Number(row.not_applicable_decisions),
+        profitableDecisions: Number(row.profitable_decisions),
+        losingDecisions: Number(row.losing_decisions),
+        flatDecisions: Number(row.flat_decisions),
+        winRate: row.win_rate === null ? null : Number(row.win_rate),
+        avgForwardReturnPercent: row.avg_forward_return_percent === null ? null : Number(row.avg_forward_return_percent),
+        avgTradeProfitPercent: row.avg_trade_profit_percent === null ? null : Number(row.avg_trade_profit_percent),
+        totalTradeProfitPercent: Number(row.total_trade_profit_percent),
+        avgConfidence: row.avg_confidence === null ? null : Number(row.avg_confidence),
+        avgQualityScore: row.avg_quality_score === null ? null : Number(row.avg_quality_score),
+        riskElevatedDecisions: Number(row.risk_elevated_decisions),
+        buyDecisions: Number(row.buy_decisions),
+        sellDecisions: Number(row.sell_decisions),
+        waitDecisions: Number(row.wait_decisions),
+      });
+
+      const summary = mapSummary(summaryResult.rows[0] ?? {
+        total_decisions: "0",
+        settled_decisions: "0",
+        pending_decisions: "0",
+        not_applicable_decisions: "0",
+        profitable_decisions: "0",
+        losing_decisions: "0",
+        flat_decisions: "0",
+        win_rate: null,
+        avg_forward_return_percent: null,
+        avg_trade_profit_percent: null,
+        total_trade_profit_percent: "0",
+        avg_confidence: null,
+        avg_quality_score: null,
+        risk_elevated_decisions: "0",
+        buy_decisions: "0",
+        sell_decisions: "0",
+        wait_decisions: "0",
+      });
+
+      return {
+        filters,
+        summary,
+        breakdown: breakdownResult.rows.map((row) => ({
+          ...mapSummary(row),
+          origem: row.origem,
+          ativo: row.ativo,
+          timeframe: row.timeframe,
+          recomendacao: row.recomendacao,
+          riskRegime: row.risk_regime,
+        })),
       };
     },
 
@@ -1812,6 +2042,7 @@ export const getPortfolioPositions = async (runId: number): Promise<PortfolioPos
 };
 
 export const saveDecisionLog = (input: DecisionLogInput) => createRepository(getDefaultPool()).saveDecisionLog(input);
+export const getDecisionKpis = (filters: DecisionKpiFilters = {}) => createRepository(getDefaultPool()).getDecisionKpis(filters);
 export const getDecisionLog = (id: number) => createRepository(getDefaultPool()).getDecisionLog(id);
 export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => createRepository(getDefaultPool()).settleDecisionLog(id, outcome);
 export const createBenchmarkRun = (input: BenchmarkRunInput) => createRepository(getDefaultPool()).createBenchmarkRun(input);
