@@ -75,6 +75,66 @@ export interface SaveTradeInput {
   closedAt?: Date | null;
 }
 
+export interface DecisionLogInput {
+  backtestRunId?: number | null;
+  ativo: string;
+  timeframe: Timeframe;
+  decisionAt: Date;
+  dataAsOf: Date;
+  decision: DecisionResult;
+  referencePrice: number;
+  targetPct?: number | null;
+  stopPct?: number | null;
+  lookaheadCandles?: number | null;
+  executionModelVersion?: string | null;
+}
+
+export interface DecisionLogOutcome {
+  outcomeStatus: "settled" | "not_applicable";
+  outcomeDirection?: "up" | "down" | "flat" | null;
+  forwardReturnPercent?: number | null;
+  tradeProfitPercent?: number | null;
+  exitReason?: "target" | "stop" | "end" | null;
+  evaluatedAt?: Date | null;
+}
+
+export interface BenchmarkRunInput {
+  sourceRunId?: number | null;
+  ativo: string;
+  timeframe: Timeframe;
+  periodoInicio: Date;
+  periodoFim: Date;
+  oosStartRatio?: number | null;
+  candlesTotal?: number | null;
+  datasetHash?: string | null;
+  executionModelVersion?: string | null;
+  targetPct?: number | null;
+  stopPct?: number | null;
+  lookaheadCandles?: number | null;
+  slippagePct?: number | null;
+  feePct?: number | null;
+}
+
+export interface BenchmarkResultInput {
+  benchmarkRunId: number;
+  estrategia: "baseline" | "buyhold" | "jev";
+  status: "ok" | "unavailable" | "error";
+  totalTrades?: number;
+  closedTrades?: number;
+  openTrades?: number;
+  winRate?: number | null;
+  profitFactor?: number | null;
+  totalProfitPercent?: number;
+  avgProfitPercent?: number;
+  expectancyPercent?: number;
+  maxDrawdownPercent?: number;
+  grossTotalProfitPercent?: number;
+  totalFeePercent?: number;
+  totalSlippagePercent?: number;
+  avgCandlesHeld?: number | null;
+  notas?: string | null;
+}
+
 export interface MetricsByOrigem {
   origem: string;
   total: number;
@@ -382,6 +442,159 @@ export function createRepository(db: RepositoryPool) {
       }));
     },
 
+
+    async saveDecisionLog(input: DecisionLogInput): Promise<number> {
+      asFinite(input.referencePrice, "referencePrice");
+      if (input.referencePrice <= 0) throw new Error("referencePrice must be greater than zero");
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO decision_log
+          (backtest_run_id, ativo, timeframe, decision_at, data_as_of, origem, recomendacao,
+           jev_model_version, jev_choice, jev_probs, confidence, quality_score,
+           risco_elevado, tamanho_posicao_pct, observacao, reference_price,
+           target_pct, stop_pct, lookahead_candles, execution_model_version)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+         RETURNING id`,
+        [
+          input.backtestRunId ?? null,
+          input.ativo,
+          input.timeframe,
+          input.decisionAt,
+          input.dataAsOf,
+          input.decision.origem,
+          input.decision.recomendacao,
+          input.decision.jevModelVersion ?? null,
+          input.decision.jevChoice ?? null,
+          input.decision.jevProbs ? JSON.stringify(input.decision.jevProbs) : null,
+          null,
+          input.decision.qualityScore ?? null,
+          input.decision.riscoElevado ?? null,
+          input.decision.tamanhoPosicaoPct,
+          input.decision.observacao ?? null,
+          input.referencePrice,
+          input.targetPct ?? null,
+          input.stopPct ?? null,
+          input.lookaheadCandles ?? null,
+          input.executionModelVersion ?? null,
+        ],
+      );
+      return Number(rows[0]?.id);
+    },
+
+    async settleDecisionLog(id: number, outcome: DecisionLogOutcome): Promise<void> {
+      const { rowCount } = await db.query(
+        `UPDATE decision_log
+         SET outcome_status = $2,
+             outcome_direction = $3,
+             forward_return_percent = $4,
+             trade_profit_percent = $5,
+             exit_reason = $6,
+             evaluated_at = $7
+         WHERE id = $1`,
+        [
+          id,
+          outcome.outcomeStatus,
+          outcome.outcomeDirection ?? null,
+          outcome.forwardReturnPercent ?? null,
+          outcome.tradeProfitPercent ?? null,
+          outcome.exitReason ?? null,
+          outcome.evaluatedAt ?? new Date(),
+        ],
+      );
+      if (rowCount === 0) throw new Error(`Decision log ${id} not found`);
+    },
+
+    async createBenchmarkRun(input: BenchmarkRunInput): Promise<number> {
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO benchmark_runs
+          (source_run_id, ativo, timeframe, periodo_inicio, periodo_fim, oos_start_ratio,
+           candles_total, dataset_hash, execution_model_version, target_pct, stop_pct,
+           lookahead_candles, slippage_pct, fee_pct)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         RETURNING id`,
+        [
+          input.sourceRunId ?? null,
+          input.ativo,
+          input.timeframe,
+          input.periodoInicio,
+          input.periodoFim,
+          input.oosStartRatio ?? null,
+          input.candlesTotal ?? null,
+          input.datasetHash ?? null,
+          input.executionModelVersion ?? null,
+          input.targetPct ?? null,
+          input.stopPct ?? null,
+          input.lookaheadCandles ?? null,
+          input.slippagePct ?? null,
+          input.feePct ?? null,
+        ],
+      );
+      const id = Number(rows[0]?.id);
+      if (!Number.isInteger(id) || id <= 0) throw new Error("Database did not return a valid benchmark run id");
+      return id;
+    },
+
+    async saveBenchmarkResult(input: BenchmarkResultInput): Promise<number> {
+      const { rows } = await db.query<{ id: number }>(
+        `INSERT INTO benchmark_results
+          (benchmark_run_id, estrategia, status, total_trades, closed_trades, open_trades,
+           win_rate, profit_factor, total_profit_percent, avg_profit_percent, expectancy_percent,
+           max_drawdown_percent, gross_total_profit_percent, total_fee_percent,
+           total_slippage_percent, avg_candles_held, notas)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         ON CONFLICT (benchmark_run_id, estrategia) DO UPDATE SET
+           status=EXCLUDED.status,
+           total_trades=EXCLUDED.total_trades,
+           closed_trades=EXCLUDED.closed_trades,
+           open_trades=EXCLUDED.open_trades,
+           win_rate=EXCLUDED.win_rate,
+           profit_factor=EXCLUDED.profit_factor,
+           total_profit_percent=EXCLUDED.total_profit_percent,
+           avg_profit_percent=EXCLUDED.avg_profit_percent,
+           expectancy_percent=EXCLUDED.expectancy_percent,
+           max_drawdown_percent=EXCLUDED.max_drawdown_percent,
+           gross_total_profit_percent=EXCLUDED.gross_total_profit_percent,
+           total_fee_percent=EXCLUDED.total_fee_percent,
+           total_slippage_percent=EXCLUDED.total_slippage_percent,
+           avg_candles_held=EXCLUDED.avg_candles_held,
+           notas=EXCLUDED.notas
+         RETURNING id`,
+        [
+          input.benchmarkRunId,
+          input.estrategia,
+          input.status,
+          input.totalTrades ?? 0,
+          input.closedTrades ?? 0,
+          input.openTrades ?? 0,
+          input.winRate ?? null,
+          input.profitFactor ?? null,
+          input.totalProfitPercent ?? 0,
+          input.avgProfitPercent ?? 0,
+          input.expectancyPercent ?? 0,
+          input.maxDrawdownPercent ?? 0,
+          input.grossTotalProfitPercent ?? 0,
+          input.totalFeePercent ?? 0,
+          input.totalSlippagePercent ?? 0,
+          input.avgCandlesHeld ?? null,
+          input.notas ?? null,
+        ],
+      );
+      return Number(rows[0]?.id);
+    },
+
+    async getBenchmarkResults(benchmarkRunId: number) {
+      const { rows } = await db.query(
+        `SELECT estrategia, status, total_trades, closed_trades, open_trades,
+                win_rate, profit_factor, total_profit_percent, avg_profit_percent,
+                expectancy_percent, max_drawdown_percent, gross_total_profit_percent,
+                total_fee_percent, total_slippage_percent, avg_candles_held, notas
+         FROM benchmark_results
+         WHERE benchmark_run_id = $1
+         ORDER BY estrategia`,
+        [benchmarkRunId],
+      );
+      return rows;
+    },
+
     async freezeConfigThresholds(userId: string): Promise<void> {
       if (!userId.trim()) throw new Error("userId is required");
       await db.query(
@@ -490,6 +703,12 @@ export const createBacktestRun = (input: BacktestRunInput) =>
 
 export const getBacktestRun = (id: number) =>
   createRepository(getDefaultPool()).getBacktestRun(id);
+
+export const saveDecisionLog = (input: DecisionLogInput) => createRepository(getDefaultPool()).saveDecisionLog(input);
+export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => createRepository(getDefaultPool()).settleDecisionLog(id, outcome);
+export const createBenchmarkRun = (input: BenchmarkRunInput) => createRepository(getDefaultPool()).createBenchmarkRun(input);
+export const saveBenchmarkResult = (input: BenchmarkResultInput) => createRepository(getDefaultPool()).saveBenchmarkResult(input);
+export const getBenchmarkResults = (benchmarkRunId: number) => createRepository(getDefaultPool()).getBenchmarkResults(benchmarkRunId);
 
 export const saveSignal = (
   ativo: string,
