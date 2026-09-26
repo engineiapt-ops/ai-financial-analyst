@@ -167,6 +167,71 @@ export async function fetchKlines(
   }));
 }
 
+export interface HistoricalKlineOptions {
+  totalCandles: number;
+  endTime?: number;
+  chunkSize?: number;
+  delayMs?: number;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Recupera um histórico maior que o limite de uma única chamada da Binance,
+ * paginando para trás e retornando apenas candles fechados, em ordem crescente.
+ */
+export async function fetchKlinesHistory(
+  symbol: string,
+  timeframe: Timeframe,
+  options: HistoricalKlineOptions,
+): Promise<Kline[]> {
+  if (!Number.isInteger(options.totalCandles) || options.totalCandles < 1) {
+    throw new Error("totalCandles must be a positive integer");
+  }
+  if (options.totalCandles > 50_000) {
+    throw new Error("totalCandles cannot exceed 50000");
+  }
+
+  const chunkSize = Math.max(1, Math.min(1000, options.chunkSize ?? 1000));
+  const delayMs = Math.max(0, options.delayMs ?? 100);
+  let cursorEnd = options.endTime ?? Date.now();
+  const collected = new Map<number, Kline>();
+
+  while (collected.size < options.totalCandles) {
+    const remaining = options.totalCandles - collected.size;
+    const batch = await fetchKlines(symbol, timeframe, {
+      limit: Math.min(chunkSize, remaining),
+      endTime: cursorEnd,
+    });
+
+    if (batch.length === 0) break;
+
+    let oldestOpenTime = Number.POSITIVE_INFINITY;
+    for (const candle of batch) {
+      const closeTime = candle.closeTime?.getTime() ?? 0;
+      if (closeTime > Date.now()) continue;
+      const openTime = candle.openTime.getTime();
+      oldestOpenTime = Math.min(oldestOpenTime, openTime);
+      collected.set(openTime, candle);
+    }
+
+    if (!Number.isFinite(oldestOpenTime)) break;
+    const nextEnd = oldestOpenTime - 1;
+    if (nextEnd >= cursorEnd) break;
+    cursorEnd = nextEnd;
+
+    if (collected.size < options.totalCandles && delayMs > 0) {
+      await sleep(delayMs);
+    }
+  }
+
+  return [...collected.values()]
+    .sort((a, b) => a.openTime.getTime() - b.openTime.getTime())
+    .slice(-options.totalCandles);
+}
+
 /**
  * Subclasse de WebSocket que adiciona reconexão automática com backoff progressivo,
  * prevenção de múltiplas conexões simultâneas e encerramento limpo.
