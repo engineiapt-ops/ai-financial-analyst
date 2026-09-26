@@ -4,6 +4,7 @@ import { buildOosValidationReport, type OosFoldRow } from "./oosValidationReport
 import { buildOosRobustnessReport } from "./oosRobustness.js";
 import {
   buildOosValidationGate,
+  computeOosValidationGateEvidenceHash,
   MIN_GATE_CLOSED_TRADES,
   MIN_GATE_FOLDS,
 } from "./oosValidationGate.js";
@@ -147,6 +148,16 @@ const readyGate = buildOosValidationGate({
 assert.equal(readyGate.status, "ready");
 assert.equal(readyGate.blockingReasons.length, 0);
 assert.equal(readyGate.evidenceHash.length, 64);
+assert.equal(
+  computeOosValidationGateEvidenceHash({
+    gateVersion: readyGate.gateVersion,
+    strategy: readyGate.strategy,
+    validationReport,
+    robustnessReport,
+    checks: readyGate.checks,
+  }),
+  readyGate.evidenceHash,
+);
 const repeatedGate = buildOosValidationGate({
   strategy: "baseline",
   validationReport,
