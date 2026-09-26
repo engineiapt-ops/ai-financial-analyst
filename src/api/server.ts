@@ -28,6 +28,7 @@ import { runRiskRegimeAnalysis } from "../risk/analysis.js";
 import { buildEvaluationOverview } from "../product/evaluationOverview.js";
 import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForwardReport.js";
 import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDiagnostics.js";
+import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernanceOverview.js";
 
 
 
@@ -301,6 +302,10 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
           <li class="endpoint-item">
             <div><span class="method method-get">GET</span> <a href="/api/market/klines?symbol=BTCUSDT&timeframe=1h&limit=5" target="_blank">/api/market/klines</a></div>
             <span style="color:var(--text-muted)">Binance Candles</span>
+          </li>
+          <li class="endpoint-item">
+            <div><span class="method method-get">GET</span> <a href="/api/evaluation/portfolio-overview?fromRun=1" target="_blank">/api/evaluation/portfolio-overview</a></div>
+            <span style="color:var(--text-muted)">Portfolio governance diagnostics</span>
           </li>
           <li class="endpoint-item">
             <div><span class="method method-get">GET</span> <a href="/api/metrics" target="_blank">/api/metrics</a></div>
@@ -994,6 +999,35 @@ app.get("/api/portfolio/walk-forward", async (req, res) => {
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/portfolio-overview", async (req, res) => {
+  try {
+    const fromRun = Number(req.query.fromRun);
+    if (!Number.isInteger(fromRun) || fromRun <= 0) {
+      return res.status(400).json({
+        status: "error",
+        error: "fromRun must be a positive integer",
+      });
+    }
+
+    const [portfolioReport, regimeDiagnostics] = await Promise.all([
+      buildPortfolioWalkForwardReport(fromRun),
+      buildPortfolioRegimeDiagnostics(fromRun),
+    ]);
+
+    const overview = buildPortfolioGovernanceOverview({
+      generatedAt: new Date(),
+      portfolioReport,
+      regimeDiagnostics,
+    });
+
+    res.json({ status: "ok", ...overview });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
   }
 });

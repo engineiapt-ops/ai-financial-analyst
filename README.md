@@ -59,3 +59,7 @@ The dashboard at `/` now surfaces decision state, market-data freshness, snapsho
 ## Quantitative quality cockpit
 
 The product dashboard also exposes `GET /api/evaluation/overview`, which consolidates decision-quality KPIs, confidence calibration and recent OOS validation-gate audits for the selected asset/timeframe. This layer is diagnostic/governance-only: it does not alter strategy thresholds or produce a new trading signal.
+
+## Portfolio governance overview
+
+The product API exposes `GET /api/evaluation/portfolio-overview?fromRun=<walk-forward-run-id>` to consolidate account-level portfolio walk-forward validation and regime diagnostics. This layer is read-only/diagnostic and does not select a preferred strategy or alter trading rules.
