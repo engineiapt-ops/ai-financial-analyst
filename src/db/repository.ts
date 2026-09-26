@@ -2,6 +2,7 @@ import pg, { type Pool, type PoolClient, type QueryResultRow } from "pg";
 import type { DecisionResult, Kline, Timeframe } from "../types.js";
 import type { ResearchSnapshot } from "../research/snapshot.js";
 import type { CalibrationObservation } from "../evaluation/calibration.js";
+import type { OosValidationGate } from "../evaluation/oosValidationGate.js";
 
 export interface RepositoryPool {
   query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
@@ -94,6 +95,33 @@ export interface ResearchSnapshotRecord {
   dataAsOf: Date;
   createdAt: Date;
   snapshot: ResearchSnapshot;
+}
+
+export interface OosValidationGateAuditRecord {
+  id: number;
+  backtestRunId: number;
+  walkForwardRunId: number | null;
+  ativo: string;
+  timeframe: Timeframe;
+  estrategia: "baseline" | "baseline_risk" | "jev";
+  gateVersion: string;
+  status: "ready" | "blocked";
+  validationFrom: Date;
+  validationTo: Date;
+  evidenceHash: string;
+  createdAt: Date;
+  gate: OosValidationGate;
+}
+
+export interface SaveOosValidationGateAuditInput {
+  gate: OosValidationGate;
+}
+
+export interface OosValidationGateAuditFilters {
+  backtestRunId?: number | null;
+  walkForwardRunId?: number | null;
+  strategy?: "baseline" | "baseline_risk" | "jev" | null;
+  limit?: number;
 }
 
 export interface SaveResearchSnapshotInput {
@@ -596,6 +624,235 @@ export function createRepository(db: RepositoryPool) {
       const id = Number(rows[0]?.id);
       if (!Number.isInteger(id) || id <= 0) throw new Error("Database did not return a valid signal id");
       return id;
+    },
+
+    async saveOosValidationGateAudit(
+      input: SaveOosValidationGateAuditInput,
+    ): Promise<OosValidationGateAuditRecord> {
+      const gate = input.gate;
+      if (!/^[0-9a-f]{64}$/.test(gate.evidenceHash)) {
+        throw new Error("evidenceHash must be a 64-character lowercase SHA-256 hex string");
+      }
+
+      const { rows } = await db.query<{
+        id: number;
+        backtest_run_id: number;
+        walk_forward_run_id: number | null;
+        ativo: string;
+        timeframe: Timeframe;
+        estrategia: "baseline" | "baseline_risk" | "jev";
+        gate_version: string;
+        status: "ready" | "blocked";
+        validation_from: Date;
+        validation_to: Date;
+        evidence_hash: string;
+        created_at: Date;
+        gate: OosValidationGate;
+      }>(
+        `INSERT INTO oos_validation_gate_audits
+          (backtest_run_id, walk_forward_run_id, ativo, timeframe, estrategia,
+           gate_version, status, validation_from, validation_to, evidence_hash, gate)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+         ON CONFLICT (backtest_run_id, walk_forward_run_id, estrategia, evidence_hash)
+         DO NOTHING
+         RETURNING id, backtest_run_id, walk_forward_run_id, ativo, timeframe,
+                   estrategia, gate_version, status, validation_from, validation_to,
+                   evidence_hash, created_at, gate`,
+        [
+          gate.scope.backtestRunId,
+          gate.scope.walkForwardRunId,
+          gate.scope.ativo,
+          gate.scope.timeframe,
+          gate.strategy,
+          gate.gateVersion,
+          gate.status,
+          new Date(gate.scope.validationFrom),
+          new Date(gate.scope.validationTo),
+          gate.evidenceHash,
+          JSON.stringify(gate),
+        ],
+      );
+
+      const row = rows[0];
+      if (row) {
+        return {
+          id: Number(row.id),
+          backtestRunId: Number(row.backtest_run_id),
+          walkForwardRunId:
+            row.walk_forward_run_id === null ? null : Number(row.walk_forward_run_id),
+          ativo: row.ativo,
+          timeframe: row.timeframe,
+          estrategia: row.estrategia,
+          gateVersion: row.gate_version,
+          status: row.status,
+          validationFrom: new Date(row.validation_from),
+          validationTo: new Date(row.validation_to),
+          evidenceHash: row.evidence_hash,
+          createdAt: new Date(row.created_at),
+          gate: row.gate,
+        };
+      }
+
+      const existing = await db.query<typeof rows[number]>(
+        `SELECT id, backtest_run_id, walk_forward_run_id, ativo, timeframe,
+                estrategia, gate_version, status, validation_from, validation_to,
+                evidence_hash, created_at, gate
+         FROM oos_validation_gate_audits
+         WHERE backtest_run_id = $1
+           AND walk_forward_run_id IS NOT DISTINCT FROM $2
+           AND estrategia = $3
+           AND evidence_hash = $4`,
+        [
+          gate.scope.backtestRunId,
+          gate.scope.walkForwardRunId,
+          gate.strategy,
+          gate.evidenceHash,
+        ],
+      );
+
+      const existingRow = existing.rows[0];
+      if (!existingRow) {
+        throw new Error("OOS validation gate audit could not be persisted");
+      }
+
+      return {
+        id: Number(existingRow.id),
+        backtestRunId: Number(existingRow.backtest_run_id),
+        walkForwardRunId:
+          existingRow.walk_forward_run_id === null
+            ? null
+            : Number(existingRow.walk_forward_run_id),
+        ativo: existingRow.ativo,
+        timeframe: existingRow.timeframe,
+        estrategia: existingRow.estrategia,
+        gateVersion: existingRow.gate_version,
+        status: existingRow.status,
+        validationFrom: new Date(existingRow.validation_from),
+        validationTo: new Date(existingRow.validation_to),
+        evidenceHash: existingRow.evidence_hash,
+        createdAt: new Date(existingRow.created_at),
+        gate: existingRow.gate,
+      };
+    },
+
+    async getOosValidationGateAudit(
+      id: number,
+    ): Promise<OosValidationGateAuditRecord | null> {
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new Error("audit id must be a positive integer");
+      }
+
+      const { rows } = await db.query<{
+        id: number;
+        backtest_run_id: number;
+        walk_forward_run_id: number | null;
+        ativo: string;
+        timeframe: Timeframe;
+        estrategia: "baseline" | "baseline_risk" | "jev";
+        gate_version: string;
+        status: "ready" | "blocked";
+        validation_from: Date;
+        validation_to: Date;
+        evidence_hash: string;
+        created_at: Date;
+        gate: OosValidationGate;
+      }>(
+        `SELECT id, backtest_run_id, walk_forward_run_id, ativo, timeframe,
+                estrategia, gate_version, status, validation_from, validation_to,
+                evidence_hash, created_at, gate
+         FROM oos_validation_gate_audits
+         WHERE id = $1`,
+        [id],
+      );
+
+      const row = rows[0];
+      if (!row) return null;
+
+      return {
+        id: Number(row.id),
+        backtestRunId: Number(row.backtest_run_id),
+        walkForwardRunId:
+          row.walk_forward_run_id === null ? null : Number(row.walk_forward_run_id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        estrategia: row.estrategia,
+        gateVersion: row.gate_version,
+        status: row.status,
+        validationFrom: new Date(row.validation_from),
+        validationTo: new Date(row.validation_to),
+        evidenceHash: row.evidence_hash,
+        createdAt: new Date(row.created_at),
+        gate: row.gate,
+      };
+    },
+
+    async listOosValidationGateAudits(
+      filters: OosValidationGateAuditFilters = {},
+    ): Promise<OosValidationGateAuditRecord[]> {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+      const add = (condition: string, value: unknown) => {
+        values.push(value);
+        conditions.push(condition.replace("?", String(values.length)));
+      };
+
+      if (filters.backtestRunId !== null && filters.backtestRunId !== undefined) {
+        add("backtest_run_id = ?", filters.backtestRunId);
+      }
+      if (filters.walkForwardRunId !== null && filters.walkForwardRunId !== undefined) {
+        add("walk_forward_run_id = ?", filters.walkForwardRunId);
+      }
+      if (filters.strategy) {
+        add("estrategia = ?", filters.strategy);
+      }
+
+      const limit = filters.limit ?? 50;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error("audit history limit must be an integer between 1 and 100");
+      }
+
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const { rows } = await db.query<{
+        id: number;
+        backtest_run_id: number;
+        walk_forward_run_id: number | null;
+        ativo: string;
+        timeframe: Timeframe;
+        estrategia: "baseline" | "baseline_risk" | "jev";
+        gate_version: string;
+        status: "ready" | "blocked";
+        validation_from: Date;
+        validation_to: Date;
+        evidence_hash: string;
+        created_at: Date;
+        gate: OosValidationGate;
+      }>(
+        `SELECT id, backtest_run_id, walk_forward_run_id, ativo, timeframe,
+                estrategia, gate_version, status, validation_from, validation_to,
+                evidence_hash, created_at, gate
+         FROM oos_validation_gate_audits
+         ${where}
+         ORDER BY created_at DESC, id DESC
+         LIMIT ${limit}`,
+        values,
+      );
+
+      return rows.map((row) => ({
+        id: Number(row.id),
+        backtestRunId: Number(row.backtest_run_id),
+        walkForwardRunId:
+          row.walk_forward_run_id === null ? null : Number(row.walk_forward_run_id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        estrategia: row.estrategia,
+        gateVersion: row.gate_version,
+        status: row.status,
+        validationFrom: new Date(row.validation_from),
+        validationTo: new Date(row.validation_to),
+        evidenceHash: row.evidence_hash,
+        createdAt: new Date(row.created_at),
+        gate: row.gate,
+      }));
     },
 
     async saveResearchSnapshot(input: SaveResearchSnapshotInput): Promise<ResearchSnapshotRecord> {
@@ -2131,6 +2388,13 @@ export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => cr
 export const createBenchmarkRun = (input: BenchmarkRunInput) => createRepository(getDefaultPool()).createBenchmarkRun(input);
 export const saveBenchmarkResult = (input: BenchmarkResultInput) => createRepository(getDefaultPool()).saveBenchmarkResult(input);
 export const getBenchmarkResults = (benchmarkRunId: number) => createRepository(getDefaultPool()).getBenchmarkResults(benchmarkRunId);
+
+export const saveOosValidationGateAudit = (input: SaveOosValidationGateAuditInput) =>
+  createRepository(getDefaultPool()).saveOosValidationGateAudit(input);
+export const getOosValidationGateAudit = (id: number) =>
+  createRepository(getDefaultPool()).getOosValidationGateAudit(id);
+export const listOosValidationGateAudits = (filters: OosValidationGateAuditFilters = {}) =>
+  createRepository(getDefaultPool()).listOosValidationGateAudits(filters);
 
 export const saveResearchSnapshot = (input: SaveResearchSnapshotInput) =>
   createRepository(getDefaultPool()).saveResearchSnapshot(input);
