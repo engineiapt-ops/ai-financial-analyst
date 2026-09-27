@@ -395,7 +395,6 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         <div class="overview-item"><span class="overview-label">Latest governance</span><span class="overview-value" id="ovGovernance" style="font-size:0.8rem;">-</span><span class="overview-note">latest audit per strategy</span></div>
       </div>
     </div>
-  </div>
 
     <div class="card" style="margin-bottom:1.5rem;">
       <div class="card-title">
