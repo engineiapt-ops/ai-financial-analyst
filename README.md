@@ -112,3 +112,12 @@ This check is read-only and does not change strategy, thresholds, sizing or exec
 ## Operational quality cockpit
 
 The read-only `GET /api/evaluation/operational-quality` contract consolidates system readiness, live market-data freshness, quantitative governance, portfolio integrity and the paper-trading invariant. It is diagnostic only and does not produce or modify trading signals.
+
+
+## Pipeline audit and traceability
+
+The read-only `GET /api/evaluation/pipeline-audit?fromRun=<walkForwardRunId>` contract exposes `pipeline-audit.v1` for a persisted walk-forward run. It validates the traceability chain from dataset metadata to OOS gate evidence, portfolio governance, fold-stability coverage and execution-model registration.
+
+The audit produces a deterministic SHA-256 evidence hash, explicit blocking reasons and non-blocking warnings. It does not create signals, change thresholds, select strategies or authorize live execution.
+
+The module also exposes `comparePipelineAudits(previous, current)` for structural regression detection across snapshots. It identifies state regressions, OOS governance regressions, portfolio-integrity regressions, stability-coverage reductions, contract drift and expected dataset scope changes. Historical snapshot persistence is intentionally separated from this first read-only contract.
