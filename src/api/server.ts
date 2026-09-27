@@ -435,6 +435,37 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
 
     <div class="card" style="margin-bottom:1.5rem;">
       <div class="card-title">
+        <span>System Validation Cockpit 2.0</span>
+        <span class="method method-get">GET /api/system/validation</span>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="validationRun">Walk-forward Run (optional)</label>
+          <input type="number" id="validationRun" min="1" placeholder="e.g. 41" />
+        </div>
+        <div class="form-group" style="display:flex;align-items:end;">
+          <button type="button" onclick="refreshSystemValidation()" style="height:42px;">Run Validation</button>
+        </div>
+      </div>
+      <div id="validationPanel" style="display:none;">
+        <div class="overview-grid">
+          <div class="overview-item"><span class="overview-label">System state</span><span class="overview-value" id="svState">-</span></div>
+          <div class="overview-item"><span class="overview-label">Ready checks</span><span class="overview-value" id="svReady">-</span></div>
+          <div class="overview-item"><span class="overview-label">Degraded checks</span><span class="overview-value" id="svDegraded">-</span></div>
+          <div class="overview-item"><span class="overview-label">Blocked checks</span><span class="overview-value" id="svBlocked">-</span></div>
+          <div class="overview-item"><span class="overview-label">Blocking failures</span><span class="overview-value" id="svBlocking">-</span></div>
+          <div class="overview-item"><span class="overview-label">Settlement coverage</span><span class="overview-value" id="svSettlement">-</span></div>
+          <div class="overview-item"><span class="overview-label">Evidence hash</span><span class="overview-value" id="svEvidence" style="font-size:0.72rem;word-break:break-all;">-</span></div>
+          <div class="overview-item"><span class="overview-label">Contract</span><span class="overview-value" id="svContract" style="font-size:0.8rem;">-</span></div>
+        </div>
+        <div id="svChecks" style="margin:0.75rem 0;"></div>
+        <p id="svInterpretation" style="font-size:0.8rem;color:var(--text-muted);"></p>
+        <pre id="svJson"></pre>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title">
         <span>Continuous Governance</span>
         <span class="method method-get">GET /api/product/continuous-governance</span>
       </div>
@@ -513,6 +544,55 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         document.getElementById('riJson').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         alert('Research Intelligence Error: ' + err.message);
+      }
+    }
+
+    async function refreshSystemValidation() {
+      try {
+        const params = new URLSearchParams({
+          asset: document.getElementById('ativo').value,
+          timeframe: document.getElementById('timeframe').value,
+          lookbackDays: '30',
+          limit: '20'
+        });
+        const run = document.getElementById('validationRun').value.trim() ||
+          document.getElementById('governanceRun').value.trim();
+        if (run) params.set('fromRun', run);
+
+        const response = await fetch('/api/system/validation?' + params.toString());
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'System validation failed');
+
+        document.getElementById('validationPanel').style.display = 'block';
+        document.getElementById('svState').textContent = data.state || '-';
+        document.getElementById('svReady').textContent = String(data.summary?.readyCount ?? 0);
+        document.getElementById('svDegraded').textContent = String(data.summary?.degradedCount ?? 0);
+        document.getElementById('svBlocked').textContent = String(data.summary?.blockedCount ?? 0);
+        document.getElementById('svBlocking').textContent = String(data.summary?.blockingFailures ?? 0);
+        document.getElementById('svEvidence').textContent = data.evidenceHash || '-';
+        document.getElementById('svContract').textContent = data.version || '-';
+
+        const settlement = data.checks?.find(check => check.key === 'outcome-settlement');
+        document.getElementById('svSettlement').textContent =
+          settlement?.evidence?.coveragePct == null
+            ? 'No finalized outcomes'
+            : Number(settlement.evidence.coveragePct).toFixed(2) + '%';
+
+        document.getElementById('svChecks').innerHTML =
+          (data.checks || []).map(check =>
+            '<div class="overview-item" style="margin-bottom:0.35rem;">' +
+              '<div class="overview-label">' + check.key + '</div>' +
+              '<div class="overview-value">' + check.state + '</div>' +
+              '<div class="overview-note">' + (check.detail || '') + '</div>' +
+            '</div>'
+          ).join('');
+
+        document.getElementById('svInterpretation').textContent =
+          data.interpretation?.readyMeans || '';
+
+        document.getElementById('svJson').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        alert('System Validation Error: ' + err.message);
       }
     }
 
@@ -638,6 +718,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
 
     refreshStatus();
     refreshEvaluationOverview();
+    refreshSystemValidation();
 
     const form = document.getElementById('analyzeForm');
     const analyzeBtn = document.getElementById('analyzeBtn');

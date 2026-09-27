@@ -192,3 +192,12 @@ The research layer now exposes `GET /api/product/research-intelligence?snapshotI
 The `research-intelligence.v1` contract enriches an existing persisted `research-snapshot.v1` with structured evidence traceability, source status, point-in-time validation, aggregate sentiment context, provenance-chain checks and a deterministic quality state. The intelligence endpoint reads the persisted snapshot; it does not trigger a new market decision or store mutable third-party content.
 
 The endpoint is protected by API authentication and the heavy API rate limit. External research remains context-only: the deterministic quantitative Decision Engine remains authoritative, while research and Gemini context are advisory.
+
+
+## Governance Cockpit 2.0 + Automated Release Gate
+
+The dashboard now exposes a consolidated `System Validation Cockpit 2.0` backed by `system-validation.v1`. It shows the selected system state, counts of ready/degraded/blocked checks, blocking failures, settlement-audit coverage and the deterministic validation evidence hash.
+
+The release pipeline now includes `release-gate.v1` after the full TypeScript build and aggregate test suite. The gate verifies that the release-critical governance contracts are present, that the aggregate test suite includes system validation and settlement-audit coverage, and that the product guardrails remain explicit: paper trading only, deterministic Decision Engine authority, AI/Gemini advisory-only and dashboard read-only.
+
+The release gate does not create signals, rank strategies, change thresholds/sizing or authorize real execution.
