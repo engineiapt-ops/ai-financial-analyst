@@ -914,7 +914,11 @@ export function createRepository(db: RepositoryPool) {
       const timeframe = snapshot.scope.timeframe;
       const datasetHash = snapshot.scope.datasetHash;
 
-      if (!Number.isInteger(resolvedWalkForwardRunId) || resolvedWalkForwardRunId <= 0) {
+      if (
+        typeof resolvedWalkForwardRunId !== "number" ||
+        !Number.isInteger(resolvedWalkForwardRunId) ||
+        resolvedWalkForwardRunId <= 0
+      ) {
         throw new Error("pipeline audit snapshot requires a positive walk-forward run id");
       }
       if (!ativo || !timeframe || !datasetHash) {
@@ -927,7 +931,7 @@ export function createRepository(db: RepositoryPool) {
         throw new Error("evidenceHash must be a 64-character lowercase SHA-256 hex string");
       }
 
-      const walkForwardRunId: number = resolvedWalkForwardRunId;
+      const walkForwardRunId = resolvedWalkForwardRunId;
 
       const rowResult = await db.query<{
         id: number;
