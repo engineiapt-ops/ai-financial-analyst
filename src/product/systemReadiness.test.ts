@@ -25,7 +25,8 @@ const ready = buildSystemReadinessOverview({
   },
   governanceContracts: [
     "evaluation-overview.v1",
-    "portfolio-governance-overview.v1",
+    "portfolio-governance-overview.v2",
+    "portfolio-stability.v1",
   ],
 });
 
@@ -81,7 +82,7 @@ const blocked = buildSystemReadinessOverview({
   },
   governanceContracts: [
     "evaluation-overview.v1",
-    "portfolio-governance-overview.v1",
+    "portfolio-governance-overview.v2",
   ],
 });
 
