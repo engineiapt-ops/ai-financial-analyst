@@ -27,7 +27,7 @@ function validateConfig(config: DecisionEvaluationConfig): void {
   }
 }
 
-function futureClosedCandles(
+export function selectFutureClosedCandles(
   candles: Kline[],
   dataAsOf: Date,
   evaluatedAt: Date,
@@ -80,7 +80,7 @@ export function evaluateDecisionLog(
     throw new Error("evaluatedAt must be after decision dataAsOf");
   }
 
-  const future = futureClosedCandles(candles, decision.dataAsOf, evaluatedAt);
+  const future = selectFutureClosedCandles(candles, decision.dataAsOf, evaluatedAt);
   const target = future[config.lookaheadCandles - 1];
   if (!target) {
     throw new Error("Insufficient future closed candles for requested lookahead");
