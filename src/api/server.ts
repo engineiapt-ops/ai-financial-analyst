@@ -17,7 +17,7 @@ import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits, healthDatabase, savePipelineAuditSnapshot, listPipelineAuditSnapshots } from "../db/repository.js";
+import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLogWithAudit, getOutcomeSettlementAudit, getOutcomeSettlementAuditSummary, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits, healthDatabase, savePipelineAuditSnapshot, listPipelineAuditSnapshots } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -29,6 +29,8 @@ import { runWalkForwardPortfolio } from "../portfolio/walkForwardPortfolio.js";
 import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
 import { runRiskRegimeAnalysis } from "../risk/analysis.js";
 import { buildEvaluationOverview } from "../product/evaluationOverview.js";
+import { buildOutcomeSettlementAudit } from "../evaluation/outcomeSettlementAudit.js";
+import { buildSystemValidationForScope } from "../product/systemValidationService.js";
 import { settlePendingDecisionLogs } from "../evaluation/pendingSettlement.js";
 import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForwardReport.js";
 import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDiagnostics.js";
@@ -1031,6 +1033,25 @@ app.get("/api/product/research-intelligence", async (req, res) => {
   }
 });
 
+app.get("/api/system/validation", async (req, res) => {
+  try {
+    const query = z.object({
+      asset: z.string().min(1).max(32).default("BTCUSDT"),
+      timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(30),
+      limit: z.coerce.number().int().min(1).max(50).default(20),
+      fromRun: z.coerce.number().int().positive().optional(),
+    }).parse(req.query);
+
+    const validation = await buildSystemValidationForScope(query);
+    res.json({ status: "ok", ...validation });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
 app.get("/api/system/readiness", async (_req, res) => {
   const [marketDataCheck, databaseCheck] = await Promise.all([
     pingBinance()
@@ -1262,7 +1283,18 @@ app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
       },
     );
 
-    await settleDecisionLog(decisionLogId, evaluation.outcome);
+    const audit = buildOutcomeSettlementAudit({
+      decision,
+      candles,
+      evaluation,
+      evaluatedAt,
+      config: {
+        lookaheadCandles: body.lookaheadCandles,
+        flatThresholdPct: body.flatThresholdPct,
+      },
+    });
+
+    await settleDecisionLogWithAudit(decisionLogId, evaluation.outcome, audit);
 
     res.json({
       status: "ok",
@@ -1284,6 +1316,51 @@ app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
     const status = message.includes("DATABASE_URL") ? 503
       : message.includes("Insufficient future closed candles") ? 422
       : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/decisions/:decisionLogId/audit", async (req, res) => {
+  try {
+    const decisionLogId = Number(req.params.decisionLogId);
+    if (!Number.isInteger(decisionLogId) || decisionLogId <= 0) {
+      return res.status(400).json({ status: "error", error: "decisionLogId must be a positive integer" });
+    }
+
+    const audit = await getOutcomeSettlementAudit(decisionLogId);
+    if (!audit) {
+      return res.status(404).json({ status: "error", error: "outcome settlement audit not found" });
+    }
+
+    res.json({ status: "ok", ...audit });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/settlement-audit", async (req, res) => {
+  try {
+    const query = z.object({
+      ativo: z.string().min(1).optional(),
+      timeframe: z.enum(["1h", "4h", "1d"]).optional(),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(30),
+    }).parse(req.query);
+
+    const now = new Date();
+    const from = new Date(now.getTime() - query.lookbackDays * 24 * 60 * 60 * 1000);
+    const summary = await getOutcomeSettlementAuditSummary({
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      from,
+      to: now,
+    });
+
+    res.json({ status: "ok", generatedAt: now.toISOString(), ...summary });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
   }
 });
