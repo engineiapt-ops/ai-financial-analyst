@@ -17,7 +17,7 @@ import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLogWithAudit, getOutcomeSettlementAudit, getOutcomeSettlementAuditSummary, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits, healthDatabase, savePipelineAuditSnapshot, listPipelineAuditSnapshots } from "../db/repository.js";
+import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLogWithAudit, getOutcomeSettlementAudit, getOutcomeSettlementAuditSummary, saveSystemValidationSnapshot, listSystemValidationSnapshots, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits, healthDatabase, savePipelineAuditSnapshot, listPipelineAuditSnapshots } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -31,6 +31,7 @@ import { runRiskRegimeAnalysis } from "../risk/analysis.js";
 import { buildEvaluationOverview } from "../product/evaluationOverview.js";
 import { buildOutcomeSettlementAudit } from "../evaluation/outcomeSettlementAudit.js";
 import { buildSystemValidationForScope } from "../product/systemValidationService.js";
+import { buildValidationHistoryForScope, recordValidationSnapshotForScope } from "../product/validationHistoryService.js";
 import { settlePendingDecisionLogs } from "../evaluation/pendingSettlement.js";
 import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForwardReport.js";
 import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDiagnostics.js";
@@ -466,6 +467,32 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
 
     <div class="card" style="margin-bottom:1.5rem;">
       <div class="card-title">
+        <span>Validation Evidence Timeline</span>
+        <span class="method method-get">GET /api/system/validation/history</span>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="validationHistoryLimit">History limit</label>
+          <input type="number" id="validationHistoryLimit" min="1" max="100" value="20" />
+        </div>
+        <div class="form-group" style="display:flex;align-items:end;">
+          <button type="button" onclick="refreshValidationHistory()" style="height:42px;">Load Evidence Timeline</button>
+        </div>
+      </div>
+      <div id="validationHistoryPanel" style="display:none;">
+        <div class="overview-grid">
+          <div class="overview-item"><span class="overview-label">Snapshots</span><span class="overview-value" id="vhCount">-</span></div>
+          <div class="overview-item"><span class="overview-label">Current state</span><span class="overview-value" id="vhCurrent">-</span></div>
+          <div class="overview-item"><span class="overview-label">Temporal order</span><span class="overview-value" id="vhTemporal">-</span></div>
+          <div class="overview-item"><span class="overview-label">Evidence hashes</span><span class="overview-value" id="vhEvidence">-</span></div>
+        </div>
+        <div id="vhTimeline" style="margin:0.75rem 0;"></div>
+        <pre id="vhJson"></pre>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title">
         <span>Continuous Governance</span>
         <span class="method method-get">GET /api/product/continuous-governance</span>
       </div>
@@ -596,6 +623,43 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       }
     }
 
+    async function refreshValidationHistory() {
+      try {
+        const params = new URLSearchParams({
+          asset: document.getElementById('ativo').value,
+          timeframe: document.getElementById('timeframe').value,
+          limit: document.getElementById('validationHistoryLimit').value || '20'
+        });
+        const run = document.getElementById('validationRun').value.trim() ||
+          document.getElementById('governanceRun').value.trim();
+        if (run) params.set('fromRun', run);
+
+        const response = await fetch('/api/system/validation/history?' + params.toString());
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Validation history failed');
+
+        document.getElementById('validationHistoryPanel').style.display = 'block';
+        document.getElementById('vhCount').textContent = String(data.count ?? 0);
+        document.getElementById('vhCurrent').textContent = data.current?.state || 'No persisted snapshots';
+        document.getElementById('vhTemporal').textContent = data.checks?.temporalOrderValid ? 'Valid' : 'Invalid';
+        document.getElementById('vhEvidence').textContent = data.checks?.evidenceHashesValid ? 'Valid SHA-256' : 'Invalid';
+
+        document.getElementById('vhTimeline').innerHTML =
+          (data.timeline || []).slice(0, 30).map(event =>
+            '<div class="overview-item" style="margin-bottom:0.35rem;">' +
+              '<div class="overview-label">' + new Date(event.at).toLocaleString() + ' · ' + event.kind + '</div>' +
+              '<div class="overview-value">' + event.state + '</div>' +
+              '<div class="overview-note">' + (event.message || '') + '</div>' +
+              '<div class="overview-note" style="font-family:monospace;word-break:break-all;">' + (event.evidenceHash || '') + '</div>' +
+            '</div>'
+          ).join('') || '<p class="overview-note">Nenhum snapshot persistido para o escopo selecionado.</p>';
+
+        document.getElementById('vhJson').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        alert('Validation History Error: ' + err.message);
+      }
+    }
+
     async function checkContinuousGovernance() {
       try {
         const run = document.getElementById('continuousRun').value.trim();
@@ -719,6 +783,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
     refreshStatus();
     refreshEvaluationOverview();
     refreshSystemValidation();
+    refreshValidationHistory();
 
     const form = document.getElementById('analyzeForm');
     const analyzeBtn = document.getElementById('analyzeBtn');
@@ -1131,6 +1196,53 @@ app.get("/api/system/validation", async (req, res) => {
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/system/validation/history", async (req, res) => {
+  try {
+    const query = z.object({
+      asset: z.string().min(1).max(32).default("BTCUSDT"),
+      timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+      limit: z.coerce.number().int().min(1).max(100).default(20),
+      fromRun: z.coerce.number().int().positive().optional(),
+    }).parse(req.query);
+
+    const history = await buildValidationHistoryForScope(query);
+    res.json({ status: "ok", ...history });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.post("/api/system/validation/history", async (req, res) => {
+  try {
+    const body = z.object({
+      asset: z.string().min(1).max(32).default("BTCUSDT"),
+      timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(30),
+      limit: z.coerce.number().int().min(1).max(100).default(20),
+      fromRun: z.coerce.number().int().positive().optional(),
+    }).parse(req.body);
+
+    const result = await recordValidationSnapshotForScope(body);
+    res.status(201).json({
+      status: "ok",
+      snapshotId: result.snapshot.id,
+      createdAt: result.snapshot.createdAt.toISOString(),
+      evidenceHash: result.snapshot.evidenceHash,
+      state: result.snapshot.state,
+      history: result.history,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status =
+      message.includes("not found") ? 404 :
+      message.includes("DATABASE_URL") ? 503 :
+      400;
     res.status(status).json({ status: "error", error: message });
   }
 });
