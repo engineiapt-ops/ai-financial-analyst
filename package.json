@@ -50,7 +50,7 @@
     "test:pipeline-audit-repository": "tsx src/product/pipelineAuditRepository.test.ts",
     "test:governance-dashboard": "tsx src/product/governanceDashboard.test.ts",
     "test:continuous-governance": "tsx src/product/continuousGovernance.test.ts",
-    "test:research-intelligence": "tsx src/research/intelligence.test.ts"
+    "test:research-intelligence": "tsx src/research/researchIntelligence.test.ts"
   },
   "dependencies": {
     "express": "^4.19.2",
