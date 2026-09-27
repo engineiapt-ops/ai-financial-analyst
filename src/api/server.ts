@@ -1063,7 +1063,7 @@ app.get("/api/system/readiness", async (_req, res) => {
       "pipeline-audit-history.v1",
       "governance-dashboard.v1",
       "continuous-governance.v1",
-        "research-intelligence.v1",
+      "research-intelligence.v1",
       "portfolio-governance-overview.v2",
       "portfolio-stability.v1",
     ],
