@@ -6,6 +6,7 @@ import type { OosValidationGate } from "../evaluation/oosValidationGate.js";
 import type { OosValidationReport } from "../evaluation/oosValidationReport.js";
 import type { OosRobustnessReport } from "../evaluation/oosRobustness.js";
 import type { PipelineAuditOverview } from "../product/pipelineAudit.js";
+import type { OutcomeSettlementAuditPayload } from "../evaluation/outcomeSettlementAudit.js";
 
 export interface RepositoryPool {
   query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
@@ -239,6 +240,37 @@ export interface PendingDecisionLogFilters {
   ativo?: string | null;
   timeframe?: Timeframe | null;
   limit?: number;
+}
+
+export interface OutcomeSettlementAuditRecord extends OutcomeSettlementAuditPayload {
+  id: number;
+  createdAt: Date;
+}
+
+export interface OutcomeSettlementAuditFilters {
+  decisionLogId?: number | null;
+  ativo?: string | null;
+  timeframe?: Timeframe | null;
+  from?: Date | null;
+  to?: Date | null;
+  limit?: number;
+}
+
+export interface OutcomeSettlementAuditSummary {
+  version: "outcome-settlement-audit.v1";
+  filters: {
+    ativo: string | null;
+    timeframe: Timeframe | null;
+    from: Date | null;
+    to: Date | null;
+  };
+  finalizedDecisions: number;
+  settledDecisions: number;
+  notApplicableDecisions: number;
+  pendingDecisions: number;
+  auditedDecisions: number;
+  coveragePct: number | null;
+  latestEvaluatedAt: Date | null;
 }
 
 export interface DecisionLogInput {
@@ -1870,6 +1902,312 @@ export function createRepository(db: RepositoryPool) {
       }
     },
 
+    async settleDecisionLogWithAudit(
+      id: number,
+      outcome: DecisionLogOutcome,
+      audit: OutcomeSettlementAuditPayload,
+    ): Promise<void> {
+      if (audit.decisionLogId !== id) {
+        throw new Error("settlement audit decisionLogId must match the decision log id");
+      }
+      const client = await db.connect();
+      try {
+        await client.query("BEGIN");
+
+        const result = await client.query(
+          `UPDATE decision_log
+           SET outcome_status = $2,
+               outcome_direction = $3,
+               forward_return_percent = $4,
+               trade_profit_percent = $5,
+               exit_reason = $6,
+               evaluated_at = $7
+           WHERE id = $1 AND outcome_status = 'pending'
+           RETURNING id`,
+          [
+            id,
+            outcome.outcomeStatus,
+            outcome.outcomeDirection ?? null,
+            outcome.forwardReturnPercent ?? null,
+            outcome.tradeProfitPercent ?? null,
+            outcome.exitReason ?? null,
+            outcome.evaluatedAt ?? new Date(),
+          ],
+        );
+
+        if (result.rows.length === 0) {
+          throw new Error("decision log is already settled or does not exist");
+        }
+
+        await client.query(
+          `INSERT INTO outcome_settlement_audits (
+             decision_log_id, audit_version, ativo, timeframe, recommendation,
+             decision_at, data_as_of, evaluated_at, reference_price,
+             lookahead_candles, flat_threshold_pct, outcome_status,
+             outcome_direction, forward_return_percent, trade_profit_percent,
+             exit_reason, evaluation_candle_open_time, evaluation_candle_close_time,
+             evaluation_price, future_closed_candle_count, future_first_open_time,
+             future_last_close_time, market_data_hash, evidence_hash,
+             source, notes, audit
+           )
+           VALUES (
+             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+             $17,$18,$19,$20,$21,$22,$23,$24,$25,$26::jsonb,$27::jsonb
+           )`,
+          [
+            audit.decisionLogId,
+            audit.version,
+            audit.asset,
+            audit.timeframe,
+            audit.recommendation,
+            audit.decisionAt,
+            audit.dataAsOf,
+            audit.evaluatedAt,
+            audit.referencePrice,
+            audit.lookaheadCandles,
+            audit.flatThresholdPct,
+            audit.outcomeStatus,
+            audit.outcomeDirection,
+            audit.forwardReturnPercent,
+            audit.tradeProfitPercent,
+            audit.exitReason,
+            audit.evaluationCandleOpenTime,
+            audit.evaluationCandleCloseTime,
+            audit.evaluationPrice,
+            audit.futureClosedCandleCount,
+            audit.futureFirstOpenTime,
+            audit.futureLastCloseTime,
+            audit.marketDataHash,
+            audit.evidenceHash,
+            audit.source,
+            JSON.stringify(audit.notes),
+            JSON.stringify(audit),
+          ],
+        );
+
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async saveOutcomeSettlementAudit(
+      audit: OutcomeSettlementAuditPayload,
+    ): Promise<OutcomeSettlementAuditRecord> {
+      const { rows } = await db.query<{
+        id: number;
+        created_at: Date;
+      }>(
+        `INSERT INTO outcome_settlement_audits (
+           decision_log_id, audit_version, ativo, timeframe, recommendation,
+           decision_at, data_as_of, evaluated_at, reference_price,
+           lookahead_candles, flat_threshold_pct, outcome_status,
+           outcome_direction, forward_return_percent, trade_profit_percent,
+           exit_reason, evaluation_candle_open_time, evaluation_candle_close_time,
+           evaluation_price, future_closed_candle_count, future_first_open_time,
+           future_last_close_time, market_data_hash, evidence_hash,
+           source, notes, audit
+         )
+         VALUES (
+           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+           $17,$18,$19,$20,$21,$22,$23,$24,$25,$26::jsonb,$27::jsonb
+         )
+         ON CONFLICT (decision_log_id) DO NOTHING
+         RETURNING id, created_at`,
+        [
+          audit.decisionLogId,
+          audit.version,
+          audit.asset,
+          audit.timeframe,
+          audit.recommendation,
+          audit.decisionAt,
+          audit.dataAsOf,
+          audit.evaluatedAt,
+          audit.referencePrice,
+          audit.lookaheadCandles,
+          audit.flatThresholdPct,
+          audit.outcomeStatus,
+          audit.outcomeDirection,
+          audit.forwardReturnPercent,
+          audit.tradeProfitPercent,
+          audit.exitReason,
+          audit.evaluationCandleOpenTime,
+          audit.evaluationCandleCloseTime,
+          audit.evaluationPrice,
+          audit.futureClosedCandleCount,
+          audit.futureFirstOpenTime,
+          audit.futureLastCloseTime,
+          audit.marketDataHash,
+          audit.evidenceHash,
+          audit.source,
+          JSON.stringify(audit.notes),
+          JSON.stringify(audit),
+        ],
+      );
+
+      let id = rows[0]?.id;
+      let createdAt = rows[0]?.created_at;
+
+      if (id === undefined || createdAt === undefined) {
+        const existing = await this.getOutcomeSettlementAudit(audit.decisionLogId);
+        if (!existing) throw new Error("Outcome settlement audit could not be persisted");
+        if (existing.evidenceHash !== audit.evidenceHash) {
+          throw new Error("Outcome settlement audit collision with different evidence");
+        }
+        return existing;
+      }
+
+      return {
+        ...audit,
+        id: Number(id),
+        createdAt: new Date(createdAt),
+      };
+    },
+
+    async getOutcomeSettlementAudit(
+      decisionLogId: number,
+    ): Promise<OutcomeSettlementAuditRecord | null> {
+      if (!Number.isInteger(decisionLogId) || decisionLogId <= 0) {
+        throw new Error("decision log id must be a positive integer");
+      }
+
+      const { rows } = await db.query<any>(
+        `SELECT id, decision_log_id, audit_version, ativo, timeframe, recommendation,
+                decision_at, data_as_of, evaluated_at, reference_price,
+                lookahead_candles, flat_threshold_pct, outcome_status,
+                outcome_direction, forward_return_percent, trade_profit_percent,
+                exit_reason, evaluation_candle_open_time, evaluation_candle_close_time,
+                evaluation_price, future_closed_candle_count, future_first_open_time,
+                future_last_close_time, market_data_hash, evidence_hash,
+                source, notes, audit, created_at
+         FROM outcome_settlement_audits
+         WHERE decision_log_id = $1`,
+        [decisionLogId],
+      );
+
+      const row = rows[0];
+      if (!row) return null;
+
+      const audit = row.audit as OutcomeSettlementAuditPayload;
+      return {
+        ...audit,
+        id: Number(row.id),
+        createdAt: new Date(row.created_at),
+      };
+    },
+
+    async listOutcomeSettlementAudits(
+      filters: OutcomeSettlementAuditFilters = {},
+    ): Promise<OutcomeSettlementAuditRecord[]> {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+      const add = (condition: string, value: unknown) => {
+        values.push(value);
+        conditions.push(condition.replace("?", String(values.length)));
+      };
+
+      if (filters.decisionLogId !== null && filters.decisionLogId !== undefined) {
+        add("decision_log_id = ?", filters.decisionLogId);
+      }
+      if (filters.ativo) add("ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("timeframe = ?", filters.timeframe);
+      if (filters.from) add("evaluated_at >= ?", filters.from);
+      if (filters.to) add("evaluated_at <= ?", filters.to);
+
+      const limit = filters.limit ?? 100;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error("settlement audit limit must be an integer between 1 and 100");
+      }
+
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const { rows } = await db.query<any>(
+        `SELECT id, decision_log_id, audit_version, ativo, timeframe, recommendation,
+                decision_at, data_as_of, evaluated_at, reference_price,
+                lookahead_candles, flat_threshold_pct, outcome_status,
+                outcome_direction, forward_return_percent, trade_profit_percent,
+                exit_reason, evaluation_candle_open_time, evaluation_candle_close_time,
+                evaluation_price, future_closed_candle_count, future_first_open_time,
+                future_last_close_time, market_data_hash, evidence_hash,
+                source, notes, audit, created_at
+         FROM outcome_settlement_audits
+         ${where}
+         ORDER BY evaluated_at DESC, id DESC
+         LIMIT ${limit}`,
+        values,
+      );
+
+      return rows.map((row) => ({
+        ...(row.audit as OutcomeSettlementAuditPayload),
+        id: Number(row.id),
+        createdAt: new Date(row.created_at),
+      }));
+    },
+
+    async getOutcomeSettlementAuditSummary(
+      filters: Pick<OutcomeSettlementAuditFilters, "ativo" | "timeframe" | "from" | "to"> = {},
+    ): Promise<OutcomeSettlementAuditSummary> {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+      const add = (condition: string, value: unknown) => {
+        values.push(value);
+        conditions.push(condition.replace("?", String(values.length)));
+      };
+
+      if (filters.ativo) add("dl.ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("dl.timeframe = ?", filters.timeframe);
+      if (filters.from) add("dl.decision_at >= ?", filters.from);
+      if (filters.to) add("dl.decision_at <= ?", filters.to);
+
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const { rows } = await db.query<{
+        finalized_decisions: string;
+        settled_decisions: string;
+        not_applicable_decisions: string;
+        pending_decisions: string;
+        audited_decisions: string;
+        latest_evaluated_at: Date | null;
+      }>(
+        `SELECT
+           COUNT(*) FILTER (WHERE dl.outcome_status IN ('settled','not_applicable'))::int AS finalized_decisions,
+           COUNT(*) FILTER (WHERE dl.outcome_status = 'settled')::int AS settled_decisions,
+           COUNT(*) FILTER (WHERE dl.outcome_status = 'not_applicable')::int AS not_applicable_decisions,
+           COUNT(*) FILTER (WHERE dl.outcome_status = 'pending')::int AS pending_decisions,
+           COUNT(osa.id)::int AS audited_decisions,
+           MAX(dl.evaluated_at) AS latest_evaluated_at
+         FROM decision_log dl
+         LEFT JOIN outcome_settlement_audits osa ON osa.decision_log_id = dl.id
+         ${where}`,
+        values,
+      );
+
+      const row = rows[0];
+      const finalizedDecisions = Number(row?.finalized_decisions ?? 0);
+      const auditedDecisions = Number(row?.audited_decisions ?? 0);
+
+      return {
+        version: "outcome-settlement-audit.v1",
+        filters: {
+          ativo: filters.ativo?.trim().toUpperCase() ?? null,
+          timeframe: filters.timeframe ?? null,
+          from: filters.from ?? null,
+          to: filters.to ?? null,
+        },
+        finalizedDecisions,
+        settledDecisions: Number(row?.settled_decisions ?? 0),
+        notApplicableDecisions: Number(row?.not_applicable_decisions ?? 0),
+        pendingDecisions: Number(row?.pending_decisions ?? 0),
+        auditedDecisions,
+        coveragePct:
+          finalizedDecisions > 0
+            ? Number(((auditedDecisions / finalizedDecisions) * 100).toFixed(2))
+            : null,
+        latestEvaluatedAt: row?.latest_evaluated_at ? new Date(row.latest_evaluated_at) : null,
+      };
+    },
+
     async createBenchmarkRun(input: BenchmarkRunInput): Promise<number> {
       const { rows } = await db.query<{ id: number }>(
         `INSERT INTO benchmark_runs
@@ -2756,6 +3094,21 @@ export const getDecisionLog = (id: number) => createRepository(getDefaultPool())
 export const getPendingDecisionLogs = (filters: PendingDecisionLogFilters = {}) =>
   createRepository(getDefaultPool()).getPendingDecisionLogs(filters);
 export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => createRepository(getDefaultPool()).settleDecisionLog(id, outcome);
+export const settleDecisionLogWithAudit = (
+  id: number,
+  outcome: DecisionLogOutcome,
+  audit: OutcomeSettlementAuditPayload,
+) => createRepository(getDefaultPool()).settleDecisionLogWithAudit(id, outcome, audit);
+export const saveOutcomeSettlementAudit = (audit: OutcomeSettlementAuditPayload) =>
+  createRepository(getDefaultPool()).saveOutcomeSettlementAudit(audit);
+export const getOutcomeSettlementAudit = (decisionLogId: number) =>
+  createRepository(getDefaultPool()).getOutcomeSettlementAudit(decisionLogId);
+export const listOutcomeSettlementAudits = (filters: OutcomeSettlementAuditFilters = {}) =>
+  createRepository(getDefaultPool()).listOutcomeSettlementAudits(filters);
+export const getOutcomeSettlementAuditSummary = (
+  filters: Pick<OutcomeSettlementAuditFilters, "ativo" | "timeframe" | "from" | "to"> = {},
+) => createRepository(getDefaultPool()).getOutcomeSettlementAuditSummary(filters);
+
 export const createBenchmarkRun = (input: BenchmarkRunInput) => createRepository(getDefaultPool()).createBenchmarkRun(input);
 export const saveBenchmarkResult = (input: BenchmarkResultInput) => createRepository(getDefaultPool()).saveBenchmarkResult(input);
 export const getBenchmarkResults = (benchmarkRunId: number) => createRepository(getDefaultPool()).getBenchmarkResults(benchmarkRunId);
