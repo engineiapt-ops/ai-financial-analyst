@@ -79,12 +79,13 @@ export function runWalkForwardPortfolioTests() {
       maxGrossExposurePct: 20,
     });
 
-    assert(result.executedTrades === trades.length, "todas as entradas podem ser aceitas até o limite");
+    assert(result.executedTrades === 9, "o limite de exposição deve aceitar apenas as posições que cabem no capital");
     assert(
       result.maxGrossExposure <= 200.000001,
       "exposição bruta não pode ultrapassar 20% do capital inicial",
     );
-    assert(result.closedTrades === trades.length, "todas as posições fechadas devem ser contabilizadas");
+    assert(result.closedTrades === 9, "todas as posições aceitas devem ser contabilizadas como fechadas");
+    assert(result.rejectedTrades === 11, "entradas além do limite de exposição devem ser rejeitadas");
     console.log("PASS");
   }
 

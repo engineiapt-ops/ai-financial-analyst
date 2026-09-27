@@ -281,6 +281,7 @@ export function simulateWalkForwardPortfolio(options: {
         quantity: notional / trade.outcome.entryPrice,
         entryFee,
       });
+      executedTrades += 1;
       grossExposure += notional;
     }
 
@@ -361,7 +362,6 @@ export function simulateWalkForwardPortfolio(options: {
     if (previous > 0) returns.push(equityCurve[index].equity / previous - 1);
   }
 
-  const executedTrades = trades.length;
   const closedTrades = realizedResults.length;
   const winningTrades = realizedResults.filter((pnl) => pnl > 0).length;
   const losingTrades = realizedResults.filter((pnl) => pnl < 0).length;
