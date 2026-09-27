@@ -137,6 +137,12 @@ export interface OosValidationGateAuditFilters {
   limit?: number;
 }
 
+export interface ResearchSnapshotFilters {
+  ativo?: string | null;
+  timeframe?: Timeframe | null;
+  limit?: number;
+}
+
 export interface SaveResearchSnapshotInput {
   snapshot: ResearchSnapshot;
   decisionLogId?: number | null;
@@ -1304,6 +1310,60 @@ export function createRepository(db: RepositoryPool) {
         createdAt: new Date(row.created_at),
         snapshot: row.snapshot,
       };
+    },
+
+    async listResearchSnapshots(
+      filters: ResearchSnapshotFilters = {},
+    ): Promise<ResearchSnapshotRecord[]> {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+      const add = (condition: string, value: unknown) => {
+        values.push(value);
+        conditions.push(condition.replace("?", String(values.length)));
+      };
+
+      if (filters.ativo) add("ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("timeframe = ?", filters.timeframe);
+
+      const limit = filters.limit ?? 20;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error("research snapshot list limit must be an integer between 1 and 100");
+      }
+
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const { rows } = await db.query<{
+        snapshot_id: string;
+        schema_version: string;
+        content_hash: string;
+        signal_id: number;
+        decision_log_id: number | null;
+        ativo: string;
+        timeframe: Timeframe;
+        data_as_of: Date;
+        created_at: Date;
+        snapshot: ResearchSnapshot;
+      }>(
+        `SELECT snapshot_id, schema_version, content_hash, signal_id,
+                decision_log_id, ativo, timeframe, data_as_of, created_at, snapshot
+         FROM research_snapshots
+         ${where}
+         ORDER BY data_as_of DESC, created_at DESC, snapshot_id DESC
+         LIMIT ${limit}`,
+        values,
+      );
+
+      return rows.map((row) => ({
+        snapshotId: row.snapshot_id,
+        schemaVersion: row.schema_version,
+        contentHash: row.content_hash,
+        signalId: Number(row.signal_id),
+        decisionLogId: row.decision_log_id === null ? null : Number(row.decision_log_id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        dataAsOf: new Date(row.data_as_of),
+        createdAt: new Date(row.created_at),
+        snapshot: row.snapshot,
+      }));
     },
 
     async saveTrade(input: SaveTradeInput): Promise<number> {
@@ -3129,6 +3189,9 @@ export const listPipelineAuditSnapshots = (filters: PipelineAuditSnapshotFilters
 
 export const saveResearchSnapshot = (input: SaveResearchSnapshotInput) =>
   createRepository(getDefaultPool()).saveResearchSnapshot(input);
+export const listResearchSnapshots = (filters: ResearchSnapshotFilters = {}) =>
+  createRepository(getDefaultPool()).listResearchSnapshots(filters);
+
 export const getResearchSnapshot = (snapshotId: string) =>
   createRepository(getDefaultPool()).getResearchSnapshot(snapshotId);
 
