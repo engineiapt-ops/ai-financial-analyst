@@ -84,7 +84,7 @@ const evaluation = {
     readyCount: 1,
     blockedCount: 0,
   },
-} as const;
+} as unknown as EvaluationOverview;
 
 const operationalQuality = {
   version: "operational-quality.v1",
@@ -123,7 +123,7 @@ const operationalQuality = {
     portfolioGovernance: "portfolio-governance-overview.v2",
   },
   notes: [],
-} as unknown as EvaluationOverview;
+} as unknown as OperationalQualityOverview;
 
 const pipeline = {
   version: "pipeline-audit.v1",
