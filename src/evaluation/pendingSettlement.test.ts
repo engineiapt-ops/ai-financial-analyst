@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import type { DecisionLogRecord, PendingDecisionLogFilters } from "../db/repository.js";
 import type { Kline } from "../types.js";
 import { settlePendingDecisionLogs, type PendingSettlementDependencies } from "./pendingSettlement.js";
+import type { OutcomeSettlementAuditPayload } from "./outcomeSettlementAudit.js";
 
 const candles: Kline[] = [
   {
@@ -62,8 +63,10 @@ const deps: PendingSettlementDependencies = {
     return [decision(1), decision(2, "WAIT")];
   },
   getCandles: async () => candles,
-  settle: async (id) => {
+  settle: async (id, _outcome, audit: OutcomeSettlementAuditPayload) => {
     settled.push(id);
+    assert.match(audit.evidenceHash, /^[0-9a-f]{64}$/);
+    assert.equal(audit.decisionLogId, id);
   },
   evaluate: (log, future, evaluatedAt, config) => {
     assert.equal(future.length, candles.length);
