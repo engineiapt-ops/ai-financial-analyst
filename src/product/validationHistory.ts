@@ -167,7 +167,7 @@ export function buildValidationHistoryOverview(input: {
     (item) =>
       item.ativo.toUpperCase() === input.asset.toUpperCase() &&
       item.timeframe === input.timeframe &&
-      (input.fromRun === undefined || item.fromRun === input.fromRun),
+      (input.fromRun === undefined ? item.fromRun === null : item.fromRun === input.fromRun),
   );
 
   const timeline = chronological.flatMap((item, index) =>
