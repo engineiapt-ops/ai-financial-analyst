@@ -28,6 +28,8 @@ export interface PendingSettlementResult {
     status: "settled" | "not_ready" | "failed";
     outcomeStatus?: "settled" | "not_applicable";
     evaluatedAt?: string;
+    evidenceHash?: string;
+    marketDataHash?: string;
     error?: string;
   }>;
 }
@@ -163,6 +165,8 @@ export async function settlePendingDecisionLogs(
         status: "settled",
         outcomeStatus: evaluation.outcome.outcomeStatus,
         evaluatedAt: evaluation.outcome.evaluatedAt?.toISOString(),
+        evidenceHash: audit.evidenceHash,
+        marketDataHash: audit.marketDataHash,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
