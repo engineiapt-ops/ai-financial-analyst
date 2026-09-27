@@ -429,6 +429,59 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
     </div>
   </div>
 
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title">
+        <span>Continuous Governance</span>
+        <span class="method method-get">GET /api/product/continuous-governance</span>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="continuousRun">Walk-forward Run</label>
+          <input type="number" id="continuousRun" min="1" placeholder="e.g. 41" />
+        </div>
+        <div class="form-group" style="display:flex;align-items:end;">
+          <button type="button" onclick="checkContinuousGovernance()" style="height:42px;">Check Governance</button>
+        </div>
+      </div>
+      <div id="continuousPanel" style="display:none;">
+        <div class="overview-grid">
+          <div class="overview-item"><span class="overview-label">State</span><span class="overview-value" id="cgState">-</span></div>
+          <div class="overview-item"><span class="overview-label">Regression</span><span class="overview-value" id="cgRegression">-</span></div>
+          <div class="overview-item"><span class="overview-label">Blocking events</span><span class="overview-value" id="cgBlocking">-</span></div>
+          <div class="overview-item"><span class="overview-label">History</span><span class="overview-value" id="cgHistory">-</span></div>
+          <div class="overview-item"><span class="overview-label">Baseline</span><span class="overview-value" id="cgBaseline">-</span></div>
+          <div class="overview-item"><span class="overview-label">Dataset consistency</span><span class="overview-value" id="cgDataset">-</span></div>
+          <div class="overview-item"><span class="overview-label">Evidence</span><span class="overview-value" id="cgEvidence" style="font-size:0.72rem;word-break:break-all;">-</span></div>
+          <div class="overview-item"><span class="overview-label">Snapshot persisted</span><span class="overview-value" id="cgPersisted">-</span></div>
+        </div>
+        <pre id="cgJson"></pre>
+      </div>
+    </div>
+
+    async function checkContinuousGovernance() {
+      try {
+        const run = document.getElementById('continuousRun').value.trim();
+        if (!run) throw new Error('Informe um walk-forward run.');
+
+        const response = await fetch('/api/product/continuous-governance?fromRun=' + encodeURIComponent(run));
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Governance request failed');
+
+        document.getElementById('continuousPanel').style.display = 'block';
+        document.getElementById('cgState').textContent = data.state || '-';
+        document.getElementById('cgRegression').textContent = data.regression?.detected ? 'DETECTED' : 'None';
+        document.getElementById('cgBlocking').textContent = String(data.regression?.blockingEventCount ?? 0);
+        document.getElementById('cgHistory').textContent = String(data.history?.count ?? 0);
+        document.getElementById('cgBaseline').textContent = data.baseline?.snapshotId ?? 'None';
+        document.getElementById('cgDataset').textContent = data.checks?.datasetConsistency || 'unknown';
+        document.getElementById('cgEvidence').textContent = data.current?.evidenceHash || 'Not available';
+        document.getElementById('cgPersisted').textContent = data.checks?.snapshotPersisted ? 'Yes' : 'No (GET)';
+        document.getElementById('cgJson').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        alert('Continuous Governance Error: ' + err.message);
+      }
+    }
+
   <script>
     async function refreshGovernanceDashboard() {
       try {
