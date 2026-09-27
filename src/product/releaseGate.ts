@@ -11,12 +11,14 @@ import { RESEARCH_INTELLIGENCE_VERSION } from "../research/researchIntelligence.
 import { SYSTEM_READINESS_VERSION } from "./systemReadiness.js";
 import { SYSTEM_VALIDATION_VERSION } from "./systemValidation.js";
 import { OUTCOME_SETTLEMENT_AUDIT_VERSION } from "../evaluation/outcomeSettlementAudit.js";
+import { VALIDATION_HISTORY_VERSION } from "./validationHistory.js";
 
 export const RELEASE_GATE_VERSION = "release-gate.v1";
 
 export const RELEASE_GATE_REQUIRED_CONTRACTS = [
   SYSTEM_VALIDATION_VERSION,
   OUTCOME_SETTLEMENT_AUDIT_VERSION,
+  VALIDATION_HISTORY_VERSION,
   SYSTEM_READINESS_VERSION,
   MARKET_DATA_QUALITY_VERSION,
   OPERATIONAL_QUALITY_VERSION,
@@ -65,12 +67,13 @@ export function buildReleaseGateReport(input: {
   const testScript = input.packageScripts.test ?? "";
   const testScriptPassed =
     testScript.includes("npm run test:system-validation") &&
-    testScript.includes("npm run test:outcome-settlement-audit");
+    testScript.includes("npm run test:outcome-settlement-audit") &&
+    testScript.includes("npm run test:validation-history");
   checks.push({
     key: "test-script",
     passed: testScriptPassed,
     detail: testScriptPassed
-      ? "The release pipeline includes system-validation and settlement-audit tests."
+      ? "The release pipeline includes system-validation, settlement-audit and validation-history tests."
       : "The aggregate test suite is missing one or more release-critical contract suites.",
   });
 
