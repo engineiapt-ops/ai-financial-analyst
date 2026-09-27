@@ -33,6 +33,8 @@ import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForw
 import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDiagnostics.js";
 import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernanceOverview.js";
 import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
+import { evaluateMarketDataQuality } from "../marketdata/quality.js";
+import { buildOperationalQualityOverview } from "../product/operationalQuality.js";
 import { listAiProviders } from "../ai/providers.js";
 import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
@@ -523,6 +525,124 @@ app.get("/", (req, res) => {
   });
 });
 
+app.get("/api/evaluation/operational-quality", async (req, res) => {
+  try {
+    const query = z.object({
+      ativo: z.string().min(1).default("BTCUSDT"),
+      timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(30),
+      limit: z.coerce.number().int().min(1).max(50).default(10),
+      fromRun: z.coerce.number().int().positive().optional(),
+    }).parse(req.query);
+
+    const now = new Date();
+    const from = new Date(now.getTime() - query.lookbackDays * 24 * 60 * 60 * 1000);
+    const to = now;
+
+    const [marketDataCheck, databaseCheck, marketKlines, kpis, observations, audits] =
+      await Promise.all([
+        pingBinance()
+          .then((ok) => ({ available: ok, detail: ok ? "Binance ping OK" : "Binance ping failed" }))
+          .catch((error: unknown) => ({
+            available: false,
+            detail: error instanceof Error ? error.message : String(error),
+          })),
+        healthDatabase()
+          .then(() => ({ available: true, detail: "Database query OK" }))
+          .catch((error: unknown) => ({
+            available: false,
+            detail: error instanceof Error ? error.message : String(error),
+          })),
+        fetchKlines(query.ativo, query.timeframe as Timeframe, 2),
+        getDecisionKpis({
+          ativo: query.ativo,
+          timeframe: query.timeframe,
+          from,
+          to,
+        }),
+        getDecisionCalibrationObservations({
+          ativo: query.ativo,
+          timeframe: query.timeframe,
+          from,
+          to,
+        }),
+        listOosValidationGateAudits({
+          ativo: query.ativo,
+          timeframe: query.timeframe,
+          strategy: undefined,
+          limit: query.limit,
+        }),
+      ]);
+
+    const readiness = buildSystemReadinessOverview({
+      generatedAt: now,
+      marketData: marketDataCheck,
+      database: databaseCheck,
+      aiProviders: listAiProviders(),
+      paperTradingOnly: true,
+      apiAuthenticationConfigured: Boolean(process.env.API_AUTH_TOKEN?.trim()),
+      runtimeConfig: inspectRuntimeConfig(),
+      governanceContracts: [
+        "evaluation-overview.v1",
+        "portfolio-governance-overview.v2",
+        "portfolio-stability.v1",
+      ],
+    });
+
+    const marketData = evaluateMarketDataQuality({
+      timeframe: query.timeframe,
+      candles: marketKlines,
+      checkedAt: now,
+    });
+
+    const evaluation = buildEvaluationOverview({
+      generatedAt: now,
+      from,
+      to,
+      ativo: query.ativo,
+      timeframe: query.timeframe,
+      kpis,
+      calibration: buildCalibrationReport(observations, {
+        ativo: query.ativo,
+        timeframe: query.timeframe,
+        from,
+        to,
+      }),
+      audits,
+    });
+
+    let portfolio;
+    if (query.fromRun !== undefined) {
+      const [portfolioReport, regimeDiagnostics] = await Promise.all([
+        buildPortfolioWalkForwardReport(query.fromRun),
+        buildPortfolioRegimeDiagnostics(query.fromRun),
+      ]);
+      portfolio = buildPortfolioGovernanceOverview({
+        generatedAt: now,
+        portfolioReport,
+        regimeDiagnostics,
+      });
+    }
+
+    const quality = buildOperationalQualityOverview({
+      generatedAt: now,
+      asset: query.ativo,
+      timeframe: query.timeframe,
+      portfolioRunId: query.fromRun,
+      readiness,
+      marketData,
+      evaluation,
+      portfolio,
+    });
+
+    res.json({ status: "ok", ...quality });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
 app.get("/api/system/readiness", async (_req, res) => {
   const [marketDataCheck, databaseCheck] = await Promise.all([
     pingBinance()
@@ -549,7 +669,8 @@ app.get("/api/system/readiness", async (_req, res) => {
     runtimeConfig: inspectRuntimeConfig(),
     governanceContracts: [
       "evaluation-overview.v1",
-      "portfolio-governance-overview.v1",
+      "portfolio-governance-overview.v2",
+      "portfolio-stability.v1",
     ],
   });
 
