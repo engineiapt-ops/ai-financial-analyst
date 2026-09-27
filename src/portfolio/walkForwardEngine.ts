@@ -230,8 +230,7 @@ export function simulateWalkForwardPortfolio(options: {
       if (!position) continue;
 
       const result = closeAtStoredExecution(position);
-      cash += position.notional + result.grossPnl
-        - Math.max(0, result.totalFees - position.entryFee);
+      cash += position.notional + result.netPnl + position.entryFee;
       realizedPnl += result.netPnl;
       realizedResults.push(result.netPnl);
       totalFees += result.totalFees;
