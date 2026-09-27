@@ -152,3 +152,12 @@ The product layer exposes deterministic continuous-governance checks around pers
 - POST /api/product/continuous-governance/check persists an immutable snapshot idempotently and compares it with the previous evidence scope.
 
 The continuous-governance.v1 contract provides temporal state history, evidence history, dataset-scope consistency, OOS traceability and contract-drift detection. Structural regressions are surfaced as governance events; they do not rank strategies, modify thresholds, modify sizing or authorize execution.
+
+
+## Research Intelligence
+
+The research layer exposes research-intelligence.v1 over immutable research snapshots. It provides structured evidence aggregation, source diversity, traceability state, point-in-time validation, deterministic evidence IDs, snapshot/decision linkage and provenance from external-source -> evidence -> research-snapshot -> decision-log.
+
+The report flow now returns intelligence together with the deterministic analysis, research result and persisted snapshot. Existing snapshot retrieval also returns the same intelligence contract, and GET /api/research/intelligence/:snapshotId exposes it directly.
+
+This layer is descriptive and governance-oriented. It does not rank sources, select a strategy, alter thresholds or sizing, or authorize execution.
