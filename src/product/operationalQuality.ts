@@ -79,8 +79,12 @@ export function buildOperationalQualityOverview(input: {
   const marketState: OperationalQualityState =
     input.marketData.status === "fresh" ? "ready" : "blocked";
 
+  const latestBlockedAudit = input.evaluation.governance.latestByStrategy.some(
+    (audit) => audit.status === "blocked",
+  );
+
   const quantitativeState: OperationalQualityState =
-    input.evaluation.governance.blockedCount > 0
+    latestBlockedAudit
       ? "blocked"
       : !input.evaluation.calibration.sufficientSample ||
           input.evaluation.governance.auditCount === 0
