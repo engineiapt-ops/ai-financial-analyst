@@ -3,9 +3,10 @@ import {
   getWalkForwardPortfolioRuns,
   getWalkForwardRun,
 } from "../db/repository.js";
+import { buildPortfolioStabilitySummary } from "./portfolioStability.js";
 
 export const PORTFOLIO_WALK_FORWARD_REPORT_VERSION =
-  "portfolio-walk-forward-report.v1";
+  "portfolio-walk-forward-report.v2";
 
 type StrategyRun = {
   id: number;
@@ -180,6 +181,7 @@ export async function buildPortfolioWalkForwardReport(
       maxGrossExposure: num(run.max_gross_exposure),
       riskGateBlocks: run.risk_gate_blocks,
       checks,
+      stability: buildPortfolioStabilitySummary(run.folds),
     };
   });
 
