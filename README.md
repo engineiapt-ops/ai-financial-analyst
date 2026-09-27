@@ -152,3 +152,12 @@ The product layer exposes deterministic continuous-governance checks around pers
 - POST /api/product/continuous-governance/check persists an immutable snapshot idempotently and compares it with the previous evidence scope.
 
 The continuous-governance.v1 contract provides temporal state history, evidence history, dataset-scope consistency, OOS traceability and contract-drift detection. Structural regressions are surfaced as governance events; they do not rank strategies, modify thresholds, modify sizing or authorize execution.
+
+
+## Research Intelligence
+
+The research layer now exposes `GET /api/product/research-intelligence?snapshotId=rs_...`.
+
+The `research-intelligence.v1` contract enriches an existing persisted `research-snapshot.v1` with structured evidence traceability, source status, point-in-time validation, aggregate sentiment context, provenance-chain checks and a deterministic quality state. The intelligence endpoint reads the persisted snapshot; it does not trigger a new market decision or store mutable third-party content.
+
+The endpoint is protected by API authentication and the heavy API rate limit. External research remains context-only: the deterministic quantitative Decision Engine remains authoritative, while research and Gemini context are advisory.
