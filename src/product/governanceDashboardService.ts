@@ -84,6 +84,7 @@ export async function buildGovernanceDashboardForScope(input: {
       "continuous-governance.v1",
       "outcome-settlement-audit.v1",
       "system-validation.v1",
+      "validation-history.v1",
     ],
   });
 
