@@ -35,6 +35,7 @@ export interface PipelineAuditLatestOosAudit {
   status: OosValidationGateAuditRecord["status"];
   walkForwardRunId: number | null;
   evidenceHash: string;
+  gateVersion: string;
   createdAt: string;
 }
 
@@ -139,6 +140,7 @@ function latestOosAudits(
       status: audit.status,
       walkForwardRunId: audit.walkForwardRunId,
       evidenceHash: audit.evidenceHash,
+      gateVersion: audit.gateVersion,
       createdAt: audit.createdAt.toISOString(),
     });
   }
@@ -398,6 +400,7 @@ export function buildPipelineAuditOverview(input: {
       status: audit.status,
       walkForwardRunId: audit.walkForwardRunId,
       evidenceHash: audit.evidenceHash,
+      gateVersion: audit.gateVersion,
     })),
     portfolio: input.portfolio
       ? {
