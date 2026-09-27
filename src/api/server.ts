@@ -17,7 +17,7 @@ import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLogWithAudit, getOutcomeSettlementAudit, getOutcomeSettlementAuditSummary, saveSystemValidationSnapshot, listSystemValidationSnapshots, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits, healthDatabase, savePipelineAuditSnapshot, listPipelineAuditSnapshots } from "../db/repository.js";
+import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLogWithAudit, getOutcomeSettlementAudit, getOutcomeSettlementAuditSummary, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits, healthDatabase, savePipelineAuditSnapshot, listPipelineAuditSnapshots } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -1280,6 +1280,7 @@ app.get("/api/system/readiness", async (_req, res) => {
       "continuous-governance.v1",
       "outcome-settlement-audit.v1",
       "system-validation.v1",
+      "validation-history.v1",
       "research-intelligence.v1",
       "portfolio-governance-overview.v2",
       "portfolio-stability.v1",
