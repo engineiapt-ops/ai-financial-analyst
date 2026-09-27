@@ -47,6 +47,7 @@ export interface PortfolioGovernanceOverview {
         finiteCapital: boolean;
         signalsConsistent: boolean;
       };
+      stability: PortfolioStabilitySummary;
     }>;
   };
   regimes: {
