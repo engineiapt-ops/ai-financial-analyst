@@ -1,5 +1,7 @@
+import type { PortfolioStabilitySummary } from "../evaluation/portfolioStability.js";
+
 export const PORTFOLIO_GOVERNANCE_OVERVIEW_VERSION =
-  "portfolio-governance-overview.v1";
+  "portfolio-governance-overview.v2";
 
 export interface PortfolioGovernanceOverview {
   version: typeof PORTFOLIO_GOVERNANCE_OVERVIEW_VERSION;
@@ -117,6 +119,7 @@ export function buildPortfolioGovernanceOverview(input: {
       "This contract is diagnostic/governance-only.",
       "It does not select a preferred strategy.",
       "It does not alter trading rules, thresholds, sizing or order execution.",
+      "Fold-level stability fields describe dispersion and consistency; they are not a ranking.",
       ...input.portfolioReport.notes.filter((note) => !note.includes("does not select a preferred strategy.")),
       ...(input.regimeDiagnostics.notes ?? []),
     ],
