@@ -127,3 +127,18 @@ The module also exposes `comparePipelineAudits(previous, current)` for structura
 O contrato `pipeline-audit.v1` pode ser persistido de forma imutável por `POST /api/evaluation/pipeline-audit/snapshots` com `fromRun`. Cada snapshot usa o `evidenceHash` como identidade idempotente e mantém o JSON completo da auditoria para reconstrução posterior.
 
 `GET /api/evaluation/pipeline-audit/history?fromRun=<id>` retorna os snapshots históricos do walk-forward e calcula regressões estruturais entre estados consecutivos. Isso permite detectar degradação operacional, regressão OOS, perda de integridade do portfolio e redução de cobertura de estabilidade sem introduzir qualquer alteração de estratégia ou execução real.
+
+
+## Governance Dashboard
+
+The product layer exposes `GET /api/product/governance-dashboard` as the read-only governance cockpit. It consolidates system readiness, live market-data quality, evaluation/calibration, operational quality and, when `fromRun=<walk-forward-run-id>` is supplied, the current pipeline audit, historical audit snapshots, evidence hashes and dataset/OOS/portfolio/product traceability.
+
+Example:
+
+```text
+GET /api/product/governance-dashboard?asset=BTCUSDT&timeframe=1h&fromRun=41
+```
+
+The `governance-dashboard.v1` contract explicitly preserves the product guardrails: paper trading only, deterministic Decision Engine authority, external AI/Gemini advisory-only, and dashboard read-only behavior. It does not rank strategies, select a preferred strategy, change thresholds, change sizing or authorize execution.
+
+Pipeline audit construction now reuses the persisted `buildPipelineAuditForRun` service, avoiding duplicated scope-building logic between the read-only audit endpoint and the historical snapshot flow.
