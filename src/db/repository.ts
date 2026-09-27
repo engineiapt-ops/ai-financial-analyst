@@ -7,6 +7,7 @@ import type { OosValidationReport } from "../evaluation/oosValidationReport.js";
 import type { OosRobustnessReport } from "../evaluation/oosRobustness.js";
 import type { PipelineAuditOverview } from "../product/pipelineAudit.js";
 import type { OutcomeSettlementAuditPayload } from "../evaluation/outcomeSettlementAudit.js";
+import type { SystemValidationOverview, SystemValidationState } from "../product/systemValidation.js";
 
 export interface RepositoryPool {
   query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
@@ -170,6 +171,35 @@ export interface PipelineAuditSnapshotFilters {
   walkForwardRunId?: number | null;
   ativo?: string | null;
   timeframe?: Timeframe | null;
+  limit?: number;
+}
+
+export interface SystemValidationSnapshotRecord {
+  id: number;
+  ativo: string;
+  timeframe: Timeframe;
+  fromRun: number | null;
+  lookbackDays: number;
+  validationVersion: string;
+  state: SystemValidationState;
+  readyCount: number;
+  degradedCount: number;
+  blockedCount: number;
+  blockingFailures: number;
+  evidenceHash: string;
+  generatedAt: Date;
+  createdAt: Date;
+  snapshot: SystemValidationOverview;
+}
+
+export interface SaveSystemValidationSnapshotInput {
+  snapshot: SystemValidationOverview;
+}
+
+export interface SystemValidationSnapshotFilters {
+  ativo?: string | null;
+  timeframe?: Timeframe | null;
+  fromRun?: number | null;
   limit?: number;
 }
 
@@ -1176,6 +1206,181 @@ export function createRepository(db: RepositoryPool) {
         state: row.state,
         operationalQualityState: row.operational_quality_state,
         evidenceHash: row.evidence_hash,
+        createdAt: new Date(row.created_at),
+        snapshot: row.snapshot,
+      }));
+    },
+
+    async saveSystemValidationSnapshot(
+      input: SaveSystemValidationSnapshotInput,
+    ): Promise<SystemValidationSnapshotRecord> {
+      const snapshot = input.snapshot;
+      if (!/^[0-9a-f]{64}$/.test(snapshot.evidenceHash)) {
+        throw new Error("system validation evidenceHash must be a 64-character lowercase SHA-256 hex string");
+      }
+      if (snapshot.version !== "system-validation.v1") {
+        throw new Error("unsupported system validation contract version");
+      }
+
+      const { rows } = await db.query<{
+        id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        from_run: number | null;
+        lookback_days: number;
+        validation_version: string;
+        state: SystemValidationState;
+        ready_count: number;
+        degraded_count: number;
+        blocked_count: number;
+        blocking_failures: number;
+        evidence_hash: string;
+        generated_at: Date;
+        created_at: Date;
+        snapshot: SystemValidationOverview;
+      }>(
+        `INSERT INTO system_validation_snapshots
+          (ativo, timeframe, from_run, lookback_days, validation_version, state,
+           ready_count, degraded_count, blocked_count, blocking_failures,
+           evidence_hash, generated_at, snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)
+         ON CONFLICT (evidence_hash) DO NOTHING
+         RETURNING id, ativo, timeframe, from_run, lookback_days, validation_version,
+                   state, ready_count, degraded_count, blocked_count, blocking_failures,
+                   evidence_hash, generated_at, created_at, snapshot`,
+        [
+          snapshot.scope.asset,
+          snapshot.scope.timeframe,
+          snapshot.scope.fromRun,
+          snapshot.scope.lookbackDays,
+          snapshot.version,
+          snapshot.state,
+          snapshot.summary.readyCount,
+          snapshot.summary.degradedCount,
+          snapshot.summary.blockedCount,
+          snapshot.summary.blockingFailures,
+          snapshot.evidenceHash,
+          new Date(snapshot.generatedAt),
+          JSON.stringify(snapshot),
+        ],
+      );
+
+      const row = rows[0];
+      if (row) {
+        return {
+          id: Number(row.id),
+          ativo: row.ativo,
+          timeframe: row.timeframe,
+          fromRun: row.from_run === null ? null : Number(row.from_run),
+          lookbackDays: Number(row.lookback_days),
+          validationVersion: row.validation_version,
+          state: row.state,
+          readyCount: Number(row.ready_count),
+          degradedCount: Number(row.degraded_count),
+          blockedCount: Number(row.blocked_count),
+          blockingFailures: Number(row.blocking_failures),
+          evidenceHash: row.evidence_hash,
+          generatedAt: new Date(row.generated_at),
+          createdAt: new Date(row.created_at),
+          snapshot: row.snapshot,
+        };
+      }
+
+      const existing = await db.query<typeof rows[number]>(
+        `SELECT id, ativo, timeframe, from_run, lookback_days, validation_version,
+                state, ready_count, degraded_count, blocked_count, blocking_failures,
+                evidence_hash, generated_at, created_at, snapshot
+         FROM system_validation_snapshots
+         WHERE evidence_hash = $1`,
+        [snapshot.evidenceHash],
+      );
+      const existingRow = existing.rows[0];
+      if (!existingRow) {
+        throw new Error("System validation snapshot could not be persisted");
+      }
+
+      return {
+        id: Number(existingRow.id),
+        ativo: existingRow.ativo,
+        timeframe: existingRow.timeframe,
+        fromRun: existingRow.from_run === null ? null : Number(existingRow.from_run),
+        lookbackDays: Number(existingRow.lookback_days),
+        validationVersion: existingRow.validation_version,
+        state: existingRow.state,
+        readyCount: Number(existingRow.ready_count),
+        degradedCount: Number(existingRow.degraded_count),
+        blockedCount: Number(existingRow.blocked_count),
+        blockingFailures: Number(existingRow.blocking_failures),
+        evidenceHash: existingRow.evidence_hash,
+        generatedAt: new Date(existingRow.generated_at),
+        createdAt: new Date(existingRow.created_at),
+        snapshot: existingRow.snapshot,
+      };
+    },
+
+    async listSystemValidationSnapshots(
+      filters: SystemValidationSnapshotFilters = {},
+    ): Promise<SystemValidationSnapshotRecord[]> {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+      const add = (condition: string, value: unknown) => {
+        values.push(value);
+        conditions.push(condition.replace("?", String(values.length)));
+      };
+
+      if (filters.ativo) add("ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("timeframe = ?", filters.timeframe);
+      if (filters.fromRun !== null && filters.fromRun !== undefined) {
+        add("from_run = ?", filters.fromRun);
+      }
+
+      const limit = filters.limit ?? 20;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error("system validation snapshot history limit must be an integer between 1 and 100");
+      }
+
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const { rows } = await db.query<{
+        id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        from_run: number | null;
+        lookback_days: number;
+        validation_version: string;
+        state: SystemValidationState;
+        ready_count: number;
+        degraded_count: number;
+        blocked_count: number;
+        blocking_failures: number;
+        evidence_hash: string;
+        generated_at: Date;
+        created_at: Date;
+        snapshot: SystemValidationOverview;
+      }>(
+        `SELECT id, ativo, timeframe, from_run, lookback_days, validation_version,
+                state, ready_count, degraded_count, blocked_count, blocking_failures,
+                evidence_hash, generated_at, created_at, snapshot
+         FROM system_validation_snapshots
+         ${where}
+         ORDER BY created_at DESC, id DESC
+         LIMIT ${limit}`,
+        values,
+      );
+
+      return rows.map((row) => ({
+        id: Number(row.id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        fromRun: row.from_run === null ? null : Number(row.from_run),
+        lookbackDays: Number(row.lookback_days),
+        validationVersion: row.validation_version,
+        state: row.state,
+        readyCount: Number(row.ready_count),
+        degradedCount: Number(row.degraded_count),
+        blockedCount: Number(row.blocked_count),
+        blockingFailures: Number(row.blocking_failures),
+        evidenceHash: row.evidence_hash,
+        generatedAt: new Date(row.generated_at),
         createdAt: new Date(row.created_at),
         snapshot: row.snapshot,
       }));
