@@ -42,6 +42,7 @@ import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
 import { buildGovernanceDashboardForScope } from "../product/governanceDashboardService.js";
 import { buildContinuousGovernanceForRun } from "../product/continuousGovernanceService.js";
+import { buildResearchIntelligenceForSnapshot } from "../research/researchIntelligenceService.js";
 
 
 
@@ -832,6 +833,7 @@ app.get("/api/evaluation/operational-quality", async (req, res) => {
         "pipeline-audit-history.v1",
         "governance-dashboard.v1",
         "continuous-governance.v1",
+        "research-intelligence.v1",
         "portfolio-governance-overview.v2",
         "portfolio-stability.v1",
       ],
@@ -987,6 +989,7 @@ app.get("/api/system/readiness", async (_req, res) => {
       "pipeline-audit-history.v1",
       "governance-dashboard.v1",
       "continuous-governance.v1",
+      "research-intelligence.v1",
       "portfolio-governance-overview.v2",
       "portfolio-stability.v1",
     ],
@@ -1065,10 +1068,15 @@ app.post("/api/report", async (req, res) => {
     const research = await generateAnalystReport(analysis);
     const snapshot = buildResearchSnapshot(analysis, research);
     const stored = await saveResearchSnapshot({ snapshot, decisionLogId: analysis.decisionLogId });
+    const intelligence = await buildResearchIntelligenceForSnapshot(
+      stored.snapshotId,
+      stored.createdAt,
+    );
     res.json({
       status: "ok",
       analysis,
       research,
+      intelligence,
       snapshot: stored.snapshot,
       persistence: {
         snapshotId: stored.snapshotId,
@@ -1097,9 +1105,15 @@ app.get("/api/research/snapshots/:snapshotId", async (req, res) => {
       return res.status(404).json({ status: "error", error: "research snapshot not found" });
     }
 
+    const intelligence = await buildResearchIntelligenceForSnapshot(
+      snapshotId,
+      stored.createdAt,
+    );
+
     res.json({
       status: "ok",
       snapshot: stored.snapshot,
+      intelligence,
       persistence: {
         snapshotId: stored.snapshotId,
         contentHash: stored.contentHash,
@@ -1177,6 +1191,22 @@ app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
     const status = message.includes("DATABASE_URL") ? 503
       : message.includes("Insufficient future closed candles") ? 422
       : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/research/intelligence/:snapshotId", async (req, res) => {
+  try {
+    const snapshotId = String(req.params.snapshotId ?? "").trim();
+    if (!/^rs_[a-f0-9]{24}$/.test(snapshotId)) {
+      return res.status(400).json({ status: "error", error: "invalid snapshotId" });
+    }
+
+    const intelligence = await buildResearchIntelligenceForSnapshot(snapshotId);
+    res.json({ status: "ok", ...intelligence });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
   }
 });
