@@ -1313,6 +1313,11 @@ app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
         tradeProfitPercent: evaluation.tradeProfitPercent,
         outcomeStatus: evaluation.outcome.outcomeStatus,
         evaluatedAt,
+        audit: {
+          version: audit.version,
+          evidenceHash: audit.evidenceHash,
+          marketDataHash: audit.marketDataHash,
+        },
       },
     });
   } catch (err: any) {
