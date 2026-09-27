@@ -156,7 +156,7 @@ export function buildSystemValidationOverview(input: {
   });
 
   const hasRun = input.fromRun !== undefined;
-  const pipeline = input.dashboard.pipelineAudit;
+  const pipeline = input.dashboard.pipeline.current;
   const oosBlocked =
     hasRun && pipeline ? pipeline.state === "blocked" : false;
   const oosAvailable =
@@ -186,7 +186,7 @@ export function buildSystemValidationOverview(input: {
     },
   });
 
-  const portfolio = input.dashboard.portfolio;
+  const portfolio = input.dashboard.portfolio.overview;
   const portfolioReady = Boolean(
     portfolio &&
     portfolio.portfolio.allChecksPassed &&
