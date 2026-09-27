@@ -836,6 +836,25 @@ app.get("/api/evaluation/operational-quality", async (req, res) => {
   }
 });
 
+app.get("/api/product/governance-dashboard", async (req, res) => {
+  try {
+    const query = z.object({
+      asset: z.string().min(1).max(32).default("BTCUSDT"),
+      timeframe: z.enum(["1h", "4h", "1d"]).default("1h"),
+      lookbackDays: z.coerce.number().int().min(1).max(3650).default(30),
+      limit: z.coerce.number().int().min(1).max(50).default(20),
+      fromRun: z.coerce.number().int().positive().optional(),
+    }).parse(req.query);
+
+    const dashboard = await buildGovernanceDashboardForScope(query);
+    res.json({ status: "ok", ...dashboard });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
 app.get("/api/system/readiness", async (_req, res) => {
   const [marketDataCheck, databaseCheck] = await Promise.all([
     pingBinance()
