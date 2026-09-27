@@ -6,6 +6,7 @@ import {
   type PendingDecisionLogFilters,
 } from "../db/repository.js";
 import { evaluateDecisionLog, type DecisionEvaluationConfig } from "./decisionEvaluator.js";
+import { buildOutcomeSettlementAudit, type OutcomeSettlementAuditPayload } from "./outcomeSettlementAudit.js";
 import type { Kline, Timeframe } from "../types.js";
 
 export interface PendingSettlementOptions {
@@ -44,6 +45,7 @@ export interface PendingSettlementDependencies {
   settle: (
     id: number,
     outcome: ReturnType<typeof evaluateDecisionLog>["outcome"],
+    audit: OutcomeSettlementAuditPayload,
   ) => Promise<void>;
   evaluate: typeof evaluateDecisionLog;
   now: () => Date;
@@ -52,7 +54,10 @@ export interface PendingSettlementDependencies {
 const defaultDependencies: PendingSettlementDependencies = {
   listPending: getPendingDecisionLogs,
   getCandles: getMarketDataRange,
-  settle: settleDecisionLog,
+  settle: async (id, outcome, audit) => {
+    const { settleDecisionLogWithAudit } = await import("../db/repository.js");
+    await settleDecisionLogWithAudit(id, outcome, audit);
+  },
   evaluate: evaluateDecisionLog,
   now: () => new Date(),
 };
@@ -146,7 +151,15 @@ export async function settlePendingDecisionLogs(
         config,
       );
 
-      await dependencies.settle(decision.id, evaluation.outcome);
+      const audit = buildOutcomeSettlementAudit({
+        decision,
+        candles: candlesByGroup.get(groupKey(decision)) ?? [],
+        evaluation,
+        evaluatedAt,
+        config,
+      });
+
+      await dependencies.settle(decision.id, evaluation.outcome, audit);
       settled += 1;
       results.push({
         decisionLogId: decision.id,
