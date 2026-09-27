@@ -22,10 +22,10 @@ export function buildResearchIntelligenceOverview(input:{snapshot:ResearchSnapsh
   const dataAsOf=new Date(input.snapshot.analysis.dataAsOf), researchAsOf=new Date(input.snapshot.research.asOf);
   if(Number.isNaN(dataAsOf.getTime())||Number.isNaN(researchAsOf.getTime())) throw new Error("Research snapshot requires valid timestamps");
   const aligned=dataAsOf.toISOString()===researchAsOf.toISOString();
-  const items=input.snapshot.research.evidence.map(e=>{
+  const items: ResearchIntelligenceOverview["evidence"]["items"] = input.snapshot.research.evidence.map(e=>{
     const d=new Date(e.publishedAt), valid=!Number.isNaN(d.getTime()), pit=valid&&d.getTime()<=researchAsOf.getTime();
     const complete=Boolean(e.source?.trim()&&e.title?.trim()&&e.url?.trim()&&pit), partial=Boolean(e.source?.trim()&&e.title?.trim()&&valid);
-    return {evidenceId:evidenceId({source:e.source,title:e.title,publishedAt:e.publishedAt,url:e.url??null}),source:e.source,title:e.title,publishedAt:e.publishedAt,url:e.url??null,stance:e.stance,sentimentScore:e.sentimentScore,traceability:complete?"complete":partial?"partial":"invalid",pointInTimeValid:pit};
+    return {evidenceId:evidenceId({source:e.source,title:e.title,publishedAt:e.publishedAt,url:e.url??null}),source:e.source,title:e.title,publishedAt:e.publishedAt,url:e.url??null,stance:e.stance,sentimentScore:e.sentimentScore,traceability:(complete?"complete":partial?"partial":"invalid") as "complete"|"partial"|"invalid",pointInTimeValid:pit};
   });
   const positiveCount=items.filter(x=>x.stance==="positive").length, neutralCount=items.filter(x=>x.stance==="neutral").length, negativeCount=items.filter(x=>x.stance==="negative").length;
   const sourceNames=[...new Set(items.map(x=>x.source))].sort(), traceableCount=items.filter(x=>x.traceability==="complete").length, partialCount=items.filter(x=>x.traceability==="partial").length, invalidCount=items.filter(x=>x.traceability==="invalid").length, pointInTimeValidCount=items.filter(x=>x.pointInTimeValid).length;
