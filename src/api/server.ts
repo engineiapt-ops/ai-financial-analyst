@@ -427,8 +427,9 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         <pre id="govJson"></pre>
       </div>
     </div>
+  </div>
 
-  
+  <script>
     async function refreshGovernanceDashboard() {
       try {
         const params = new URLSearchParams({
@@ -881,6 +882,10 @@ app.get("/api/system/readiness", async (_req, res) => {
     runtimeConfig: inspectRuntimeConfig(),
     governanceContracts: [
       "evaluation-overview.v1",
+      "operational-quality.v1",
+      "pipeline-audit.v1",
+      "pipeline-audit-history.v1",
+      "governance-dashboard.v1",
       "portfolio-governance-overview.v2",
       "portfolio-stability.v1",
     ],
