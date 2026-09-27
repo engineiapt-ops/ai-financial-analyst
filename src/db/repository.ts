@@ -909,12 +909,12 @@ export function createRepository(db: RepositoryPool) {
       input: SavePipelineAuditSnapshotInput,
     ): Promise<PipelineAuditSnapshotRecord> {
       const snapshot = input.snapshot;
-      const walkForwardRunId = snapshot.scope.walkForwardRunId;
+      const resolvedWalkForwardRunId = snapshot.scope.walkForwardRunId;
       const ativo = snapshot.scope.asset;
       const timeframe = snapshot.scope.timeframe;
       const datasetHash = snapshot.scope.datasetHash;
 
-      if (!Number.isInteger(walkForwardRunId) || walkForwardRunId <= 0) {
+      if (!Number.isInteger(resolvedWalkForwardRunId) || resolvedWalkForwardRunId <= 0) {
         throw new Error("pipeline audit snapshot requires a positive walk-forward run id");
       }
       if (!ativo || !timeframe || !datasetHash) {
@@ -926,6 +926,8 @@ export function createRepository(db: RepositoryPool) {
       if (!/^[0-9a-f]{64}$/.test(snapshot.evidenceHash)) {
         throw new Error("evidenceHash must be a 64-character lowercase SHA-256 hex string");
       }
+
+      const walkForwardRunId: number = resolvedWalkForwardRunId;
 
       const rowResult = await db.query<{
         id: number;
@@ -979,7 +981,19 @@ export function createRepository(db: RepositoryPool) {
         };
       }
 
-      const existing = await db.query<typeof row>(
+      const existing = await db.query<{
+        id: number;
+        walk_forward_run_id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        dataset_hash: string;
+        audit_version: string;
+        state: PipelineAuditOverview["state"];
+        operational_quality_state: PipelineAuditOverview["state"] | null;
+        evidence_hash: string;
+        created_at: Date;
+        snapshot: PipelineAuditOverview;
+      }>(
         `SELECT id, walk_forward_run_id, ativo, timeframe, dataset_hash,
                 audit_version, state, operational_quality_state, evidence_hash,
                 created_at, snapshot
