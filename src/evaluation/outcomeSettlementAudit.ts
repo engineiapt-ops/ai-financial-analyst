@@ -96,8 +96,10 @@ export function buildOutcomeSettlementAudit(input: {
     throw new Error("Outcome settlement audit target candle does not match decision evaluation");
   }
 
+  const usedFuture = future.slice(0, input.config.lookaheadCandles);
+
   const marketDataHash = sha256(
-    future.map((candle) => candleEvidence(candle)),
+    usedFuture.map((candle) => candleEvidence(candle)),
   );
 
   const withoutEvidenceHash = {
@@ -120,10 +122,10 @@ export function buildOutcomeSettlementAudit(input: {
     evaluationCandleOpenTime: target.openTime.toISOString(),
     evaluationCandleCloseTime: targetClose,
     evaluationPrice: input.evaluation.evaluationPrice,
-    futureClosedCandleCount: future.length,
-    futureFirstOpenTime: future[0].openTime.toISOString(),
+    futureClosedCandleCount: usedFuture.length,
+    futureFirstOpenTime: usedFuture[0].openTime.toISOString(),
     futureLastCloseTime: (
-      future[future.length - 1].closeTime ?? future[future.length - 1].openTime
+      usedFuture[usedFuture.length - 1].closeTime ?? usedFuture[usedFuture.length - 1].openTime
     ).toISOString(),
     marketDataHash,
     source: "persisted-market-data" as const,
