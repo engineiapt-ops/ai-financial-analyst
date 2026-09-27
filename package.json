@@ -11,7 +11,7 @@
     "start": "node dist/api/server.js",
     "test:indicators": "tsx src/features/indicators.test.ts",
     "test:sentiment": "tsx src/features/sentimentPipeline.test.ts",
-    "test": "npm run test:indicators && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:evaluation-overview && npm run test:portfolio-governance-overview && npm run test:portfolio-stability && npm run test:operational-quality && npm run test:pipeline-audit && npm run test:pipeline-audit-repository && npm run test:governance-dashboard && npm run test:continuous-governance && npm run test:research-intelligence && npm run test:system-readiness && npm run test:rate-limit && npm run test:auth && npm run test:observability && npm run test:runtime-config && npm run test:api-integration && npm run test:gemini && npm run test:pit && npm run test:market-data-quality && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:portfolio-walk-forward && npm run test:dataset && npm run test:repository && npm run test:server",
+    "test": "npm run test:indicators && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:pending-settlement && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:evaluation-overview && npm run test:portfolio-governance-overview && npm run test:portfolio-stability && npm run test:operational-quality && npm run test:pipeline-audit && npm run test:pipeline-audit-repository && npm run test:governance-dashboard && npm run test:continuous-governance && npm run test:research-intelligence && npm run test:system-readiness && npm run test:rate-limit && npm run test:auth && npm run test:observability && npm run test:runtime-config && npm run test:api-integration && npm run test:gemini && npm run test:pit && npm run test:market-data-quality && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:portfolio-walk-forward && npm run test:dataset && npm run test:repository && npm run test:server",
     "test:decision": "tsx src/decision/decisionEngine.test.ts",
     "test:baseline": "tsx src/decision/baselineEngine.test.ts",
     "test:paper": "tsx src/papertrading/simulator.test.ts",
@@ -50,7 +50,8 @@
     "test:pipeline-audit-repository": "tsx src/product/pipelineAuditRepository.test.ts",
     "test:governance-dashboard": "tsx src/product/governanceDashboard.test.ts",
     "test:continuous-governance": "tsx src/product/continuousGovernance.test.ts",
-    "test:research-intelligence": "tsx src/research/researchIntelligence.test.ts"
+    "test:research-intelligence": "tsx src/research/researchIntelligence.test.ts",
+    "test:pending-settlement": "tsx src/evaluation/pendingSettlement.test.ts"
   },
   "dependencies": {
     "express": "^4.19.2",
