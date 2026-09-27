@@ -107,4 +107,4 @@ The readiness contract now validates deployment configuration without exposing s
 
 In production/Vercel, `DATABASE_URL` and `API_AUTH_TOKEN` are required. Optional integrations such as Gemini are reported as warnings when absent, while malformed URLs, booleans or numeric limits are reported as invalid configuration.
 
-This check is read-only and does not change strategy, thresholds, sizing or execution.
+This check is read-only and does not change strategy, thresholds, sizing or execution.\n\n## Portfolio stability diagnostics\n\nThe portfolio walk-forward report now exposes portfolio-stability.v1 metrics per strategy, derived only from persisted out-of-sample folds. The diagnostics include fold-count, positive/non-negative fold frequency, return mean/median/dispersion, best/worst fold, drawdown dispersion, median Sharpe/Sortino and closed-trade coverage.\n\nThese fields are descriptive and governance-only. They do not rank strategies, change thresholds, size positions or authorize live execution.\n
