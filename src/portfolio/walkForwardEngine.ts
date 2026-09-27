@@ -328,7 +328,6 @@ export function simulateWalkForwardPortfolio(options: {
     const result = closeAtEnd(position, finalPrice);
     cash += position.notional + result.netPnl + position.entryFee;
     realizedPnl += result.netPnl;
-    realizedResults.push(result.netPnl);
     totalFees += result.totalFees;
     totalSlippage += result.slippage;
     active.delete(position.trade.id);
