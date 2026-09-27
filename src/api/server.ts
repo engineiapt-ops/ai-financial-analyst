@@ -35,6 +35,7 @@ import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernance
 import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
 import { evaluateMarketDataQuality } from "../marketdata/quality.js";
 import { buildOperationalQualityOverview } from "../product/operationalQuality.js";
+import { buildPipelineAuditOverview } from "../product/pipelineAudit.js";
 import { listAiProviders } from "../ai/providers.js";
 import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
@@ -523,6 +524,68 @@ app.get("/", (req, res) => {
       "/api/market/klines",
     ],
   });
+});
+
+app.get("/api/evaluation/pipeline-audit", async (req, res) => {
+  try {
+    const query = z.object({
+      fromRun: z.coerce.number().int().positive(),
+      limit: z.coerce.number().int().min(1).max(100).default(100),
+    }).parse(req.query);
+
+    const now = new Date();
+    const sourceRun = await getWalkForwardRun(query.fromRun);
+    if (!sourceRun) {
+      res.status(404).json({
+        status: "error",
+        error: `Walk-forward Run ${query.fromRun} not found`,
+      });
+      return;
+    }
+
+    const [audits, portfolioReport, regimeDiagnostics] = await Promise.all([
+      listOosValidationGateAudits({
+        walkForwardRunId: query.fromRun,
+        ativo: sourceRun.ativo,
+        timeframe: sourceRun.timeframe,
+        limit: query.limit,
+      }),
+      buildPortfolioWalkForwardReport(query.fromRun),
+      buildPortfolioRegimeDiagnostics(query.fromRun),
+    ]);
+
+    const portfolio = buildPortfolioGovernanceOverview({
+      generatedAt: now,
+      portfolioReport,
+      regimeDiagnostics,
+    });
+
+    const audit = buildPipelineAuditOverview({
+      generatedAt: now,
+      sourceRun: {
+        id: sourceRun.id,
+        ativo: sourceRun.ativo,
+        timeframe: sourceRun.timeframe,
+        candlesTotal: sourceRun.candlesTotal,
+        datasetHash: sourceRun.datasetHash,
+        datasetStart: sourceRun.datasetStart,
+        datasetEnd: sourceRun.datasetEnd,
+        initialTrainCandles: sourceRun.initialTrainCandles,
+        testCandles: sourceRun.testCandles,
+        stepCandles: sourceRun.stepCandles,
+        lookaheadCandles: sourceRun.lookaheadCandles,
+        executionModelVersion: sourceRun.executionModelVersion,
+      },
+      audits,
+      portfolio,
+    });
+
+    res.json({ status: "ok", ...audit });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
 });
 
 app.get("/api/evaluation/operational-quality", async (req, res) => {
