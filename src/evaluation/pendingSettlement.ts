@@ -1,7 +1,7 @@
 import {
   getMarketDataRange,
   getPendingDecisionLogs,
-  settleDecisionLog,
+  settleDecisionLogWithAudit,
   type DecisionLogRecord,
   type PendingDecisionLogFilters,
 } from "../db/repository.js";
@@ -54,10 +54,7 @@ export interface PendingSettlementDependencies {
 const defaultDependencies: PendingSettlementDependencies = {
   listPending: getPendingDecisionLogs,
   getCandles: getMarketDataRange,
-  settle: async (id, outcome, audit) => {
-    const { settleDecisionLogWithAudit } = await import("../db/repository.js");
-    await settleDecisionLogWithAudit(id, outcome, audit);
-  },
+  settle: settleDecisionLogWithAudit,
   evaluate: evaluateDecisionLog,
   now: () => new Date(),
 };
