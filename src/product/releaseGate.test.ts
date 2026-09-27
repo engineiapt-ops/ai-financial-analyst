@@ -9,7 +9,7 @@ const report = buildReleaseGateReport({
   packageScripts: {
     build: "tsc -p .",
     test:
-      "npm run test:system-readiness && npm run test:system-validation && npm run test:outcome-settlement-audit",
+      "npm run test:system-readiness && npm run test:system-validation && npm run test:outcome-settlement-audit && npm run test:validation-history",
   },
 });
 

@@ -9,6 +9,7 @@ export function isProtectedApiRequest(req: Request): boolean {
   if (req.path === "/api/analyze" && req.method === "POST") return true;
   if (req.path === "/api/report" && req.method === "POST") return true;
   if (req.path === "/api/product/research-intelligence" && req.method === "GET") return true;
+  if (req.path === "/api/system/validation/history" && req.method === "POST") return true;
   if (
     req.path.startsWith("/api/research/snapshots/") ||
     req.path.startsWith("/api/evaluation/decisions/")

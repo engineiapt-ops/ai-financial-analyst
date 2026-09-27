@@ -201,3 +201,15 @@ The dashboard now exposes a consolidated `System Validation Cockpit 2.0` backed 
 The release pipeline now includes `release-gate.v1` after the full TypeScript build and aggregate test suite. The gate verifies that the release-critical governance contracts are present, that the aggregate test suite includes system validation and settlement-audit coverage, and that the product guardrails remain explicit: paper trading only, deterministic Decision Engine authority, AI/Gemini advisory-only and dashboard read-only.
 
 The release gate does not create signals, rank strategies, change thresholds/sizing or authorize real execution.
+
+## Validation History / Evidence Timeline
+
+The system validation layer can now persist immutable `system-validation.v1` snapshots and expose a historical evidence timeline.
+
+Endpoints:
+- `GET /api/system/validation/history?asset=BTCUSDT&timeframe=1h&fromRun=41` reads persisted validation snapshots without mutating state.
+- `POST /api/system/validation/history` explicitly records a new validation snapshot; the write endpoint requires API authentication.
+
+The `validation-history.v1` contract validates temporal ordering, SHA-256 evidence hashes and scope consistency. Timeline events surface state changes, blocking-failure changes and evidence-hash changes between persisted snapshots.
+
+The history is operational/audit evidence only. It does not rank strategies, change thresholds or sizing, produce investment verdicts or authorize execution.
