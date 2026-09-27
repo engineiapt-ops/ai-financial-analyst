@@ -142,3 +142,13 @@ GET /api/product/governance-dashboard?asset=BTCUSDT&timeframe=1h&fromRun=41
 The `governance-dashboard.v1` contract explicitly preserves the product guardrails: paper trading only, deterministic Decision Engine authority, external AI/Gemini advisory-only, and dashboard read-only behavior. It does not rank strategies, select a preferred strategy, change thresholds, change sizing or authorize execution.
 
 Pipeline audit construction now reuses the persisted `buildPipelineAuditForRun` service, avoiding duplicated scope-building logic between the read-only audit endpoint and the historical snapshot flow.
+
+
+## Continuous Governance
+
+The product layer exposes deterministic continuous-governance checks around persisted pipeline-audit.v1 snapshots.
+
+- GET /api/product/continuous-governance?fromRun=<id> evaluates the current scope without persisting a new snapshot.
+- POST /api/product/continuous-governance/check persists an immutable snapshot idempotently and compares it with the previous evidence scope.
+
+The continuous-governance.v1 contract provides temporal state history, evidence history, dataset-scope consistency, OOS traceability and contract-drift detection. Structural regressions are surfaced as governance events; they do not rank strategies, modify thresholds, modify sizing or authorize execution.

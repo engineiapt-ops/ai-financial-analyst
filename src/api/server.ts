@@ -41,6 +41,7 @@ import { listAiProviders } from "../ai/providers.js";
 import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
 import { buildGovernanceDashboardForScope } from "../product/governanceDashboardService.js";
+import { buildContinuousGovernanceForRun } from "../product/continuousGovernanceService.js";
 
 
 
@@ -428,6 +429,59 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
     </div>
   </div>
 
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title">
+        <span>Continuous Governance</span>
+        <span class="method method-get">GET /api/product/continuous-governance</span>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="continuousRun">Walk-forward Run</label>
+          <input type="number" id="continuousRun" min="1" placeholder="e.g. 41" />
+        </div>
+        <div class="form-group" style="display:flex;align-items:end;">
+          <button type="button" onclick="checkContinuousGovernance()" style="height:42px;">Check Governance</button>
+        </div>
+      </div>
+      <div id="continuousPanel" style="display:none;">
+        <div class="overview-grid">
+          <div class="overview-item"><span class="overview-label">State</span><span class="overview-value" id="cgState">-</span></div>
+          <div class="overview-item"><span class="overview-label">Regression</span><span class="overview-value" id="cgRegression">-</span></div>
+          <div class="overview-item"><span class="overview-label">Blocking events</span><span class="overview-value" id="cgBlocking">-</span></div>
+          <div class="overview-item"><span class="overview-label">History</span><span class="overview-value" id="cgHistory">-</span></div>
+          <div class="overview-item"><span class="overview-label">Baseline</span><span class="overview-value" id="cgBaseline">-</span></div>
+          <div class="overview-item"><span class="overview-label">Dataset consistency</span><span class="overview-value" id="cgDataset">-</span></div>
+          <div class="overview-item"><span class="overview-label">Evidence</span><span class="overview-value" id="cgEvidence" style="font-size:0.72rem;word-break:break-all;">-</span></div>
+          <div class="overview-item"><span class="overview-label">Snapshot persisted</span><span class="overview-value" id="cgPersisted">-</span></div>
+        </div>
+        <pre id="cgJson"></pre>
+      </div>
+    </div>
+
+    async function checkContinuousGovernance() {
+      try {
+        const run = document.getElementById('continuousRun').value.trim();
+        if (!run) throw new Error('Informe um walk-forward run.');
+
+        const response = await fetch('/api/product/continuous-governance?fromRun=' + encodeURIComponent(run));
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Governance request failed');
+
+        document.getElementById('continuousPanel').style.display = 'block';
+        document.getElementById('cgState').textContent = data.state || '-';
+        document.getElementById('cgRegression').textContent = data.regression?.detected ? 'DETECTED' : 'None';
+        document.getElementById('cgBlocking').textContent = String(data.regression?.blockingEventCount ?? 0);
+        document.getElementById('cgHistory').textContent = String(data.history?.count ?? 0);
+        document.getElementById('cgBaseline').textContent = data.baseline?.snapshotId ?? 'None';
+        document.getElementById('cgDataset').textContent = data.checks?.datasetConsistency || 'unknown';
+        document.getElementById('cgEvidence').textContent = data.current?.evidenceHash || 'Not available';
+        document.getElementById('cgPersisted').textContent = data.checks?.snapshotPersisted ? 'Yes' : 'No (GET)';
+        document.getElementById('cgJson').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        alert('Continuous Governance Error: ' + err.message);
+      }
+    }
+
   <script>
     async function refreshGovernanceDashboard() {
       try {
@@ -777,6 +831,7 @@ app.get("/api/evaluation/operational-quality", async (req, res) => {
         "pipeline-audit.v1",
         "pipeline-audit-history.v1",
         "governance-dashboard.v1",
+        "continuous-governance.v1",
         "portfolio-governance-overview.v2",
         "portfolio-stability.v1",
       ],
@@ -855,6 +910,52 @@ app.get("/api/product/governance-dashboard", async (req, res) => {
   }
 });
 
+app.get("/api/product/continuous-governance", async (req, res) => {
+  try {
+    const query = z.object({
+      fromRun: z.coerce.number().int().positive(),
+      auditLimit: z.coerce.number().int().min(1).max(100).default(100),
+      historyLimit: z.coerce.number().int().min(1).max(100).default(20),
+    }).parse(req.query);
+
+    const governance = await buildContinuousGovernanceForRun({
+      walkForwardRunId: query.fromRun,
+      auditLimit: query.auditLimit,
+      historyLimit: query.historyLimit,
+      persist: false,
+    });
+
+    res.json({ status: "ok", ...governance });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.post("/api/product/continuous-governance/check", async (req, res) => {
+  try {
+    const body = z.object({
+      fromRun: z.coerce.number().int().positive(),
+      auditLimit: z.coerce.number().int().min(1).max(100).default(100),
+      historyLimit: z.coerce.number().int().min(1).max(100).default(20),
+    }).parse(req.body);
+
+    const governance = await buildContinuousGovernanceForRun({
+      walkForwardRunId: body.fromRun,
+      auditLimit: body.auditLimit,
+      historyLimit: body.historyLimit,
+      persist: true,
+    });
+
+    res.status(201).json({ status: "ok", ...governance });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
 app.get("/api/system/readiness", async (_req, res) => {
   const [marketDataCheck, databaseCheck] = await Promise.all([
     pingBinance()
@@ -885,6 +986,7 @@ app.get("/api/system/readiness", async (_req, res) => {
       "pipeline-audit.v1",
       "pipeline-audit-history.v1",
       "governance-dashboard.v1",
+      "continuous-governance.v1",
       "portfolio-governance-overview.v2",
       "portfolio-stability.v1",
     ],
