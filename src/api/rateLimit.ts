@@ -83,7 +83,7 @@ export function getRequestClientKey(req: Request): string {
 export function isHeavyApiRequest(req: Request): boolean {
   if (!req.path.startsWith("/api/")) return false;
 
-  if (req.path === "/api/analyze" || req.path === "/api/report") return true;
+  if (req.path === "/api/analyze" || req.path === "/api/report" || req.path === "/api/product/research-intelligence") return true;
   if (req.path.startsWith("/api/backtest/")) return true;
   if (req.path === "/api/portfolio/run" || req.path === "/api/portfolio/walk-forward") {
     return true;
