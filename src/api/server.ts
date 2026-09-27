@@ -42,6 +42,7 @@ import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
 import { buildGovernanceDashboardForScope } from "../product/governanceDashboardService.js";
 import { buildContinuousGovernanceForRun } from "../product/continuousGovernanceService.js";
+import { buildResearchIntelligenceForScope } from "../research/intelligenceService.js";
 
 
 
@@ -457,6 +458,59 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         <pre id="cgJson"></pre>
       </div>
     </div>
+
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title">
+        <span>Research Intelligence</span>
+        <span class="method method-get">GET /api/product/research-intelligence</span>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="researchAsset">Asset</label>
+          <input type="text" id="researchAsset" value="BTCUSDT" />
+        </div>
+        <div class="form-group" style="display:flex;align-items:end;">
+          <button type="button" onclick="loadResearchIntelligence()" style="height:42px;">Refresh Research</button>
+        </div>
+      </div>
+      <div id="researchPanel" style="display:none;">
+        <div class="overview-grid">
+          <div class="overview-item"><span class="overview-label">Completeness</span><span class="overview-value" id="riCompleteness">-</span></div>
+          <div class="overview-item"><span class="overview-label">Evidence</span><span class="overview-value" id="riEvidenceCount">-</span></div>
+          <div class="overview-item"><span class="overview-label">Sources</span><span class="overview-value" id="riSources">-</span></div>
+          <div class="overview-item"><span class="overview-label">Failed sources</span><span class="overview-value" id="riFailed">-</span></div>
+          <div class="overview-item"><span class="overview-label">Positive / Neutral / Negative</span><span class="overview-value" id="riStance">-</span></div>
+          <div class="overview-item"><span class="overview-label">Source agreement</span><span class="overview-value" id="riAgreement">-</span></div>
+          <div class="overview-item"><span class="overview-label">Evidence hash</span><span class="overview-value" id="riHash" style="font-size:0.72rem;word-break:break-all;">-</span></div>
+          <div class="overview-item"><span class="overview-label">Point-in-time</span><span class="overview-value" id="riPit">-</span></div>
+        </div>
+        <pre id="riJson"></pre>
+      </div>
+    </div>
+
+    async function loadResearchIntelligence() {
+      try {
+        const asset = document.getElementById('researchAsset').value.trim() || 'BTCUSDT';
+        const response = await fetch('/api/product/research-intelligence?asset=' + encodeURIComponent(asset));
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Research request failed');
+
+        document.getElementById('researchPanel').style.display = 'block';
+        document.getElementById('riCompleteness').textContent = data.completeness || '-';
+        document.getElementById('riEvidenceCount').textContent = String(data.temporal?.evidenceCount ?? 0);
+        document.getElementById('riSources').textContent = String(data.sources?.healthy ?? 0) + ' / ' + String(data.sources?.requested ?? 0);
+        document.getElementById('riFailed').textContent = String(data.sources?.failed ?? 0);
+        document.getElementById('riStance').textContent =
+          [data.aggregation?.positiveCount ?? 0, data.aggregation?.neutralCount ?? 0, data.aggregation?.negativeCount ?? 0].join(' / ');
+        document.getElementById('riAgreement').textContent =
+          data.aggregation?.sourceAgreementRatio == null ? '-' : (Number(data.aggregation.sourceAgreementRatio) * 100).toFixed(1) + '%';
+        document.getElementById('riHash').textContent = data.provenance?.evidenceHash || '-';
+        document.getElementById('riPit').textContent = data.temporal?.pointInTimeAligned ? 'Aligned' : 'Not aligned';
+        document.getElementById('riJson').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        alert('Research Intelligence Error: ' + err.message);
+      }
+    }
 
     async function checkContinuousGovernance() {
       try {
@@ -952,6 +1006,27 @@ app.post("/api/product/continuous-governance/check", async (req, res) => {
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/product/research-intelligence", async (req, res) => {
+  try {
+    const query = z.object({
+      asset: z.string().min(1).max(32).default("BTCUSDT"),
+      asOf: z.string().datetime().optional(),
+    }).parse(req.query);
+
+    const asOf = query.asOf ? new Date(query.asOf) : undefined;
+    const intelligence = await buildResearchIntelligenceForScope({
+      asset: query.asset,
+      asOf,
+    });
+
+    res.json({ status: "ok", ...intelligence });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
   }
 });
