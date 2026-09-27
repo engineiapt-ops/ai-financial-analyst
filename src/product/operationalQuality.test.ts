@@ -1,3 +1,4 @@
+import type { PortfolioGovernanceOverview } from "./portfolioGovernanceOverview.js";
 import { strict as assert } from "node:assert";
 import {
   buildOperationalQualityOverview,
