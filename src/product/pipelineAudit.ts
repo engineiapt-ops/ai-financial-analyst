@@ -215,7 +215,7 @@ export function buildPipelineAuditOverview(input: {
           /^[0-9a-f]{64}$/.test(audit.evidenceHash),
       ),
     true,
-    input.sourceRun && linkedAudits.length === latest.length && latest.length > 0
+    Boolean(input.sourceRun && linkedAudits.length === latest.length && latest.length > 0)
       ? "Latest OOS audits are linked to the selected walk-forward run and have valid evidence hashes."
       : "One or more latest OOS audits are missing, unlinked, blocked, or carry an invalid evidence hash.",
   );
