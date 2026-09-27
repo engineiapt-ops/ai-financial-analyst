@@ -121,3 +121,9 @@ The read-only `GET /api/evaluation/pipeline-audit?fromRun=<walkForwardRunId>` co
 The audit produces a deterministic SHA-256 evidence hash, explicit blocking reasons and non-blocking warnings. It does not create signals, change thresholds, select strategies or authorize live execution.
 
 The module also exposes `comparePipelineAudits(previous, current)` for structural regression detection across snapshots. It identifies state regressions, OOS governance regressions, portfolio-integrity regressions, stability-coverage reductions, contract drift and expected dataset scope changes. Historical snapshot persistence is intentionally separated from this first read-only contract.
+
+### Histórico do pipeline audit
+
+O contrato `pipeline-audit.v1` pode ser persistido de forma imutável por `POST /api/evaluation/pipeline-audit/snapshots` com `fromRun`. Cada snapshot usa o `evidenceHash` como identidade idempotente e mantém o JSON completo da auditoria para reconstrução posterior.
+
+`GET /api/evaluation/pipeline-audit/history?fromRun=<id>` retorna os snapshots históricos do walk-forward e calcula regressões estruturais entre estados consecutivos. Isso permite detectar degradação operacional, regressão OOS, perda de integridade do portfolio e redução de cobertura de estabilidade sem introduzir qualquer alteração de estratégia ou execução real.
