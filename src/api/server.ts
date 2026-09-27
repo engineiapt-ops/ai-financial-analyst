@@ -17,7 +17,7 @@ import { buildOosValidationReport } from "../evaluation/oosValidationReport.js";
 import { generateAnalystReport } from "../research/report.js";
 import { buildResearchSnapshot } from "../research/snapshot.js";
 import type { Timeframe } from "../types.js";
-import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits, healthDatabase } from "../db/repository.js";
+import { getDecisionCalibrationObservations, getDecisionKpis, getDecisionLog, getMarketDataRange, getMetricsByOrigem, getResearchSnapshot, saveResearchSnapshot, settleDecisionLog, getBacktestRun, getWalkForwardRun, getWalkForwardFolds, listOosValidationGateAudits, healthDatabase, savePipelineAuditSnapshot, listPipelineAuditSnapshots } from "../db/repository.js";
 import { computeIndicators } from "../features/indicators.js";
 import { callJev } from "../jev/jevClient.js";
 import { runRemoteJevBacktest } from "../backtest/remoteJev.js";
@@ -35,7 +35,8 @@ import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernance
 import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
 import { evaluateMarketDataQuality } from "../marketdata/quality.js";
 import { buildOperationalQualityOverview } from "../product/operationalQuality.js";
-import { buildPipelineAuditOverview } from "../product/pipelineAudit.js";
+import { buildPipelineAuditOverview, comparePipelineAudits } from "../product/pipelineAudit.js";
+import { buildPipelineAuditForRun } from "../product/pipelineAuditService.js";
 import { listAiProviders } from "../ai/providers.js";
 import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
@@ -581,6 +582,93 @@ app.get("/api/evaluation/pipeline-audit", async (req, res) => {
     });
 
     res.json({ status: "ok", ...audit });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.post("/api/evaluation/pipeline-audit/snapshots", async (req, res) => {
+  try {
+    const body = z.object({
+      fromRun: z.coerce.number().int().positive(),
+      limit: z.coerce.number().int().min(1).max(100).default(100),
+    }).parse(req.body);
+
+    const audit = await buildPipelineAuditForRun({
+      walkForwardRunId: body.fromRun,
+      auditLimit: body.limit,
+    });
+
+    const previousSnapshots = await listPipelineAuditSnapshots({
+      walkForwardRunId: body.fromRun,
+      limit: 10,
+    });
+
+    const previous = previousSnapshots.find(
+      (snapshot) => snapshot.evidenceHash !== audit.evidenceHash,
+    )?.snapshot ?? null;
+
+    const snapshot = await savePipelineAuditSnapshot({ snapshot: audit });
+    const regression = previous
+      ? comparePipelineAudits(previous, audit)
+      : {
+          comparable: false,
+          regressed: false,
+          events: [],
+        };
+
+    res.status(201).json({
+      status: "ok",
+      snapshotId: snapshot.id,
+      createdAt: snapshot.createdAt.toISOString(),
+      evidenceHash: snapshot.evidenceHash,
+      state: snapshot.state,
+      regression,
+      audit,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/evaluation/pipeline-audit/history", async (req, res) => {
+  try {
+    const query = z.object({
+      fromRun: z.coerce.number().int().positive(),
+      limit: z.coerce.number().int().min(1).max(100).default(20),
+    }).parse(req.query);
+
+    const snapshots = await listPipelineAuditSnapshots({
+      walkForwardRunId: query.fromRun,
+      limit: query.limit,
+    });
+
+    const history = snapshots.map((snapshot, index) => {
+      const newer = snapshots[index - 1];
+      const regression = newer
+        ? comparePipelineAudits(snapshot.snapshot, newer.snapshot)
+        : null;
+
+      return {
+        snapshotId: snapshot.id,
+        createdAt: snapshot.createdAt.toISOString(),
+        state: snapshot.state,
+        evidenceHash: snapshot.evidenceHash,
+        datasetHash: snapshot.datasetHash,
+        regressionFromPrevious: regression,
+      };
+    });
+
+    res.json({
+      status: "ok",
+      walkForwardRunId: query.fromRun,
+      count: history.length,
+      history,
+    });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;

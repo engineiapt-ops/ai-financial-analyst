@@ -5,6 +5,7 @@ import type { CalibrationObservation } from "../evaluation/calibration.js";
 import type { OosValidationGate } from "../evaluation/oosValidationGate.js";
 import type { OosValidationReport } from "../evaluation/oosValidationReport.js";
 import type { OosRobustnessReport } from "../evaluation/oosRobustness.js";
+import type { PipelineAuditOverview } from "../product/pipelineAudit.js";
 
 export interface RepositoryPool {
   query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
@@ -138,6 +139,31 @@ export interface OosValidationGateAuditFilters {
 export interface SaveResearchSnapshotInput {
   snapshot: ResearchSnapshot;
   decisionLogId?: number | null;
+}
+
+export interface PipelineAuditSnapshotRecord {
+  id: number;
+  walkForwardRunId: number;
+  ativo: string;
+  timeframe: Timeframe;
+  datasetHash: string;
+  auditVersion: string;
+  state: PipelineAuditOverview["state"];
+  operationalQualityState: PipelineAuditOverview["state"] | null;
+  evidenceHash: string;
+  createdAt: Date;
+  snapshot: PipelineAuditOverview;
+}
+
+export interface SavePipelineAuditSnapshotInput {
+  snapshot: PipelineAuditOverview;
+}
+
+export interface PipelineAuditSnapshotFilters {
+  walkForwardRunId?: number | null;
+  ativo?: string | null;
+  timeframe?: Timeframe | null;
+  limit?: number;
 }
 
 export interface DecisionLogRecord {
@@ -876,6 +902,238 @@ export function createRepository(db: RepositoryPool) {
         createdAt: new Date(row.created_at),
         gate: row.gate,
         evidence: null,
+      }));
+    },
+
+    async savePipelineAuditSnapshot(
+      input: SavePipelineAuditSnapshotInput,
+    ): Promise<PipelineAuditSnapshotRecord> {
+      const snapshot = input.snapshot;
+      const resolvedWalkForwardRunId = snapshot.scope.walkForwardRunId;
+      const ativo = snapshot.scope.asset;
+      const timeframe = snapshot.scope.timeframe;
+      const datasetHash = snapshot.scope.datasetHash;
+
+      if (
+        typeof resolvedWalkForwardRunId !== "number" ||
+        !Number.isInteger(resolvedWalkForwardRunId) ||
+        resolvedWalkForwardRunId <= 0
+      ) {
+        throw new Error("pipeline audit snapshot requires a positive walk-forward run id");
+      }
+      if (!ativo || !timeframe || !datasetHash) {
+        throw new Error("pipeline audit snapshot requires asset, timeframe and dataset hash");
+      }
+      if (!/^[0-9a-f]{64}$/.test(datasetHash)) {
+        throw new Error("datasetHash must be a 64-character lowercase SHA-256 hex string");
+      }
+      if (!/^[0-9a-f]{64}$/.test(snapshot.evidenceHash)) {
+        throw new Error("evidenceHash must be a 64-character lowercase SHA-256 hex string");
+      }
+
+      const walkForwardRunId = resolvedWalkForwardRunId;
+
+      const rowResult = await db.query<{
+        id: number;
+        walk_forward_run_id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        dataset_hash: string;
+        audit_version: string;
+        state: PipelineAuditOverview["state"];
+        operational_quality_state: PipelineAuditOverview["state"] | null;
+        evidence_hash: string;
+        created_at: Date;
+        snapshot: PipelineAuditOverview;
+      }>(
+        `INSERT INTO pipeline_audit_snapshots
+          (walk_forward_run_id, ativo, timeframe, dataset_hash, audit_version,
+           state, operational_quality_state, evidence_hash, snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
+         ON CONFLICT (walk_forward_run_id, evidence_hash)
+         DO NOTHING
+         RETURNING id, walk_forward_run_id, ativo, timeframe, dataset_hash,
+                   audit_version, state, operational_quality_state, evidence_hash,
+                   created_at, snapshot`,
+        [
+          walkForwardRunId,
+          ativo,
+          timeframe,
+          datasetHash,
+          snapshot.version,
+          snapshot.state,
+          snapshot.traceability.product.operationalQualityState,
+          snapshot.evidenceHash,
+          JSON.stringify(snapshot),
+        ],
+      );
+
+      const row = rowResult.rows[0];
+      if (row) {
+        return {
+          id: Number(row.id),
+          walkForwardRunId: Number(row.walk_forward_run_id),
+          ativo: row.ativo,
+          timeframe: row.timeframe,
+          datasetHash: row.dataset_hash,
+          auditVersion: row.audit_version,
+          state: row.state,
+          operationalQualityState: row.operational_quality_state,
+          evidenceHash: row.evidence_hash,
+          createdAt: new Date(row.created_at),
+          snapshot: row.snapshot,
+        };
+      }
+
+      const existing = await db.query<{
+        id: number;
+        walk_forward_run_id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        dataset_hash: string;
+        audit_version: string;
+        state: PipelineAuditOverview["state"];
+        operational_quality_state: PipelineAuditOverview["state"] | null;
+        evidence_hash: string;
+        created_at: Date;
+        snapshot: PipelineAuditOverview;
+      }>(
+        `SELECT id, walk_forward_run_id, ativo, timeframe, dataset_hash,
+                audit_version, state, operational_quality_state, evidence_hash,
+                created_at, snapshot
+         FROM pipeline_audit_snapshots
+         WHERE walk_forward_run_id = $1
+           AND evidence_hash = $2`,
+        [walkForwardRunId, snapshot.evidenceHash],
+      );
+
+      const existingRow = existing.rows[0];
+      if (!existingRow) {
+        throw new Error("Pipeline audit snapshot could not be persisted");
+      }
+
+      return {
+        id: Number(existingRow.id),
+        walkForwardRunId: Number(existingRow.walk_forward_run_id),
+        ativo: existingRow.ativo,
+        timeframe: existingRow.timeframe,
+        datasetHash: existingRow.dataset_hash,
+        auditVersion: existingRow.audit_version,
+        state: existingRow.state,
+        operationalQualityState: existingRow.operational_quality_state,
+        evidenceHash: existingRow.evidence_hash,
+        createdAt: new Date(existingRow.created_at),
+        snapshot: existingRow.snapshot,
+      };
+    },
+
+    async getPipelineAuditSnapshot(
+      id: number,
+    ): Promise<PipelineAuditSnapshotRecord | null> {
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new Error("pipeline audit snapshot id must be a positive integer");
+      }
+
+      const { rows } = await db.query<{
+        id: number;
+        walk_forward_run_id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        dataset_hash: string;
+        audit_version: string;
+        state: PipelineAuditOverview["state"];
+        operational_quality_state: PipelineAuditOverview["state"] | null;
+        evidence_hash: string;
+        created_at: Date;
+        snapshot: PipelineAuditOverview;
+      }>(
+        `SELECT id, walk_forward_run_id, ativo, timeframe, dataset_hash,
+                audit_version, state, operational_quality_state, evidence_hash,
+                created_at, snapshot
+         FROM pipeline_audit_snapshots
+         WHERE id = $1`,
+        [id],
+      );
+
+      const row = rows[0];
+      if (!row) return null;
+
+      return {
+        id: Number(row.id),
+        walkForwardRunId: Number(row.walk_forward_run_id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        datasetHash: row.dataset_hash,
+        auditVersion: row.audit_version,
+        state: row.state,
+        operationalQualityState: row.operational_quality_state,
+        evidenceHash: row.evidence_hash,
+        createdAt: new Date(row.created_at),
+        snapshot: row.snapshot,
+      };
+    },
+
+    async listPipelineAuditSnapshots(
+      filters: PipelineAuditSnapshotFilters = {},
+    ): Promise<PipelineAuditSnapshotRecord[]> {
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+      const add = (condition: string, value: unknown) => {
+        values.push(value);
+        conditions.push(condition.replace("?", String(values.length)));
+      };
+
+      if (filters.walkForwardRunId !== null && filters.walkForwardRunId !== undefined) {
+        add("walk_forward_run_id = ?", filters.walkForwardRunId);
+      }
+      if (filters.ativo) {
+        add("ativo = ?", filters.ativo.trim().toUpperCase());
+      }
+      if (filters.timeframe) {
+        add("timeframe = ?", filters.timeframe);
+      }
+
+      const limit = filters.limit ?? 20;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error("pipeline audit snapshot history limit must be an integer between 1 and 100");
+      }
+
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const { rows } = await db.query<{
+        id: number;
+        walk_forward_run_id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        dataset_hash: string;
+        audit_version: string;
+        state: PipelineAuditOverview["state"];
+        operational_quality_state: PipelineAuditOverview["state"] | null;
+        evidence_hash: string;
+        created_at: Date;
+        snapshot: PipelineAuditOverview;
+      }>(
+        `SELECT id, walk_forward_run_id, ativo, timeframe, dataset_hash,
+                audit_version, state, operational_quality_state, evidence_hash,
+                created_at, snapshot
+         FROM pipeline_audit_snapshots
+         ${where}
+         ORDER BY created_at DESC, id DESC
+         LIMIT ${limit}`,
+        values,
+      );
+
+      return rows.map((row) => ({
+        id: Number(row.id),
+        walkForwardRunId: Number(row.walk_forward_run_id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        datasetHash: row.dataset_hash,
+        auditVersion: row.audit_version,
+        state: row.state,
+        operationalQualityState: row.operational_quality_state,
+        evidenceHash: row.evidence_hash,
+        createdAt: new Date(row.created_at),
+        snapshot: row.snapshot,
       }));
     },
 
@@ -2419,6 +2677,13 @@ export const getOosValidationGateAudit = (id: number) =>
   createRepository(getDefaultPool()).getOosValidationGateAudit(id);
 export const listOosValidationGateAudits = (filters: OosValidationGateAuditFilters = {}) =>
   createRepository(getDefaultPool()).listOosValidationGateAudits(filters);
+
+export const savePipelineAuditSnapshot = (input: SavePipelineAuditSnapshotInput) =>
+  createRepository(getDefaultPool()).savePipelineAuditSnapshot(input);
+export const getPipelineAuditSnapshot = (id: number) =>
+  createRepository(getDefaultPool()).getPipelineAuditSnapshot(id);
+export const listPipelineAuditSnapshots = (filters: PipelineAuditSnapshotFilters = {}) =>
+  createRepository(getDefaultPool()).listPipelineAuditSnapshots(filters);
 
 export const saveResearchSnapshot = (input: SaveResearchSnapshotInput) =>
   createRepository(getDefaultPool()).saveResearchSnapshot(input);
