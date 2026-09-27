@@ -33,6 +33,26 @@ const overview = buildPortfolioGovernanceOverview({
           finiteCapital: true,
           signalsConsistent: true,
         },
+        stability: {
+          version: "portfolio-stability.v1",
+          foldCount: 5,
+          positiveReturnFoldCount: 3,
+          positiveReturnFoldPct: 60,
+          nonNegativeReturnFoldPct: 80,
+          returnMeanPct: 2.2,
+          returnMedianPct: 2,
+          returnStdDevPct: 2.56,
+          bestFoldReturnPct: 6,
+          worstFoldReturnPct: -1,
+          drawdownMeanPct: 3,
+          drawdownMedianPct: 3,
+          drawdownStdDevPct: 1.41,
+          worstDrawdownPct: 5,
+          medianSharpe: 0.65,
+          medianSortino: 0.9,
+          closedTradesTotal: 50,
+          closedTradesMedian: 10,
+        },
       },
       {
         strategy: "baseline_risk",
@@ -51,6 +71,26 @@ const overview = buildPortfolioGovernanceOverview({
           exposureConstraint: { passed: true, maxAllowedOpenPositions: 10, observedMaxOpenPositions: 3 },
           finiteCapital: true,
           signalsConsistent: true,
+        },
+        stability: {
+          version: "portfolio-stability.v1",
+          foldCount: 5,
+          positiveReturnFoldCount: 3,
+          positiveReturnFoldPct: 60,
+          nonNegativeReturnFoldPct: 80,
+          returnMeanPct: 2.2,
+          returnMedianPct: 2,
+          returnStdDevPct: 2.56,
+          bestFoldReturnPct: 6,
+          worstFoldReturnPct: -1,
+          drawdownMeanPct: 3,
+          drawdownMedianPct: 3,
+          drawdownStdDevPct: 1.41,
+          worstDrawdownPct: 5,
+          medianSharpe: 0.65,
+          medianSortino: 0.9,
+          closedTradesTotal: 50,
+          closedTradesMedian: 10,
         },
       },
     ],
@@ -89,6 +129,8 @@ assert.equal(overview.portfolio.allChecksPassed, true);
 assert.equal(overview.regimes.totalRiskGateBlocks, 12);
 assert.equal(overview.regimes.foldCount, 5);
 assert.equal(overview.regimes.byTrend.length, 1);
+assert.equal(overview.portfolio.strategies[0].stability.foldCount, 5);
+assert.equal(overview.portfolio.strategies[0].stability.positiveReturnFoldPct, 60);
 assert.equal(
   overview.notes.some((note) => note.includes("does not select a preferred strategy")),
   true,
