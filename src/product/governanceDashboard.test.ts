@@ -1,4 +1,8 @@
 import { strict as assert } from "node:assert";
+import type { SystemReadinessOverview } from "./systemReadiness.js";
+import type { EvaluationOverview } from "./evaluationOverview.js";
+import type { OperationalQualityOverview } from "./operationalQuality.js";
+import type { PipelineAuditOverview } from "./pipelineAudit.js";
 import {
   buildGovernanceDashboardOverview,
   GOVERNANCE_DASHBOARD_VERSION,
@@ -37,7 +41,7 @@ const system = {
     },
   },
   notes: [],
-} as const;
+} as unknown as SystemReadinessOverview;
 
 const marketData = {
   version: "market-data-quality.v1",
@@ -119,7 +123,7 @@ const operationalQuality = {
     portfolioGovernance: "portfolio-governance-overview.v2",
   },
   notes: [],
-} as const;
+} as unknown as EvaluationOverview;
 
 const pipeline = {
   version: "pipeline-audit.v1",
@@ -168,7 +172,7 @@ const pipeline = {
     readyMeans: "traceable",
     notAnInvestmentVerdict: true,
   },
-};
+} as unknown as PipelineAuditOverview;
 
 const result = buildGovernanceDashboardOverview({
   generatedAt: new Date("2026-09-27T10:00:00.000Z"),
