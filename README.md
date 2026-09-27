@@ -152,3 +152,12 @@ The product layer exposes deterministic continuous-governance checks around pers
 - POST /api/product/continuous-governance/check persists an immutable snapshot idempotently and compares it with the previous evidence scope.
 
 The continuous-governance.v1 contract provides temporal state history, evidence history, dataset-scope consistency, OOS traceability and contract-drift detection. Structural regressions are surfaced as governance events; they do not rank strategies, modify thresholds, modify sizing or authorize execution.
+
+
+## Research Intelligence
+
+The research layer now exposes `GET /api/product/research-intelligence?asset=BTCUSDT&asOf=<ISO-8601>`.
+
+The `research-intelligence.v1` contract adds structured source coverage, source health, point-in-time alignment, per-evidence identifiers, deterministic evidence aggregation, source agreement and a SHA-256 provenance hash. It is derived from the existing research collection pipeline and does not persist mutable third-party content.
+
+The endpoint is protected by API authentication and the heavy API rate limit because it performs external research requests. External evidence remains context-only: the deterministic quantitative Decision Engine remains authoritative and the endpoint does not create or modify a trading signal.
