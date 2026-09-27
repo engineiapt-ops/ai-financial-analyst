@@ -35,11 +35,12 @@ import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernance
 import { buildSystemReadinessOverview } from "../product/systemReadiness.js";
 import { evaluateMarketDataQuality } from "../marketdata/quality.js";
 import { buildOperationalQualityOverview } from "../product/operationalQuality.js";
-import { buildPipelineAuditOverview, comparePipelineAudits } from "../product/pipelineAudit.js";
+import { comparePipelineAudits } from "../product/pipelineAudit.js";
 import { buildPipelineAuditForRun } from "../product/pipelineAuditService.js";
 import { listAiProviders } from "../ai/providers.js";
 import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
+import { buildGovernanceDashboardForScope } from "../product/governanceDashboardService.js";
 
 
 
@@ -396,7 +397,86 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
     </div>
   </div>
 
-  <script>
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title">
+        <span>Governance Dashboard</span>
+        <span class="method method-get">GET /api/product/governance-dashboard</span>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="governanceRun">Walk-forward Run (optional)</label>
+          <input type="number" id="governanceRun" min="1" placeholder="e.g. 41" />
+        </div>
+        <div class="form-group" style="display:flex;align-items:end;">
+          <button type="button" onclick="refreshGovernanceDashboard()" style="height:42px;">Refresh Governance</button>
+        </div>
+      </div>
+      <div id="governancePanel" style="display:none;">
+        <div class="overview-grid">
+          <div class="overview-item"><span class="overview-label">Overall state</span><span class="overview-value" id="govState">-</span></div>
+          <div class="overview-item"><span class="overview-label">Market data</span><span class="overview-value" id="govMarket">-</span></div>
+          <div class="overview-item"><span class="overview-label">Operational quality</span><span class="overview-value" id="govOperational">-</span></div>
+          <div class="overview-item"><span class="overview-label">Pipeline audit</span><span class="overview-value" id="govPipeline">-</span></div>
+          <div class="overview-item"><span class="overview-label">Dataset hash</span><span class="overview-value" id="govDataset" style="font-size:0.72rem;word-break:break-all;">-</span></div>
+          <div class="overview-item"><span class="overview-label">Evidence hash</span><span class="overview-value" id="govEvidence" style="font-size:0.72rem;word-break:break-all;">-</span></div>
+          <div class="overview-item"><span class="overview-label">Pipeline snapshots</span><span class="overview-value" id="govHistory">-</span></div>
+          <div class="overview-item"><span class="overview-label">Walk-forward scope</span><span class="overview-value" id="govRun">-</span></div>
+        </div>
+        <p id="govTraceability" style="font-size:0.8rem;color:var(--text-muted);margin:0.5rem 0;"></p>
+        <p style="font-size:0.75rem;color:var(--text-muted);">Read-only governance diagnostics. Regression events and states are not investment recommendations.</p>
+        <pre id="govJson"></pre>
+      </div>
+    </div>
+
+  
+    async function refreshGovernanceDashboard() {
+      try {
+        const params = new URLSearchParams({
+          asset: document.getElementById('ativo').value,
+          timeframe: document.getElementById('timeframe').value,
+          lookbackDays: '30',
+          limit: '20'
+        });
+        const run = document.getElementById('governanceRun').value.trim();
+        if (run) params.set('fromRun', run);
+
+        const response = await fetch('/api/product/governance-dashboard?' + params.toString());
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Governance request failed');
+
+        document.getElementById('governancePanel').style.display = 'block';
+        document.getElementById('govState').textContent = data.state || '-';
+        document.getElementById('govMarket').textContent = data.marketData?.status || '-';
+        document.getElementById('govOperational').textContent = data.operationalQuality?.state || '-';
+        document.getElementById('govPipeline').textContent = data.pipeline?.available ? (data.pipeline.current?.state || '-') : 'Not scoped';
+        document.getElementById('govDataset').textContent = data.evidence?.datasetHash || 'Not available';
+        document.getElementById('govEvidence').textContent = data.evidence?.currentPipelineEvidenceHash || 'Not available';
+        document.getElementById('govHistory').textContent = String(data.pipeline?.history?.length ?? 0);
+        document.getElementById('govRun').textContent = data.scope?.walkForwardRunId ?? 'Not selected';
+
+        const trace = data.traceability || {};
+        document.getElementById('govTraceability').textContent =
+          'Traceability: ' +
+          ['dataset', 'oos', 'walk-forward', 'portfolio', 'product']
+            .map((key) => key + '=' + (
+              key === 'walk-forward'
+                ? Boolean(data.scope?.walkForwardRunId)
+                : key === 'dataset'
+                  ? trace.datasetLinked
+                  : key === 'oos'
+                    ? trace.oosLinked
+                    : key === 'portfolio'
+                      ? trace.portfolioLinked
+                      : trace.productLinked
+            ))
+            .join(' · ');
+
+        document.getElementById('govJson').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        alert('Governance Error: ' + err.message);
+      }
+    }
+
     async function refreshStatus() {
       try {
         const pingRes = await fetch('/api/market/ping').then(r => r.json());
@@ -534,57 +614,15 @@ app.get("/api/evaluation/pipeline-audit", async (req, res) => {
       limit: z.coerce.number().int().min(1).max(100).default(100),
     }).parse(req.query);
 
-    const now = new Date();
-    const sourceRun = await getWalkForwardRun(query.fromRun);
-    if (!sourceRun) {
-      res.status(404).json({
-        status: "error",
-        error: `Walk-forward Run ${query.fromRun} not found`,
-      });
-      return;
-    }
-
-    const [audits, portfolioReport, regimeDiagnostics] = await Promise.all([
-      listOosValidationGateAudits({
-        walkForwardRunId: query.fromRun,
-        ativo: sourceRun.ativo,
-        timeframe: sourceRun.timeframe,
-        limit: query.limit,
-      }),
-      buildPortfolioWalkForwardReport(query.fromRun),
-      buildPortfolioRegimeDiagnostics(query.fromRun),
-    ]);
-
-    const portfolio = buildPortfolioGovernanceOverview({
-      generatedAt: now,
-      portfolioReport,
-      regimeDiagnostics,
-    });
-
-    const audit = buildPipelineAuditOverview({
-      generatedAt: now,
-      sourceRun: {
-        id: sourceRun.id,
-        ativo: sourceRun.ativo,
-        timeframe: sourceRun.timeframe,
-        candlesTotal: sourceRun.candlesTotal,
-        datasetHash: sourceRun.datasetHash,
-        datasetStart: sourceRun.datasetStart,
-        datasetEnd: sourceRun.datasetEnd,
-        initialTrainCandles: sourceRun.initialTrainCandles,
-        testCandles: sourceRun.testCandles,
-        stepCandles: sourceRun.stepCandles,
-        lookaheadCandles: sourceRun.lookaheadCandles,
-        executionModelVersion: sourceRun.executionModelVersion,
-      },
-      audits,
-      portfolio,
+    const audit = await buildPipelineAuditForRun({
+      walkForwardRunId: query.fromRun,
+      auditLimit: query.limit,
     });
 
     res.json({ status: "ok", ...audit });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
-    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
   }
 });
@@ -735,6 +773,10 @@ app.get("/api/evaluation/operational-quality", async (req, res) => {
       runtimeConfig: inspectRuntimeConfig(),
       governanceContracts: [
         "evaluation-overview.v1",
+        "operational-quality.v1",
+        "pipeline-audit.v1",
+        "pipeline-audit-history.v1",
+        "governance-dashboard.v1",
         "portfolio-governance-overview.v2",
         "portfolio-stability.v1",
       ],
