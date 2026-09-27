@@ -235,6 +235,12 @@ export interface DecisionKpis {
   breakdown: DecisionKpiBreakdown[];
 }
 
+export interface PendingDecisionLogFilters {
+  ativo?: string | null;
+  timeframe?: Timeframe | null;
+  limit?: number;
+}
+
 export interface DecisionLogInput {
   backtestRunId?: number | null;
   ativo: string;
@@ -1510,6 +1516,87 @@ export function createRepository(db: RepositoryPool) {
       };
     },
 
+    async getPendingDecisionLogs(
+      filters: PendingDecisionLogFilters = {},
+    ): Promise<DecisionLogRecord[]> {
+      const limit = filters.limit ?? 100;
+      validateLimit(Math.min(limit, 100));
+
+      const conditions = ["outcome_status = 'pending'"];
+      const values: unknown[] = [];
+      const add = (condition: string, value: unknown) => {
+        values.push(value);
+        conditions.push(condition.replace("?", `${values.length}`));
+      };
+
+      if (filters.ativo) add("ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("timeframe = ?", filters.timeframe);
+
+      const limitParam = values.length + 1;
+      const { rows } = await db.query<{
+        id: number;
+        ativo: string;
+        timeframe: Timeframe;
+        decision_at: Date;
+        data_as_of: Date;
+        origem: DecisionResult["origem"];
+        recomendacao: DecisionResult["recomendacao"];
+        jev_model_version: string | null;
+        jev_choice: DecisionResult["jevChoice"] | null;
+        jev_probs: Record<string, number> | null;
+        confidence: string | number | null;
+        quality_score: string | number | null;
+        risco_elevado: boolean | null;
+        tamanho_posicao_pct: string | number;
+        observacao: string | null;
+        reference_price: string | number;
+        outcome_status: "pending" | "settled" | "not_applicable";
+        outcome_direction: "up" | "down" | "flat" | null;
+        forward_return_percent: string | number | null;
+        trade_profit_percent: string | number | null;
+        exit_reason: "target" | "stop" | "end" | null;
+        evaluated_at: Date | null;
+      }>(
+        `SELECT id, ativo, timeframe, decision_at, data_as_of, origem, recomendacao,
+                jev_model_version, jev_choice, jev_probs, confidence, quality_score,
+                risco_elevado, tamanho_posicao_pct, observacao, reference_price,
+                outcome_status, outcome_direction, forward_return_percent,
+                trade_profit_percent, exit_reason, evaluated_at
+         FROM decision_log
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY data_as_of ASC, id ASC
+         LIMIT ${limitParam}`,
+        [...values, Math.min(limit, 100)],
+      );
+
+      return rows.map((row) => ({
+        id: Number(row.id),
+        ativo: row.ativo,
+        timeframe: row.timeframe,
+        decisionAt: new Date(row.decision_at),
+        dataAsOf: new Date(row.data_as_of),
+        origem: row.origem,
+        recomendacao: row.recomendacao,
+        jevModelVersion: row.jev_model_version,
+        jevChoice: row.jev_choice,
+        jevProbs: row.jev_probs,
+        confidence: row.confidence === null ? null : Number(row.confidence),
+        qualityScore: row.quality_score === null ? null : Number(row.quality_score),
+        riscoElevado: row.risco_elevado,
+        tamanhoPosicaoPct: Number(row.tamanho_posicao_pct),
+        observacao: row.observacao,
+        referencePrice: Number(row.reference_price),
+        outcomeStatus: row.outcome_status,
+        outcomeDirection: row.outcome_direction,
+        forwardReturnPercent:
+          row.forward_return_percent === null ? null : Number(row.forward_return_percent),
+        tradeProfitPercent:
+          row.trade_profit_percent === null ? null : Number(row.trade_profit_percent),
+        exitReason: row.exit_reason,
+        evaluatedAt: row.evaluated_at ? new Date(row.evaluated_at) : null,
+      }));
+    },
+
     async getDecisionKpis(filters: DecisionKpiFilters = {}): Promise<DecisionKpis> {
       const conditions: string[] = [];
       const values: unknown[] = [];
@@ -2666,6 +2753,8 @@ export const getDecisionKpis = (filters: DecisionKpiFilters = {}) => createRepos
 export const getDecisionCalibrationObservations = (filters: DecisionKpiFilters = {}) =>
   createRepository(getDefaultPool()).getDecisionCalibrationObservations(filters);
 export const getDecisionLog = (id: number) => createRepository(getDefaultPool()).getDecisionLog(id);
+export const getPendingDecisionLogs = (filters: PendingDecisionLogFilters = {}) =>
+  createRepository(getDefaultPool()).getPendingDecisionLogs(filters);
 export const settleDecisionLog = (id: number, outcome: DecisionLogOutcome) => createRepository(getDefaultPool()).settleDecisionLog(id, outcome);
 export const createBenchmarkRun = (input: BenchmarkRunInput) => createRepository(getDefaultPool()).createBenchmarkRun(input);
 export const saveBenchmarkResult = (input: BenchmarkResultInput) => createRepository(getDefaultPool()).saveBenchmarkResult(input);
