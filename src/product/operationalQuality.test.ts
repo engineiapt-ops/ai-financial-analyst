@@ -106,7 +106,7 @@ const portfolio = {
   },
   regimes: { totalSignals: 100, totalRiskGateBlocks: 1, blockedSignalWinRatePct: 20, blockedSignalLossRatePct: 60, foldCount: 5, byTrend: [], byVolatility: [], byMomentum: [], byCombinedRegime: [] },
   notes: [],
-};
+} as unknown as PortfolioGovernanceOverview;
 
 const ready = buildOperationalQualityOverview({
   generatedAt: new Date("2026-09-27T10:00:00.000Z"),
