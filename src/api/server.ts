@@ -29,6 +29,7 @@ import { runWalkForwardPortfolio } from "../portfolio/walkForwardPortfolio.js";
 import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
 import { runRiskRegimeAnalysis } from "../risk/analysis.js";
 import { buildEvaluationOverview } from "../product/evaluationOverview.js";
+import { settlePendingDecisionLogs } from "../evaluation/pendingSettlement.js";
 import { buildPortfolioWalkForwardReport } from "../evaluation/portfolioWalkForwardReport.js";
 import { buildPortfolioRegimeDiagnostics } from "../evaluation/portfolioRegimeDiagnostics.js";
 import { buildPortfolioGovernanceOverview } from "../product/portfolioGovernanceOverview.js";
@@ -1190,6 +1191,37 @@ app.get("/api/research/snapshots/:snapshotId", async (req, res) => {
   }
 });
 
+
+app.post("/api/evaluation/decisions/settle-pending", async (req, res) => {
+  try {
+    const body = z.object({
+      ativo: z.string().min(1).optional(),
+      timeframe: z.enum(["1h", "4h", "1d"]).optional(),
+      limit: z.coerce.number().int().min(1).max(100).default(100),
+      lookaheadCandles: z.coerce.number().int().min(1).max(5000).default(24),
+      flatThresholdPct: z.coerce.number().min(0).max(100).default(0.1),
+      evaluatedAt: z.string().datetime().optional(),
+    }).parse(req.body);
+
+    const result = await settlePendingDecisionLogs({
+      ativo: body.ativo,
+      timeframe: body.timeframe,
+      limit: body.limit,
+      lookaheadCandles: body.lookaheadCandles,
+      flatThresholdPct: body.flatThresholdPct,
+      evaluatedAt: body.evaluatedAt ? new Date(body.evaluatedAt) : undefined,
+    });
+
+    res.json({
+      status: "ok",
+      ...result,
+    });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
 
 app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
   try {

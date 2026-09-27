@@ -144,6 +144,13 @@ The `governance-dashboard.v1` contract explicitly preserves the product guardrai
 Pipeline audit construction now reuses the persisted `buildPipelineAuditForRun` service, avoiding duplicated scope-building logic between the read-only audit endpoint and the historical snapshot flow.
 
 
+## Continuous outcome settlement
+
+The evaluation layer exposes `POST /api/evaluation/decisions/settle-pending` to settle pending live decision logs once enough closed market candles are available. It uses the persisted market-data range, the existing deterministic `decisionEvaluator`, and the idempotent pending-only settlement write. Decisions that do not yet have enough future candles remain pending; failures are reported per decision and do not alter trading rules or paper-execution behavior.
+
+Configuration is request-scoped:
+`limit` (1-100), `ativo`, `timeframe`, `lookaheadCandles` (default 24), `flatThresholdPct` (default 0.1) and optional `evaluatedAt`.
+
 ## Continuous Governance
 
 The product layer exposes deterministic continuous-governance checks around persisted pipeline-audit.v1 snapshots.
