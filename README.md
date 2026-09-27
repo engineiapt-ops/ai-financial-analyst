@@ -144,6 +144,30 @@ The `governance-dashboard.v1` contract explicitly preserves the product guardrai
 Pipeline audit construction now reuses the persisted `buildPipelineAuditForRun` service, avoiding duplicated scope-building logic between the read-only audit endpoint and the historical snapshot flow.
 
 
+## System Validation
+
+The operational layer exposes `GET /api/system/validation` as a consolidated release-readiness contract.
+
+The `system-validation.v1` contract validates system readiness, market-data freshness, decision evaluation coverage, OOS governance, portfolio integrity, pipeline audit, continuous governance, research intelligence and outcome-settlement audit coverage for a selected scope. A supplied `fromRun` enables the walk-forward/OOS/portfolio governance checks; without it, those checks remain explicitly outside the requested scope.
+
+Example:
+
+```text
+GET /api/system/validation?asset=BTCUSDT&timeframe=1h&fromRun=41
+```
+
+The contract is operational only: it does not create signals, alter thresholds or sizing, select strategies, authorize execution or treat research/sentiment as causal proof.
+
+## Outcome Settlement Audit
+
+Settled decision outcomes now produce an immutable `outcome-settlement-audit.v1` record. The audit links the decision log, evaluation timestamp, exact closed-candle evidence range, market-data SHA-256 hash, evaluation result and deterministic evidence hash.
+
+Endpoints:
+- `GET /api/evaluation/decisions/:decisionLogId/audit`
+- `GET /api/evaluation/settlement-audit`
+
+Settlement writes use an atomic transaction so the decision outcome and its audit record are committed together. A decision log can be finalized only once.
+
 ## Continuous outcome settlement
 
 The evaluation layer exposes `POST /api/evaluation/decisions/settle-pending` to settle pending live decision logs once enough closed market candles are available. It uses the persisted market-data range, the existing deterministic `decisionEvaluator`, and the idempotent pending-only settlement write. Decisions that do not yet have enough future candles remain pending; failures are reported per decision and do not alter trading rules or paper-execution behavior.
