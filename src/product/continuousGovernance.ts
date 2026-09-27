@@ -199,7 +199,7 @@ export function buildContinuousGovernanceOverview(input: {
     },
     checks: {
       currentAuditPresent: true,
-      snapshotPersisted: input.snapshot.evidenceHash === input.audit.evidenceHash,
+      snapshotPersisted: input.snapshot.id > 0 && input.snapshot.evidenceHash === input.audit.evidenceHash,
       temporalOrderValid,
       evidenceHashesValid,
       datasetConsistency,
