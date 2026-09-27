@@ -41,6 +41,7 @@ import { listAiProviders } from "../ai/providers.js";
 import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
 import { buildGovernanceDashboardForScope } from "../product/governanceDashboardService.js";
+import { buildContinuousGovernanceForRun } from "../product/continuousGovernanceService.js";
 
 
 
@@ -777,6 +778,8 @@ app.get("/api/evaluation/operational-quality", async (req, res) => {
         "pipeline-audit.v1",
         "pipeline-audit-history.v1",
         "governance-dashboard.v1",
+        "continuous-governance.v1",
+        "continuous-governance.v1",
         "portfolio-governance-overview.v2",
         "portfolio-stability.v1",
       ],
@@ -848,6 +851,52 @@ app.get("/api/product/governance-dashboard", async (req, res) => {
 
     const dashboard = await buildGovernanceDashboardForScope(query);
     res.json({ status: "ok", ...dashboard });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/product/continuous-governance", async (req, res) => {
+  try {
+    const query = z.object({
+      fromRun: z.coerce.number().int().positive(),
+      auditLimit: z.coerce.number().int().min(1).max(100).default(100),
+      historyLimit: z.coerce.number().int().min(1).max(100).default(20),
+    }).parse(req.query);
+
+    const governance = await buildContinuousGovernanceForRun({
+      walkForwardRunId: query.fromRun,
+      auditLimit: query.auditLimit,
+      historyLimit: query.historyLimit,
+      persist: false,
+    });
+
+    res.json({ status: "ok", ...governance });
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.post("/api/product/continuous-governance/check", async (req, res) => {
+  try {
+    const body = z.object({
+      fromRun: z.coerce.number().int().positive(),
+      auditLimit: z.coerce.number().int().min(1).max(100).default(100),
+      historyLimit: z.coerce.number().int().min(1).max(100).default(20),
+    }).parse(req.body);
+
+    const governance = await buildContinuousGovernanceForRun({
+      walkForwardRunId: body.fromRun,
+      auditLimit: body.auditLimit,
+      historyLimit: body.historyLimit,
+      persist: true,
+    });
+
+    res.status(201).json({ status: "ok", ...governance });
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
