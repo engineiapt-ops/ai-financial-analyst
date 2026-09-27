@@ -212,6 +212,7 @@ export function simulateWalkForwardPortfolio(options: {
   const equityCurve: WalkForwardPortfolioPoint[] = [];
   let cash = initialCapital;
   let realizedPnl = 0;
+  let executedTrades = 0;
   let totalFees = 0;
   let totalSlippage = 0;
   let exposureRejectedTrades = 0;
