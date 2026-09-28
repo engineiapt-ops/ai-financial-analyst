@@ -14,10 +14,9 @@ import {
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds } from "../config/thresholds.js";
+import { resolvePriceLevels } from "../config/executionLevels.js";
 import type { MarketState, Kline } from "../types.js";
 
-const TARGET_PCT = 0.01;
-const STOP_PCT = 0.005;
 const LOOKAHEAD_CANDLES = 20;
 const OOS_START_RATIO = 0.7;
 
@@ -27,15 +26,6 @@ function forwardOutcome(signalPrice: number, future: Kline[]) {
   return {
     forwardReturnPercent: delta,
     outcomeDirection: delta > 0 ? "up" as const : delta < 0 ? "down" as const : "flat" as const,
-  };
-}
-
-function getLevels(entryPrice: number, side: "BUY" | "SELL") {
-  const direction = side === "BUY" ? 1 : -1;
-  return {
-    entrada: entryPrice,
-    alvo: entryPrice * (1 + direction * TARGET_PCT),
-    stop: entryPrice * (1 - direction * STOP_PCT),
   };
 }
 
@@ -75,8 +65,8 @@ export async function runRemoteBaselineBacktest(fromRunId?: number, requestedCan
     candlesTotal: klines.length,
     datasetHash,
     executionModelVersion: EXECUTION_MODEL_VERSION,
-    targetPct: TARGET_PCT,
-    stopPct: STOP_PCT,
+    targetPct: execution.execution.targetPct,
+        stopPct: execution.execution.stopPct,
     lookaheadCandles: LOOKAHEAD_CANDLES,
     slippagePct: DEFAULT_EXECUTION_COSTS.slippagePct,
     feePct: DEFAULT_EXECUTION_COSTS.feePct,
@@ -123,8 +113,8 @@ export async function runRemoteBaselineBacktest(fromRunId?: number, requestedCan
       dataAsOf: decisionAt,
       decision,
       referencePrice: signalCandle.close,
-      targetPct: TARGET_PCT,
-      stopPct: STOP_PCT,
+      targetPct: execution.execution.targetPct,
+        stopPct: execution.execution.stopPct,
       lookaheadCandles: LOOKAHEAD_CANDLES,
       executionModelVersion: EXECUTION_MODEL_VERSION,
     });
@@ -145,10 +135,10 @@ export async function runRemoteBaselineBacktest(fromRunId?: number, requestedCan
       decision.recomendacao,
       signalCandle,
       future,
-      TARGET_PCT,
-      STOP_PCT,
-    );
-    const levels = getLevels(trade.entryPrice, decision.recomendacao);
+        execution.execution.targetPct,
+        execution.execution.stopPct,
+      );
+    const levels = resolvePriceLevels({ entryPrice: trade.entryPrice, side: decision.recomendacao === "SELL" ? "SELL" : "BUY", atr: indicators.atr, timeframe: "1h", referencePrice: signalCandle.close }).levels;
     const signalId = await saveSignal("BTCUSDT", "1h", decision, levels, runId);
 
     await saveTrade(
