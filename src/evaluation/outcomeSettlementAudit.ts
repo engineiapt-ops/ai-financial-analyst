@@ -102,7 +102,7 @@ export function buildOutcomeSettlementAudit(input: {
     usedFuture.map((candle) => candleEvidence(candle)),
   );
 
-  const withoutEvidenceHash = {
+  const withoutEvidenceHash: Omit<OutcomeSettlementAuditPayload, "evidenceHash" | "notes"> = {
     version: OUTCOME_SETTLEMENT_AUDIT_VERSION,
     decisionLogId: input.decision.id,
     asset: input.decision.ativo.toUpperCase(),
