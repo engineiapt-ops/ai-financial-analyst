@@ -151,7 +151,7 @@ export function buildSystemValidationOverview(input: {
       totalDecisions: decisionSummary.totalDecisions,
       settledDecisions: decisionSummary.settledDecisions,
       pendingDecisions: decisionSummary.pendingDecisions,
-      notApplicableDecisions: decisionSummary.notApplicableDecisions,
+      notApplicableDecisions: null,
     },
   });
 
