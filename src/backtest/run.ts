@@ -32,6 +32,8 @@ const ATIVO = "BTCUSDT";
 const TIMEFRAME: Timeframe = "1h";
 const LOOKAHEAD_CANDLES = 20;
 const OOS_START_RATIO = DEFAULT_OOS_START_RATIO;
+const TARGET_PCT = 0.01;
+const STOP_PCT = 0.005;
 
 type Engine = "both" | "baseline" | "jev";
 

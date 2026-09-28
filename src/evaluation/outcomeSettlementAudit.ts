@@ -103,7 +103,7 @@ export function buildOutcomeSettlementAudit(input: {
   );
 
   const withoutEvidenceHash = {
-    version: OUTCOME_SETTLEMENT_AUDIT_VERSION,
+    version: OUTCOME_SETTLEMENT_AUDIT_VERSION as typeof OUTCOME_SETTLEMENT_AUDIT_VERSION,
     decisionLogId: input.decision.id,
     asset: input.decision.ativo.toUpperCase(),
     timeframe: input.decision.timeframe,

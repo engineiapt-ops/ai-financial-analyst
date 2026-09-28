@@ -20,6 +20,8 @@ import { freezeThresholds } from "../config/thresholds.js";
 import { resolveExecutionLevels } from "../config/executionLevels.js";
 import type { DecisionResult, Kline, MarketState } from "../types.js";
 
+const TARGET_PCT = 0.01;
+const STOP_PCT = 0.005;
 const LOOKAHEAD_CANDLES = 20;
 const OOS_START_RATIO = 0.7;
 const CONCURRENCY = 2;

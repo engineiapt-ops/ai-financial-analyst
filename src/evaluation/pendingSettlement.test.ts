@@ -119,6 +119,9 @@ const notReady = await settlePendingDecisionLogs(
     listPending: async () => [decision(3)],
     getCandles: async () => candles.slice(0, 1),
     settle: async () => assert.fail("not-ready decision must not be settled"),
+    evaluate: () => {
+      throw new Error("Insufficient future closed candles for requested lookahead");
+    },
   },
 );
 
@@ -127,8 +130,10 @@ assert.equal(notReady.settled, 0);
 assert.equal(notReady.notReady, 1);
 assert.equal(notReady.failed, 0);
 
-assert.throws(
-  () => settlePendingDecisionLogs({ limit: 0 }, deps),
+await assert.rejects(
+  async () => {
+    await settlePendingDecisionLogs({ limit: 0 }, deps);
+  },
   /limit must be an integer between 1 and 100/,
 );
 

@@ -432,7 +432,6 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         <pre id="govJson"></pre>
       </div>
     </div>
-  </div>
 
     <div class="card" style="margin-bottom:1.5rem;">
       <div class="card-title">
@@ -548,7 +547,9 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         <pre id="riJson"></pre>
       </div>
     </div>
+  </div>
 
+  <script>
     async function loadResearchIntelligence() {
       try {
         const snapshotId = document.getElementById('researchSnapshotId').value.trim();
@@ -684,7 +685,6 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       }
     }
 
-  <script>
     async function refreshGovernanceDashboard() {
       try {
         const params = new URLSearchParams({
@@ -2060,9 +2060,9 @@ app.post("/api/analyze", async (req, res) => {
 
 app.use(requestErrorHandler);
 
-const port = Number(process.env.PORT ?? 3000);
+const port = 3000;
 
-if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
+if (process.env.NODE_ENV !== "test") {
   app.listen(port, "0.0.0.0", () =>
     console.log(`AI Financial Analyst API rodando na porta ${port}`),
   );

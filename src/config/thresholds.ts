@@ -31,7 +31,7 @@ const values = {
 
 let frozen = false;
 export const thresholds: DecisionThresholds = values;
-export const FIXED_POSITION_PCT = envNumber("FIXED_POSITION_PCT", 1.5);
+export const FIXED_POSITION_PCT = envNumber("FIXED_POSITION_PCT", 2.0);
 
 export function freezeThresholds(): void {
   if (!frozen) {

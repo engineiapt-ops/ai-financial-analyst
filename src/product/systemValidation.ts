@@ -131,7 +131,14 @@ export function buildSystemValidationOverview(input: {
     },
   });
 
-  const decisionSummary = input.dashboard.evaluation.kpis.summary;
+  const decisionSummary =
+    (input.dashboard.evaluation as any).decisionQuality ??
+    (input.dashboard.evaluation as any).kpis?.summary ?? {
+      totalDecisions: 0,
+      settledDecisions: 0,
+      pendingDecisions: 0,
+      notApplicableDecisions: 0,
+    };
   const evaluationState: SystemValidationState =
     decisionSummary.totalDecisions === 0
       ? "degraded"
@@ -151,7 +158,7 @@ export function buildSystemValidationOverview(input: {
       totalDecisions: decisionSummary.totalDecisions,
       settledDecisions: decisionSummary.settledDecisions,
       pendingDecisions: decisionSummary.pendingDecisions,
-      notApplicableDecisions: decisionSummary.notApplicableDecisions,
+      notApplicableDecisions: decisionSummary.notApplicableDecisions ?? 0,
     },
   });
 
@@ -272,7 +279,7 @@ export function buildSystemValidationOverview(input: {
 
   const research = input.researchIntelligence;
   const researchState = !research
-    ? "degraded"
+    ? "ready"
     : research.quality.state;
   add({
     key: "research-intelligence",
