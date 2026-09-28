@@ -19,6 +19,7 @@ import {
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds } from "../config/thresholds.js";
+import { resolvePriceLevels } from "../config/executionLevels.js";
 import {
   assertOosTimestampsSeparated,
   buildOosEvaluationPlan,
@@ -29,8 +30,6 @@ import type { MarketState, Timeframe, DecisionResult, Kline } from "../types.js"
 
 const ATIVO = "BTCUSDT";
 const TIMEFRAME: Timeframe = "1h";
-const TARGET_PCT = 0.01;
-const STOP_PCT = 0.005;
 const LOOKAHEAD_CANDLES = 20;
 const OOS_START_RATIO = DEFAULT_OOS_START_RATIO;
 
@@ -58,15 +57,6 @@ function forwardOutcome(signalPrice: number, future: Kline[]) {
   return {
     forwardReturnPercent: delta,
     outcomeDirection: delta > 0 ? "up" as const : delta < 0 ? "down" as const : "flat" as const,
-  };
-}
-
-function getLevels(entryPrice: number, side: "BUY" | "SELL") {
-  const direction = side === "BUY" ? 1 : -1;
-  return {
-    entrada: entryPrice,
-    alvo: entryPrice * (1 + direction * TARGET_PCT),
-    stop: entryPrice * (1 - direction * STOP_PCT),
   };
 }
 
@@ -188,6 +178,12 @@ async function run() {
 
     for (const decision of decisions) {
       const decisionAt = signalCandle.closeTime ?? signalCandle.openTime;
+      const execution = resolvePriceLevels({
+        entryPrice: signalCandle.close,
+        side: decision.recomendacao === "SELL" ? "SELL" : "BUY",
+        atr: indicators.atr,
+        timeframe: TIMEFRAME,
+      });
       const decisionLogId = await saveDecisionLog({
         backtestRunId: runId,
         ativo: ATIVO,
@@ -196,8 +192,8 @@ async function run() {
         dataAsOf: decisionAt,
         decision,
         referencePrice: signalCandle.close,
-        targetPct: TARGET_PCT,
-        stopPct: STOP_PCT,
+        targetPct: execution.execution.targetPct,
+        stopPct: execution.execution.stopPct,
         lookaheadCandles: LOOKAHEAD_CANDLES,
         executionModelVersion: EXECUTION_MODEL_VERSION,
       });
@@ -217,10 +213,16 @@ async function run() {
         decision.recomendacao,
         signalCandle,
         future,
-        TARGET_PCT,
-        STOP_PCT,
+        execution.execution.targetPct,
+        execution.execution.stopPct,
       );
-      const levels = getLevels(trade.entryPrice, decision.recomendacao);
+      const levels = resolvePriceLevels({
+        entryPrice: trade.entryPrice,
+        side: decision.recomendacao === "SELL" ? "SELL" : "BUY",
+        atr: indicators.atr,
+        timeframe: TIMEFRAME,
+        referencePrice: signalCandle.close,
+      }).levels;
       const signalId = await saveSignal(ATIVO, TIMEFRAME, decision, levels, runId);
       await saveTrade(
         signalId,
