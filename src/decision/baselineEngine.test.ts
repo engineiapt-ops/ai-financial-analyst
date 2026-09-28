@@ -32,7 +32,7 @@ export function runBaselineTests() {
     const result = evaluateBaseline(market());
     assert(result.origem === "baseline", "origem deve ser baseline");
     assert(result.recomendacao === "BUY", "condição de alta deve gerar BUY");
-    assert(result.tamanhoPosicaoPct === 2, "posição válida deve ser 2%");
+    assert(result.tamanhoPosicaoPct === 1.5, "posição válida deve ser 1,5%");
     console.log("PASS");
   }
 
@@ -40,7 +40,7 @@ export function runBaselineTests() {
     process.stdout.write("2. Tendência de baixa + RSI acima de 30 -> SELL... ");
     const result = evaluateBaseline(market({ ema9: 99, ema21: 100, rsi: 45 }));
     assert(result.recomendacao === "SELL", "condição de baixa deve gerar SELL");
-    assert(result.tamanhoPosicaoPct === 2, "posição válida deve ser 2%");
+    assert(result.tamanhoPosicaoPct === 1.5, "posição válida deve ser 1,5%");
     console.log("PASS");
   }
 
