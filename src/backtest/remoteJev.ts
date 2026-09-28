@@ -13,7 +13,7 @@ import {
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds } from "../config/thresholds.js";
-import { resolvePriceLevels } from "../config/executionLevels.js";
+import { FALLBACK_STOP_PCT, FALLBACK_TARGET_PCT, resolvePriceLevels } from "../config/executionLevels.js";
 import type { MarketState, Kline, DecisionResult } from "../types.js";
 
 const LOOKAHEAD_CANDLES = 20;
@@ -90,8 +90,8 @@ export async function runRemoteJevBacktest(fromRunId: number) {
     candlesTotal: klines.length,
     datasetHash,
     executionModelVersion: EXECUTION_MODEL_VERSION,
-    targetPct: execution.execution.targetPct,
-        stopPct: execution.execution.stopPct,
+    targetPct: FALLBACK_TARGET_PCT,
+    stopPct: FALLBACK_STOP_PCT,
     lookaheadCandles: LOOKAHEAD_CANDLES,
     slippagePct: DEFAULT_EXECUTION_COSTS.slippagePct,
     feePct: DEFAULT_EXECUTION_COSTS.feePct,
@@ -152,6 +152,12 @@ export async function runRemoteJevBacktest(fromRunId: number) {
     const decision: DecisionResult = decisions[i];
     const candidate = candidates[i];
     const decisionAt = candidate.signalCandle.closeTime ?? candidate.signalCandle.openTime;
+    const execution = resolvePriceLevels({
+      entryPrice: candidate.signalCandle.close,
+      side: decision.recomendacao === "SELL" ? "SELL" : "BUY",
+      atr: candidate.market.indicators.atr,
+      timeframe: "1h",
+    });
     const decisionLogId = await saveDecisionLog({
       backtestRunId: runId,
       ativo: "BTCUSDT",
@@ -161,7 +167,7 @@ export async function runRemoteJevBacktest(fromRunId: number) {
       decision,
       referencePrice: candidate.signalCandle.close,
       targetPct: execution.execution.targetPct,
-        stopPct: execution.execution.stopPct,
+      stopPct: execution.execution.stopPct,
       lookaheadCandles: LOOKAHEAD_CANDLES,
       executionModelVersion: EXECUTION_MODEL_VERSION,
     });
@@ -187,7 +193,13 @@ export async function runRemoteJevBacktest(fromRunId: number) {
         execution.execution.targetPct,
         execution.execution.stopPct,
       );
-    const levels = resolvePriceLevels({ entryPrice: trade.entryPrice, side: decision.recomendacao === "SELL" ? "SELL" : "BUY", atr: indicators.atr, timeframe: "1h", referencePrice: signalCandle.close }).levels;
+    const levels = resolvePriceLevels({
+      entryPrice: trade.entryPrice,
+      side: decision.recomendacao === "SELL" ? "SELL" : "BUY",
+      atr: candidate.market.indicators.atr,
+      timeframe: "1h",
+      referencePrice: candidate.signalCandle.close,
+    }).levels;
     const signalId = await saveSignal(
       "BTCUSDT",
       "1h",
