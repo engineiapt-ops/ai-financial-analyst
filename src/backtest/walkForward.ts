@@ -444,7 +444,7 @@ export async function runWalkForward(options = getOptions()) {
       totalFeePercent: baselineRisk.totalFeePercent,
       totalSlippagePercent: baselineRisk.totalSlippagePercent,
       avgCandlesHeld: baselineRisk.avgCandlesHeld,
-      notas: `riskGateBlocks=${riskGateBlocks}; calibrationCandles=${trainKlines.length}; lowVolAtr=${foldThresholds.lowVolAtrRelative}; highVolAtr=${foldThresholds.highVolAtrRelative}; model=regime-v1+risk-engine-v1`,
+      notas: `riskGateBlocks=${riskGateBlocks}; calibrationCandles=${trainKlines.length}; lowVolAtr=${foldThresholds.lowVolAtrRelative}; highVolAtr=${foldThresholds.highVolAtrRelative}; model=regime-v1+risk-engine-v2`,
     });
 
     const foldKlines = klines.slice(testStart, testEnd + 1);
