@@ -3392,6 +3392,11 @@ export const getPipelineAuditSnapshot = (id: number) =>
 export const listPipelineAuditSnapshots = (filters: PipelineAuditSnapshotFilters = {}) =>
   createRepository(getDefaultPool()).listPipelineAuditSnapshots(filters);
 
+export const saveSystemValidationSnapshot = (input: SaveSystemValidationSnapshotInput) =>
+  createRepository(getDefaultPool()).saveSystemValidationSnapshot(input);
+export const listSystemValidationSnapshots = (filters: SystemValidationSnapshotFilters = {}) =>
+  createRepository(getDefaultPool()).listSystemValidationSnapshots(filters);
+
 export const saveResearchSnapshot = (input: SaveResearchSnapshotInput) =>
   createRepository(getDefaultPool()).saveResearchSnapshot(input);
 export const listResearchSnapshots = (filters: ResearchSnapshotFilters = {}) =>
