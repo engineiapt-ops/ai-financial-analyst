@@ -23,21 +23,21 @@ export function runDecisionEngineTests() {
   console.log("=== INÍCIO DOS TESTES DO DECISION ENGINE ===");
 
   {
-    process.stdout.write("1. ALTA com thresholds atendidos -> BUY e 2%... ");
+    process.stdout.write("1. ALTA com thresholds atendidos -> BUY e 1,5%... ");
     const result = evaluateJevResponse(response());
     assert(result.recomendacao === "BUY", "ALTA forte deve produzir BUY");
-    assert(result.tamanhoPosicaoPct === 2, "posição fixa deve ser 2%");
+    assert(result.tamanhoPosicaoPct === 1.5, "posição fixa deve ser 1,5%");
     console.log("PASS");
   }
 
   {
-    process.stdout.write("2. BAIXA com thresholds atendidos -> SELL e 2%... ");
+    process.stdout.write("2. BAIXA com thresholds atendidos -> SELL e 1,5%... ");
     const result = evaluateJevResponse(response({
       choice: "BAIXA",
       probabilities: { ALTA: 0.1, BAIXA: 0.8, AGUARDAR: 0.1 },
     }));
     assert(result.recomendacao === "SELL", "BAIXA forte deve produzir SELL");
-    assert(result.tamanhoPosicaoPct === 2, "posição fixa deve ser 2%");
+    assert(result.tamanhoPosicaoPct === 1.5, "posição fixa deve ser 1,5%");
     console.log("PASS");
   }
 
