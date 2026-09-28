@@ -17,10 +17,9 @@ import {
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds } from "../config/thresholds.js";
+import { resolveExecutionLevels } from "../config/executionLevels.js";
 import type { DecisionResult, Kline, MarketState } from "../types.js";
 
-const TARGET_PCT = 0.01;
-const STOP_PCT = 0.005;
 const LOOKAHEAD_CANDLES = 20;
 const OOS_START_RATIO = 0.7;
 const CONCURRENCY = 2;
@@ -257,8 +256,8 @@ export async function runBenchmarkSuite(
       decision.recomendacao,
       candidate.signalCandle,
       candidate.future,
-      TARGET_PCT,
-      STOP_PCT,
+      resolveExecutionLevels({ price: candidate.signalCandle.close, atr: candidate.market.indicators.atr, timeframe: candidate.market.timeframe }).targetPct,
+      resolveExecutionLevels({ price: candidate.signalCandle.close, atr: candidate.market.indicators.atr, timeframe: candidate.market.timeframe }).stopPct,
     );
     baselineTrades.push({
       trade,
@@ -329,8 +328,8 @@ export async function runBenchmarkSuite(
           decision.recomendacao,
           candidate.signalCandle,
           candidate.future,
-          TARGET_PCT,
-          STOP_PCT,
+      resolveExecutionLevels({ price: candidate.signalCandle.close, atr: candidate.market.indicators.atr, timeframe: candidate.market.timeframe }).targetPct,
+      resolveExecutionLevels({ price: candidate.signalCandle.close, atr: candidate.market.indicators.atr, timeframe: candidate.market.timeframe }).stopPct,
         );
         return [{ trade, exitIndex: index + trade.candlesHeld }];
       });

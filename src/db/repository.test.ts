@@ -207,7 +207,7 @@ const snapshot = {
     observacao: null,
   },
   risk: {
-    version: "risk-engine-v1",
+    version: "risk-engine-v2",
     allowed: true,
     positionSizePct: 2,
     maxGrossExposurePct: 20,
