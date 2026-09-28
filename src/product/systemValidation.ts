@@ -131,7 +131,7 @@ export function buildSystemValidationOverview(input: {
     },
   });
 
-  const decisionSummary = input.dashboard.evaluation.kpis.summary;
+  const decisionSummary = input.dashboard.evaluation.decisionQuality;
   const evaluationState: SystemValidationState =
     decisionSummary.totalDecisions === 0
       ? "degraded"
