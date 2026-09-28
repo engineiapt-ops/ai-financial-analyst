@@ -21,6 +21,7 @@ import {
 import { computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds, thresholds } from "../config/thresholds.js";
+import { EXECUTION_LEVELS_VERSION, FALLBACK_STOP_PCT, FALLBACK_TARGET_PCT, resolveExecutionLevels } from "../config/executionLevels.js";
 import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
 import { evaluateRisk } from "../risk/riskEngine.js";
 import {
@@ -31,8 +32,6 @@ import {
 } from "../portfolio/walkForwardEngine.js";
 import type { Kline, MarketState } from "../types.js";
 
-const TARGET_PCT = 0.01;
-const STOP_PCT = 0.005;
 const LOOKAHEAD_CANDLES = 20;
 const DEFAULT_INITIAL_TRAIN = 2000;
 const DEFAULT_TEST_CANDLES = 500;
@@ -100,12 +99,18 @@ function summarize(entries: EvaluatedTrade[]): StrategySummary {
   };
 }
 
-function buildMarket(klines: Kline[], indicatorsSeries: ReturnType<typeof computeIndicatorsSeries>, index: number): MarketState {
+function buildMarket(
+  klines: Kline[],
+  indicatorsSeries: ReturnType<typeof computeIndicatorsSeries>,
+  index: number,
+  ativo: string,
+  timeframe: "1h" | "4h" | "1d",
+): MarketState {
   const candle = klines[index];
   const asOf = candle.closeTime ?? candle.openTime;
   return {
-    ativo: "BTCUSDT",
-    timeframe: "1h",
+    ativo,
+    timeframe,
     timestamp: asOf.getTime(),
     dataAsOf: asOf.getTime(),
     precoAtual: candle.close,
@@ -210,9 +215,10 @@ export async function runWalkForward(options = getOptions()) {
     testCandles,
     stepCandles,
     lookaheadCandles: LOOKAHEAD_CANDLES,
-    executionModelVersion: EXECUTION_MODEL_VERSION,
-    targetPct: TARGET_PCT,
-    stopPct: STOP_PCT,
+    executionModelVersion: `${EXECUTION_MODEL_VERSION}:${EXECUTION_LEVELS_VERSION}`,
+    // Legacy run-level fields remain as fallback metadata; actual target/stop are resolved per signal from ATR.
+    targetPct: FALLBACK_TARGET_PCT,
+    stopPct: FALLBACK_STOP_PCT,
     slippagePct: DEFAULT_EXECUTION_COSTS.slippagePct,
     feePct: DEFAULT_EXECUTION_COSTS.feePct,
     thresholdFrozenAt: thresholds.frozenAt,
@@ -326,7 +332,7 @@ export async function runWalkForward(options = getOptions()) {
       candidates.push({
         index,
         future: klines.slice(index + 1, index + 1 + LOOKAHEAD_CANDLES),
-        market: buildMarket(klines, indicatorsSeries, index),
+        market: buildMarket(klines, indicatorsSeries, index, ativo, timeframe),
       });
     }
 
@@ -351,12 +357,17 @@ export async function runWalkForward(options = getOptions()) {
       const decision = evaluateBaseline(candidate.market);
       if (decision.recomendacao === "WAIT") continue;
 
+      const execution = resolveExecutionLevels({
+        price: candidate.market.precoAtual,
+        atr: candidate.market.indicators.atr,
+        timeframe,
+      });
       const trade = simulateTrade(
         decision.recomendacao,
         klines[candidate.index],
         candidate.future,
-        TARGET_PCT,
-        STOP_PCT,
+        execution.targetPct,
+        execution.stopPct,
       );
       baselineTrades.push({ trade, exitIndex: candidate.index + trade.candlesHeld });
       baselinePortfolioTrades.push({
@@ -374,12 +385,17 @@ export async function runWalkForward(options = getOptions()) {
         continue;
       }
 
+      const riskExecution = resolveExecutionLevels({
+        price: candidate.market.precoAtual,
+        atr: candidate.market.indicators.atr,
+        timeframe,
+      });
       const riskTrade = simulateTrade(
         decision.recomendacao,
         klines[candidate.index],
         candidate.future,
-        TARGET_PCT,
-        STOP_PCT,
+        riskExecution.targetPct,
+        riskExecution.stopPct,
       );
       baselineRiskTrades.push({
         trade: riskTrade,
@@ -635,12 +651,17 @@ export async function runWalkForward(options = getOptions()) {
         for (let index = 0; index < candidates.length; index += 1) {
           const decision = decisions[index];
           if (decision.recomendacao === "WAIT") continue;
+          const execution = resolveExecutionLevels({
+            price: candidates[index].market.precoAtual,
+            atr: candidates[index].market.indicators.atr,
+            timeframe,
+          });
           const trade = simulateTrade(
             decision.recomendacao,
             klines[candidates[index].index],
             candidates[index].future,
-            TARGET_PCT,
-            STOP_PCT,
+            execution.targetPct,
+            execution.stopPct,
           );
           jevTrades.push({ trade, exitIndex: candidates[index].index + trade.candlesHeld });
         }
@@ -831,7 +852,7 @@ export async function runWalkForward(options = getOptions()) {
       baseline: await getWalkForwardPortfolioFolds(baselinePortfolioRunId),
       baselineRisk: await getWalkForwardPortfolioFolds(baselineRiskPortfolioRunId),
     },
-    note: "Fixed-rule walk-forward validation with frozen per-fold regime thresholds and realistic finite-capital portfolio simulation: no strategy parameter optimization is performed in this stage.",
+    note: "Fixed-rule walk-forward validation with frozen per-fold regime thresholds, ATR-derived execution levels (execution-levels-v1), and realistic finite-capital portfolio simulation: no strategy parameter optimization is performed in this stage.",
   };
 }
 
