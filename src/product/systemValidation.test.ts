@@ -151,7 +151,16 @@ const ready = buildSystemValidationOverview({
     interpretation: { readyMeans: "ok", regressionMeans: "ok", notAnInvestmentVerdict: true },
     notes: [],
   },
-  researchIntelligence: null,
+  researchIntelligence: {
+    version: "research-intelligence.v1",
+    quality: { state: "ready" },
+    snapshot: { snapshotId: 1 },
+    evidence: {
+      traceableCount: 1,
+      pointInTimeValidCount: 1,
+      totalCount: 1,
+    },
+  } as any,
   settlementAudit,
 });
 
