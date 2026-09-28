@@ -95,12 +95,6 @@ export async function runRemoteBaselineBacktest(fromRunId?: number, requestedCan
 
     candidates += 1;
     const decisionAt = signalCandle.closeTime ?? signalCandle.openTime;
-    const execution = resolvePriceLevels({
-      entryPrice: signalCandle.close,
-      side: "BUY",
-      atr: indicators.atr,
-      timeframe: "1h",
-    });
     const market: MarketState = {
       ativo: "BTCUSDT",
       timeframe: "1h",
@@ -111,6 +105,12 @@ export async function runRemoteBaselineBacktest(fromRunId?: number, requestedCan
       noticiaSentimento: 0,
     };
     const decision = evaluateBaseline(market);
+    const execution = resolvePriceLevels({
+      entryPrice: signalCandle.close,
+      side: decision.recomendacao === "SELL" ? "SELL" : "BUY",
+      atr: indicators.atr,
+      timeframe: "1h",
+    });
     const decisionLogId = await saveDecisionLog({
       backtestRunId: runId,
       ativo: "BTCUSDT",
