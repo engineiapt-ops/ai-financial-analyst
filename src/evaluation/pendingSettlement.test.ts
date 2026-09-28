@@ -130,7 +130,7 @@ assert.equal(notReady.settled, 0);
 assert.equal(notReady.notReady, 1);
 assert.equal(notReady.failed, 0);
 
-assert.throws(
+await assert.rejects(
   () => settlePendingDecisionLogs({ limit: 0 }, deps),
   /limit must be an integer between 1 and 100/,
 );
