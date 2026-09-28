@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { evaluateRisk, applyRiskToDecision } from "./riskEngine.js";
+import { FIXED_POSITION_PCT } from "../config/thresholds.js";
+import { evaluateRisk, applyRiskToDecision, RISK_POSITION_SIZE_PCT } from "./riskEngine.js";
 import type { RegimeSnapshot } from "./regime.js";
 
 const baseRegime: RegimeSnapshot = {
@@ -18,12 +19,14 @@ const baseRegime: RegimeSnapshot = {
 const decision = {
   origem: "baseline" as const,
   recomendacao: "BUY" as const,
-  tamanhoPosicaoPct: 2,
+  tamanhoPosicaoPct: FIXED_POSITION_PCT,
 };
 
 const ok = evaluateRisk(decision, baseRegime);
 assert.equal(ok.allowed, true);
 assert.equal(ok.reason, "risk_ok");
+assert.equal(ok.positionSizePct, FIXED_POSITION_PCT);
+assert.equal(RISK_POSITION_SIZE_PCT, FIXED_POSITION_PCT);
 
 const highVol = evaluateRisk(decision, {
   ...baseRegime,
@@ -36,5 +39,12 @@ assert.equal(highVol.reason, "high_volatility");
 const blocked = applyRiskToDecision(decision, highVol);
 assert.equal(blocked.recomendacao, "WAIT");
 assert.equal(blocked.tamanhoPosicaoPct, 0);
+
+const elevated = evaluateRisk(
+  { ...decision, riscoElevado: true, tamanhoPosicaoPct: FIXED_POSITION_PCT },
+  baseRegime,
+);
+assert.equal(elevated.allowed, true);
+assert.ok(elevated.positionSizePct < FIXED_POSITION_PCT);
 
 console.log("risk engine tests passed");
