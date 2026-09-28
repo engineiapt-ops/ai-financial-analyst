@@ -69,6 +69,9 @@ const deps: PendingSettlementDependencies = {
     assert.equal(audit.decisionLogId, id);
   },
   evaluate: (log, future, evaluatedAt, config) => {
+    if (future.length < config.lookaheadCandles) {
+      throw new Error("Insufficient future closed candles for requested lookahead");
+    }
     assert.equal(future.length, candles.length);
     assert.equal(config.lookaheadCandles, 1);
     assert.equal(config.flatThresholdPct, 0.1);
