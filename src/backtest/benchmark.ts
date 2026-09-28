@@ -17,7 +17,7 @@ import {
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds } from "../config/thresholds.js";
-import { resolveExecutionLevels } from "../config/executionLevels.js";
+import { FALLBACK_STOP_PCT, FALLBACK_TARGET_PCT, resolveExecutionLevels } from "../config/executionLevels.js";
 import type { DecisionResult, Kline, MarketState } from "../types.js";
 
 const LOOKAHEAD_CANDLES = 20;
@@ -238,8 +238,9 @@ export async function runBenchmarkSuite(
     candlesTotal: klines.length,
     datasetHash: computeDatasetHash(klines),
     executionModelVersion: EXECUTION_MODEL_VERSION,
-    targetPct: TARGET_PCT,
-    stopPct: STOP_PCT,
+    // Legacy metadata fields remain as fallback metadata; benchmark trades use resolved levels.
+    targetPct: FALLBACK_TARGET_PCT,
+    stopPct: FALLBACK_STOP_PCT,
     lookaheadCandles: LOOKAHEAD_CANDLES,
     slippagePct: DEFAULT_EXECUTION_COSTS.slippagePct,
     feePct: DEFAULT_EXECUTION_COSTS.feePct,

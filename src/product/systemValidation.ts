@@ -131,7 +131,7 @@ export function buildSystemValidationOverview(input: {
     },
   });
 
-  const decisionSummary = input.dashboard.evaluation.kpis.summary;
+  const decisionSummary = input.dashboard.evaluation.decisionQuality;
   const evaluationState: SystemValidationState =
     decisionSummary.totalDecisions === 0
       ? "degraded"
@@ -151,7 +151,7 @@ export function buildSystemValidationOverview(input: {
       totalDecisions: decisionSummary.totalDecisions,
       settledDecisions: decisionSummary.settledDecisions,
       pendingDecisions: decisionSummary.pendingDecisions,
-      notApplicableDecisions: decisionSummary.notApplicableDecisions,
+      notApplicableDecisions: null,
     },
   });
 
