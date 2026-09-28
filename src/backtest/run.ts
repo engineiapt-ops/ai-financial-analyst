@@ -19,7 +19,7 @@ import {
 import { assertDatasetMatchesMetadata, computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds } from "../config/thresholds.js";
-import { resolvePriceLevels } from "../config/executionLevels.js";
+import { FALLBACK_STOP_PCT, FALLBACK_TARGET_PCT, resolvePriceLevels } from "../config/executionLevels.js";
 import {
   assertOosTimestampsSeparated,
   buildOosEvaluationPlan,
@@ -128,8 +128,9 @@ async function run() {
     candlesTotal: klines.length,
     datasetHash,
     executionModelVersion: EXECUTION_MODEL_VERSION,
-    targetPct: TARGET_PCT,
-    stopPct: STOP_PCT,
+    // Legacy metadata fields remain as fallback metadata; per-trade levels are ATR/timeframe resolved below.
+    targetPct: FALLBACK_TARGET_PCT,
+    stopPct: FALLBACK_STOP_PCT,
     lookaheadCandles: LOOKAHEAD_CANDLES,
     slippagePct: DEFAULT_EXECUTION_COSTS.slippagePct,
     feePct: DEFAULT_EXECUTION_COSTS.feePct,
