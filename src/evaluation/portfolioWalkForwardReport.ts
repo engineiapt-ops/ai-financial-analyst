@@ -293,7 +293,7 @@ export async function buildPortfolioWalkForwardReport(
     notes: [
       "This report is diagnostic and does not select a preferred strategy.",
       "Returns are account-level finite-capital portfolio results, not sums of signal percentages.",
-      "baseline_risk uses regime-v1/risk-engine-v1 with thresholds calibrated on each fold's pre-test window.",
+      "baseline_risk uses regime-v1/risk-engine-v2 with thresholds calibrated on each fold's pre-test window.",
       "No parameter optimization is performed by this report.",
     ],
   };
