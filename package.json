@@ -1,6 +1,6 @@
 {
   "name": "ai-financial-analyst",
-  "version": "0.1.0",
+  "version": "0.1.3-personal",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "start": "node dist/api/server.js",
     "test:indicators": "tsx src/features/indicators.test.ts",
     "test:sentiment": "tsx src/features/sentimentPipeline.test.ts",
-    "test": "npm run test:indicators && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:pending-settlement && npm run test:outcome-settlement-audit && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:evaluation-overview && npm run test:portfolio-governance-overview && npm run test:portfolio-stability && npm run test:operational-quality && npm run test:pipeline-audit && npm run test:pipeline-audit-repository && npm run test:governance-dashboard && npm run test:continuous-governance && npm run test:research-intelligence && npm run test:system-readiness && npm run test:system-validation && npm run test:validation-history && npm run test:release-gate && npm run test:rate-limit && npm run test:auth && npm run test:observability && npm run test:runtime-config && npm run test:api-integration && npm run test:gemini && npm run test:pit && npm run test:market-data-quality && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:portfolio-walk-forward && npm run test:dataset && npm run test:repository && npm run test:server",
+    "test": "npm run test:indicators && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:pending-settlement && npm run test:outcome-settlement-audit && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:evaluation-overview && npm run test:portfolio-governance-overview && npm run test:portfolio-stability && npm run test:operational-quality && npm run test:pipeline-audit && npm run test:pipeline-audit-repository && npm run test:governance-dashboard && npm run test:continuous-governance && npm run test:research-intelligence && npm run test:system-readiness && npm run test:system-validation && npm run test:validation-history && npm run test:release-gate && npm run test:rate-limit && npm run test:auth && npm run test:observability && npm run test:runtime-config && npm run test:api-integration && npm run test:gemini && npm run test:pit && npm run test:market-data-quality && npm run test:decision && npm run test:baseline && npm run test:execution-levels && npm run test:risk && npm run test:paper && npm run test:portfolio-walk-forward && npm run test:dataset && npm run test:repository && npm run test:server",
     "test:decision": "tsx src/decision/decisionEngine.test.ts",
     "test:baseline": "tsx src/decision/baselineEngine.test.ts",
     "test:paper": "tsx src/papertrading/simulator.test.ts",
@@ -56,7 +56,11 @@
     "test:system-validation": "tsx src/product/systemValidation.test.ts",
     "release:gate": "tsx src/product/releaseGate.ts",
     "test:release-gate": "tsx src/product/releaseGate.test.ts",
-    "test:validation-history": "tsx src/product/validationHistory.test.ts"
+    "test:validation-history": "tsx src/product/validationHistory.test.ts",
+    "backfill:all": "npm run market:backfill -- --symbol BTCUSDT --timeframe 1h && npm run market:backfill -- --symbol BTCUSDT --timeframe 4h && npm run market:backfill -- --symbol BTCUSDT --timeframe 1d",
+    "setup:personal": "echo \"1) Configure .env (cp .env.example .env)\" && echo \"2) npm install && npm run db:migrate\" && echo \"3) npm run backfill:all\" && echo \"4) npm run backtest:walk-forward\" && echo \"Ver PLANO-ATIVACAO.md para detalhes\"",
+    "test:execution-levels": "tsx src/config/executionLevels.test.ts",
+    "test:risk": "tsx src/risk/riskEngine.test.ts"
   },
   "dependencies": {
     "express": "^4.19.2",
