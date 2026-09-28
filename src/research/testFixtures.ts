@@ -40,7 +40,7 @@ export function buildTestAnalyzeOutput(): AnalyzeOutput {
       maxAgeMs: 90 * 60 * 1000,
     },
     risk: {
-      version: "risk-engine-v1",
+      version: "risk-engine-v2",
       allowed: true,
       positionSizePct: 2,
       maxGrossExposurePct: 20,
