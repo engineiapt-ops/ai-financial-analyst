@@ -1328,8 +1328,8 @@ export function createRepository(db: RepositoryPool) {
         conditions.push(condition.replace("?", String(values.length)));
       };
 
-      if (filters.ativo) add("ativo = ?", filters.ativo.trim().toUpperCase());
-      if (filters.timeframe) add("timeframe = ?", filters.timeframe);
+      if (filters.ativo) add("dl.ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("dl.timeframe = ?", filters.timeframe);
       if (filters.fromRun !== null && filters.fromRun !== undefined) {
         add("from_run = ?", filters.fromRun);
       }
@@ -1904,10 +1904,10 @@ export function createRepository(db: RepositoryPool) {
 
       if (filters.ativo) add("ativo = ?", filters.ativo.trim().toUpperCase());
       if (filters.timeframe) add("timeframe = ?", filters.timeframe);
-      if (filters.origem) add("origem = ?", filters.origem);
-      if (filters.recomendacao) add("recomendacao = ?", filters.recomendacao);
-      if (filters.from) add("decision_at >= ?", filters.from);
-      if (filters.to) add("decision_at <= ?", filters.to);
+      if (filters.origem) add("dl.origem = ?", filters.origem);
+      if (filters.recomendacao) add("dl.recomendacao = ?", filters.recomendacao);
+      if (filters.from) add("dl.decision_at >= ?", filters.from);
+      if (filters.to) add("dl.decision_at <= ?", filters.to);
       if (filters.riskRegime) add("COALESCE(rs.snapshot->'risk'->'regime'->>'key', 'unknown') = ?", filters.riskRegime);
 
       const baseWhere = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
