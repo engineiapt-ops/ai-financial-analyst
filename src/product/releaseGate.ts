@@ -30,6 +30,24 @@ export const RELEASE_GATE_REQUIRED_CONTRACTS = [
   RESEARCH_INTELLIGENCE_VERSION,
 ] as const;
 
+export const RELEASE_GATE_REQUIRED_TESTS = [
+  "npm run test:system-readiness",
+  "npm run test:system-validation",
+  "npm run test:outcome-settlement-audit",
+  "npm run test:validation-history",
+  "npm run test:paper-e2e",
+  "npm run test:runtime-config",
+  "npm run test:auth",
+  "npm run test:rate-limit",
+  "npm run test:observability",
+  "npm run test:api-integration",
+  "npm run test:pit",
+  "npm run test:market-data-quality",
+  "npm run test:decision",
+  "npm run test:risk",
+  "npm run test:paper",
+] as const;
+
 export interface ReleaseGateCheck {
   key: "build-script" | "test-script" | "contract-versions" | "guardrails";
   passed: boolean;
@@ -65,16 +83,16 @@ export function buildReleaseGateReport(input: {
   });
 
   const testScript = input.packageScripts.test ?? "";
-  const testScriptPassed =
-    testScript.includes("npm run test:system-validation") &&
-    testScript.includes("npm run test:outcome-settlement-audit") &&
-    testScript.includes("npm run test:validation-history");
+  const missingTests = RELEASE_GATE_REQUIRED_TESTS.filter(
+    (requiredTest) => !testScript.includes(requiredTest),
+  );
+  const testScriptPassed = missingTests.length === 0;
   checks.push({
     key: "test-script",
     passed: testScriptPassed,
     detail: testScriptPassed
-      ? "The release pipeline includes system-validation, settlement-audit and validation-history tests."
-      : "The aggregate test suite is missing one or more release-critical contract suites.",
+      ? "The aggregate test suite includes the release-critical operational, E2E, security and data-integrity suites."
+      : `The aggregate test suite is missing release-critical suites: ${missingTests.join(", ")}.`,
   });
 
   const uniqueContracts = new Set(RELEASE_GATE_REQUIRED_CONTRACTS);
@@ -112,6 +130,7 @@ export function buildReleaseGateReport(input: {
       "This gate is a release-integrity check, not an investment verdict.",
       "It does not create signals, select strategies, change thresholds or authorize real execution.",
       "CI must execute build and the aggregate test suite before this gate is accepted.",
+      "The gate now requires the controlled paper-trading E2E and production hardening test contracts in the aggregate suite.",
     ],
   };
 }
