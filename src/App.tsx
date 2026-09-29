@@ -125,7 +125,7 @@ export const App: React.FC = () => {
               </div>
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Analyzing Financial Filings for ${selectedTicker}...</h3>
+              <h3 className="text-base font-bold text-white">Analyzing Financial Filings for {selectedTicker}...</h3>
               <p className="text-xs text-slate-400 mt-1 max-w-md">
                 Decomposing DuPont ratios, structuring segment revenues, calculating valuation multiples, and synthesizing risk catalysts.
               </p>

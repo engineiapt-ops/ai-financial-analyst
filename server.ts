@@ -5,6 +5,9 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import { app as coreApiApp } from './src/api/server.js';
+import { requireApiAuth } from './src/api/auth.js';
+import { createRateLimitMiddleware, getRequestClientKey } from './src/api/rateLimit.js';
 
 dotenv.config();
 
@@ -17,6 +20,50 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+const extendedAiApiPaths = new Set([
+  '/api/analyze/ticker',
+  '/api/analyze/ledger',
+  '/api/valuation/dcf',
+  '/api/research/memo',
+  '/api/briefing/tts',
+  '/api/copilot/chat',
+]);
+
+const extendedAiRateLimiter = createRateLimitMiddleware({
+  windowMs: 60_000,
+  max: Number(process.env.RATE_LIMIT_MAX ?? 120),
+  key: (req) => `extended-api:${getRequestClientKey(req)}`,
+});
+
+const extendedAiHeavyRateLimiter = createRateLimitMiddleware({
+  windowMs: 60_000,
+  max: Number(process.env.RATE_LIMIT_HEAVY_MAX ?? 20),
+  key: (req) => `extended-heavy:${getRequestClientKey(req)}`,
+});
+
+const extendedAiAuth = requireApiAuth();
+
+app.use((req, res, next) => {
+  if (!extendedAiApiPaths.has(req.path) || req.method !== 'POST') {
+    return next();
+  }
+  extendedAiRateLimiter(req, res, next);
+});
+
+app.use((req, res, next) => {
+  if (!extendedAiApiPaths.has(req.path) || req.method !== 'POST') {
+    return next();
+  }
+  extendedAiHeavyRateLimiter(req, res, next);
+});
+
+app.use((req, res, next) => {
+  if (!extendedAiApiPaths.has(req.path) || req.method !== 'POST') {
+    return next();
+  }
+  extendedAiAuth(req, res, next);
+});
 
 // Helper to safely get initialized GoogleGenAI or null
 function getAIClient(): GoogleGenAI | null {
@@ -99,7 +146,10 @@ app.post('/api/analyze/ticker', async (req: Request, res: Response) => {
 
     const ai = getAIClient();
     if (!ai) {
-      // Fallback synthetic response if API key is not yet set
+      if (process.env.AI_DEMO_MODE !== 'true') {
+        return res.status(503).json({ error: 'GEMINI_API_KEY is required; demo fallbacks are disabled' });
+      }
+      // Explicit demo-only fallback
       return res.json({
         data: {
           ticker: ticker.toUpperCase(),
@@ -301,7 +351,10 @@ app.post('/api/analyze/ledger', async (req: Request, res: Response) => {
 
     const ai = getAIClient();
     if (!ai) {
-      // Deterministic fallback ledger summary
+      if (process.env.AI_DEMO_MODE !== 'true') {
+        return res.status(503).json({ error: 'GEMINI_API_KEY is required; demo fallbacks are disabled' });
+      }
+      // Explicit demo-only fallback
       return res.json({
         data: {
           summary: {
@@ -601,6 +654,9 @@ app.post('/api/research/memo', async (req: Request, res: Response) => {
 
     const ai = getAIClient();
     if (!ai) {
+      if (process.env.AI_DEMO_MODE !== 'true') {
+        return res.status(503).json({ error: 'GEMINI_API_KEY is required; demo fallbacks are disabled' });
+      }
       return res.json({
         memoMarkdown: `# INSTITUTIONAL EQUITY RESEARCH: ${ticker?.toUpperCase() || 'COMPANY'}
 **Recommendation:** OVERWEIGHT (12M Price Target: Bull $175 / Base $148 / Bear $95)  
@@ -749,6 +805,9 @@ app.post('/api/copilot/chat', async (req: Request, res: Response) => {
 
     const ai = getAIClient();
     if (!ai) {
+      if (process.env.AI_DEMO_MODE !== 'true') {
+        return res.status(503).json({ error: 'GEMINI_API_KEY is required; demo fallbacks are disabled' });
+      }
       const lastUserMsg = messages[messages.length - 1]?.content || '';
       return res.json({
         reply: `**AI Financial Analyst Co-Pilot Analysis:**\n\nRegarding your inquiry: "*${lastUserMsg}*"\n\n- **DuPont Framework:** ROE is decomposed into Net Margin × Asset Turnover × Equity Multiplier. For tech companies with strong software margins, high ROE is predominantly driven by pricing power rather than financial leverage.\n- **DCF Sensitivity:** A 100 bps shift in discount rate (WACC) typically produces a 12-18% swing in equity value depending on terminal growth assumptions.\n- **Forensic Audit Checks:** We monitor accounts for split transaction structuring under approval limits, unclassified vendor payouts, and sudden inventory turnover spikes.\n\n*Configure GEMINI_API_KEY for dynamic real-time web-grounded live chat.*`,
@@ -796,14 +855,14 @@ Be precise, structured, provide exact formulas where relevant, use bullet points
 
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-    app.use('*', async (req, res, next) => {
+    app.use(async (req, res, next) => {
       const url = req.originalUrl;
       if (url.startsWith('/api')) {
         return next();
@@ -818,7 +877,7 @@ async function startServer() {
     });
   } else {
     app.use(express.static(path.join(__dirname, 'dist')));
-    app.get('*', (_req, res) => {
+    app.use((_req, res) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   }
@@ -828,6 +887,18 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/health') {
+    return coreApiApp(req, res, next);
+  }
+  next();
 });
+
+export { app };
+export default app;
+
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+  });
+}
