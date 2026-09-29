@@ -1902,8 +1902,8 @@ export function createRepository(db: RepositoryPool) {
         conditions.push(condition.replace("?", `${values.length}`));
       };
 
-      if (filters.ativo) add("ativo = ?", filters.ativo.trim().toUpperCase());
-      if (filters.timeframe) add("timeframe = ?", filters.timeframe);
+      if (filters.ativo) add("dl.ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("dl.timeframe = ?", filters.timeframe);
       if (filters.origem) add("dl.origem = ?", filters.origem);
       if (filters.recomendacao) add("dl.recomendacao = ?", filters.recomendacao);
       if (filters.from) add("dl.decision_at >= ?", filters.from);
