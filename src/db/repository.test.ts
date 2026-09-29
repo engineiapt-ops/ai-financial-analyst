@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createRepository, type RepositoryPool } from "./repository.js";
 import { computeDatasetHash } from "../marketdata/dataset.js";
 import type { DecisionResult } from "../types.js";
@@ -124,6 +125,14 @@ class FakeDb implements RepositoryPool {
   }
   async connect() { return this.client as any; }
 }
+
+const repositorySource = readFileSync(new URL("./repository.ts", import.meta.url), "utf8");
+assert.match(repositorySource, /if \(filters\.ativo\) add\("dl\.ativo = \?",/);
+assert.match(repositorySource, /if \(filters\.timeframe\) add\("dl\.timeframe = \?",/);
+assert.match(repositorySource, /if \(filters\.origem\) add\("dl\.origem = \?",/);
+assert.match(repositorySource, /if \(filters\.recomendacao\) add\("dl\.recomendacao = \?",/);
+assert.match(repositorySource, /if \(filters\.from\) add\("dl\.decision_at >= \?",/);
+assert.match(repositorySource, /if \(filters\.to\) add\("dl\.decision_at <= \?",/);
 
 const db = new FakeDb();
 const repo = createRepository(db);
