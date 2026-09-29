@@ -1328,8 +1328,8 @@ export function createRepository(db: RepositoryPool) {
         conditions.push(condition.replace("?", String(values.length)));
       };
 
-      if (filters.ativo) add("dl.ativo = ?", filters.ativo.trim().toUpperCase());
-      if (filters.timeframe) add("dl.timeframe = ?", filters.timeframe);
+      if (filters.ativo) add("rs.ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("rs.timeframe = ?", filters.timeframe);
       if (filters.fromRun !== null && filters.fromRun !== undefined) {
         add("from_run = ?", filters.fromRun);
       }
@@ -1550,7 +1550,7 @@ export function createRepository(db: RepositoryPool) {
       }>(
         `SELECT snapshot_id, schema_version, content_hash, signal_id,
                 decision_log_id, ativo, timeframe, data_as_of, created_at, snapshot
-         FROM research_snapshots
+         FROM research_snapshots rs
          ${where}
          ORDER BY data_as_of DESC, created_at DESC, snapshot_id DESC
          LIMIT ${limit}`,
