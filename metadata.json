@@ -1,8 +1,7 @@
 {
   "name": "AI Financial Analyst",
-  "description": "AI-assisted financial analysis and decision engine for crypto assets.",
-  "prompt": "AI Financial Analyst API and trading decision engine",
-  "capabilities": [
+  "description": "Institutional-grade AI Financial Analyst platform providing autonomous accounting audits, financial statement ratio breakdown, DCF valuation modeling, real-time research memos with search grounding, audio executive briefings, and portfolio stress testing.",
+  "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
 }
