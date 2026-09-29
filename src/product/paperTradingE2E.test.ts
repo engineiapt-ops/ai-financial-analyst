@@ -49,8 +49,8 @@ const jev: JevResponse = {
     confidence: 0.9,
     probabilities: { ALTA: 0.8, BAIXA: 0.1, AGUARDAR: 0.1 },
   },
-  risco_elevado: { noul: 0.1 },
-  qualidade: { score: 0.9 },
+  risco_elevado: { noul: 0.1, probabilities: {}, confidence: 0.9 },
+  qualidade: { score: 0.9, probabilities: {}, confidence: 0.9 },
 } as JevResponse;
 
 const decision = evaluateJevResponse(jev);
