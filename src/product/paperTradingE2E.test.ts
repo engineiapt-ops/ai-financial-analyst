@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { computeDatasetHash } from "../marketdata/dataset.js";
-import { evaluateJevResponse, type JevResponse } from "../decision/decisionEngine.js";
+import { evaluateJevResponse } from "../decision/decisionEngine.js";
+import type { JevResponse } from "../jev/jevClient.js";
 import { evaluateRisk } from "../risk/riskEngine.js";
 import { simulateTrade, DEFAULT_EXECUTION_COSTS, EXECUTION_MODEL_VERSION } from "../papertrading/simulator.js";
 import { evaluateDecisionLog } from "../evaluation/decisionEvaluator.js";
