@@ -45,3 +45,6 @@ export interface DecisionResult {
   jevModelVersion?: string;
   observacao?: string;
 }
+
+// Compatibility bridge for the React presentation layer.
+export * from "./types/index.js";
