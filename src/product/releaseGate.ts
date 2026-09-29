@@ -73,13 +73,20 @@ export function buildReleaseGateReport(input: {
 }): ReleaseGateReport {
   const checks: ReleaseGateCheck[] = [];
 
-  const buildScriptPassed = input.packageScripts.build === "tsc -p .";
+  const buildScript = input.packageScripts.build ?? "";
+  const serverTypecheckScript = input.packageScripts["check:server"] ?? "";
+  const buildScriptPassed =
+    buildScript === "tsc -p ." ||
+    (
+      buildScript === "npm run check:server && vite build" &&
+      serverTypecheckScript === "tsc -p tsconfig.server.json --noEmit"
+    );
   checks.push({
     key: "build-script",
     passed: buildScriptPassed,
     detail: buildScriptPassed
-      ? "The release pipeline has an explicit TypeScript build command."
-      : "The expected TypeScript build command is missing or changed.",
+      ? "The release pipeline has an explicit server TypeScript check and frontend production build."
+      : "The expected production build contract is missing or changed.",
   });
 
   const testScript = input.packageScripts.test ?? "";
