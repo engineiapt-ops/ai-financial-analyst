@@ -1527,8 +1527,8 @@ export function createRepository(db: RepositoryPool) {
         conditions.push(condition.replace("?", String(values.length)));
       };
 
-      if (filters.ativo) add("ativo = ?", filters.ativo.trim().toUpperCase());
-      if (filters.timeframe) add("timeframe = ?", filters.timeframe);
+      if (filters.ativo) add("dl.ativo = ?", filters.ativo.trim().toUpperCase());
+      if (filters.timeframe) add("dl.timeframe = ?", filters.timeframe);
 
       const limit = filters.limit ?? 20;
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
