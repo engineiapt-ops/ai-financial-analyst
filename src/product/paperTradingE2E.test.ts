@@ -16,7 +16,7 @@ const candle1 = {
   closeTime: new Date("2026-09-29T11:59:59.999Z"),
   open: 100,
   high: 102,
-  low: 99.5,
+  low: 100.5,
   close: 101,
   volume: 10,
 };
