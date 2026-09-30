@@ -17,6 +17,30 @@ export function isProtectedApiRequest(req: Request): boolean {
   ].includes(req.path)) return true;
   if (req.path === "/api/report" && req.method === "POST") return true;
   if (req.path === "/api/product/research-intelligence" && req.method === "GET") return true;
+
+  // Evaluation/governance endpoints expose run-scoped diagnostics or persist
+  // governance history. Require the same API authentication used by other
+  // non-public analytical endpoints.
+  if (
+    req.method === "GET" &&
+    [
+      "/api/evaluation/kpis",
+      "/api/evaluation/oos-report",
+      "/api/evaluation/pipeline-audit",
+      "/api/product/governance-dashboard",
+    ].includes(req.path)
+  ) {
+    return true;
+  }
+  if (
+    req.method === "POST" &&
+    [
+      "/api/evaluation/pipeline-audit/snapshots",
+      "/api/product/continuous-governance/check",
+    ].includes(req.path)
+  ) {
+    return true;
+  }
   if (req.path === "/api/system/validation/history" && req.method === "POST") return true;
   if (
     req.path.startsWith("/api/research/snapshots/") ||
