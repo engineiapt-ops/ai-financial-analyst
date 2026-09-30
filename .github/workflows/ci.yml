@@ -29,8 +29,13 @@ jobs:
         with:
           node-version: 22
 
+      - name: Require lockfile
+        run: |
+          test -f package-lock.json
+          echo "package-lock.json present"
+
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Build
         run: npm run build
