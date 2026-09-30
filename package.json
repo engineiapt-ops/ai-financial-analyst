@@ -2,6 +2,10 @@
   "name": "ai-financial-analyst",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22 <23",
+    "npm": ">=10 <11"
+  },
   "scripts": {
     "dev": "tsx server.ts",
     "backtest": "tsx src/backtest/run.ts",
@@ -54,7 +58,8 @@
     "test:outcome-settlement-audit": "tsx src/evaluation/outcomeSettlementAudit.test.ts",
     "test:system-validation": "tsx src/product/systemValidation.test.ts",
     "test:paper-e2e": "tsx src/product/paperTradingE2E.test.ts",
-    "release:gate": "tsx src/product/releaseGate.ts",
+    "release:gate:checks": "tsx src/product/releaseGate.ts",
+    "release:gate": "npm run build && npm test && npm run release:gate:checks",
     "test:release-gate": "tsx src/product/releaseGate.test.ts",
     "test:validation-history": "tsx src/product/validationHistory.test.ts",
     "backfill:all": "npm run market:backfill -- --symbol BTCUSDT --timeframe 1h && npm run market:backfill -- --symbol BTCUSDT --timeframe 4h && npm run market:backfill -- --symbol BTCUSDT --timeframe 1d",
