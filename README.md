@@ -88,7 +88,7 @@ Configuration:
 API_AUTH_TOKEN=replace-with-a-random-secret
 ```
 
-The protected surface includes market analysis/report generation, research snapshot access, decision persistence, backtests, risk-regime analysis and portfolio operations. Read-only health, market connectivity and evaluation endpoints remain accessible without the token.
+The protected surface includes market analysis/report generation, research snapshot access, decision persistence, backtests, risk-regime analysis, portfolio operations and selected evaluation/governance routes. Read-only health, market connectivity and selected diagnostic evaluation endpoints remain accessible without the token.
 
 The dashboard includes a session-only API key field for `/api/analyze`; the key is sent only in the request header and is not persisted server-side.
 ## Observability
@@ -213,3 +213,8 @@ Endpoints:
 The `validation-history.v1` contract validates temporal ordering, SHA-256 evidence hashes and scope consistency. Timeline events surface state changes, blocking-failure changes and evidence-hash changes between persisted snapshots.
 
 The history is operational/audit evidence only. It does not rank strategies, change thresholds or sizing, produce investment verdicts or authorize execution.
+
+
+## Supabase database access
+
+The application uses the PostgreSQL connection configured in `DATABASE_URL` through the `pg` driver. It does not use the Supabase Data API or Supabase Auth roles from the application client. Migration `019_revoke_public_data_api_grants.sql` removes direct table, sequence and function privileges from the `anon` and `authenticated` roles and removes those grants from the PostgreSQL default privileges for future objects. This keeps database access server-side and avoids exposing application tables through Supabase's public Data API surface.\n
