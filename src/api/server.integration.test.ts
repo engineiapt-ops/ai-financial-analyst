@@ -84,6 +84,73 @@ try {
   });
   assert.equal(wrongHeader.status, 401);
 
+
+  const originalGlobalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input.url;
+
+    if (url.endsWith("/api/v3/ping")) {
+      return new Response("{}", { status: 200 });
+    }
+
+    return originalGlobalFetch(input, init);
+  }) as typeof fetch;
+
+  try {
+    const readinessPublic = await originalGlobalFetch(baseUrl + "/api/system/readiness");
+    assert.equal(readinessPublic.status, 200);
+    const readinessPublicPayload = await readinessPublic.json() as Record<string, unknown>;
+    assert.deepEqual(
+      Object.keys(readinessPublicPayload).sort(),
+      ["ready", "status", "timestamp"],
+    );
+    assert.equal(
+      readinessPublicPayload.status === "ok" || readinessPublicPayload.status === "degraded",
+      true,
+    );
+    assert.equal(typeof readinessPublicPayload.ready, "boolean");
+    assert.equal(typeof readinessPublicPayload.timestamp, "string");
+
+    const publicSerialized = JSON.stringify(readinessPublicPayload).toLowerCase();
+    for (const forbidden of ["missing", "invalid", "warnings", "detail", "contracts"]) {
+      assert.equal(
+        publicSerialized.includes(forbidden),
+        false,
+        `public readiness leaked forbidden field: ${forbidden}`,
+      );
+    }
+
+    const readinessDetailsUnauthorized = await originalGlobalFetch(
+      baseUrl + "/api/system/readiness/details",
+    );
+    assert.equal(readinessDetailsUnauthorized.status, 401);
+
+    const readinessDetailsAuthorized = await originalGlobalFetch(
+      baseUrl + "/api/system/readiness/details",
+      { headers: { "x-api-key": "integration-secret" } },
+    );
+    assert.equal(readinessDetailsAuthorized.status, 200);
+    const readinessDetailsPayload = await readinessDetailsAuthorized.json() as {
+      checks: {
+        configuration: Record<string, unknown>;
+        database: Record<string, unknown>;
+        governance: Record<string, unknown>;
+      };
+    };
+    assert.equal(typeof readinessDetailsPayload.checks.configuration, "object");
+    assert.equal(Array.isArray(readinessDetailsPayload.checks.governance.contracts), true);
+    assert.equal(
+      JSON.stringify(readinessDetailsPayload).includes("DATABASE_URL is required"),
+      true,
+    );
+  } finally {
+    globalThis.fetch = originalGlobalFetch;
+  }
+
   const routePathSet = new Set<string>();
   const routers = [app, coreApiApp];
   for (const routerOwner of routers) {
