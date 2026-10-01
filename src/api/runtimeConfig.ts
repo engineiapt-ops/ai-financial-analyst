@@ -36,6 +36,18 @@ function validUrl(value: string | undefined, protocols: string[]): boolean {
   }
 }
 
+function validCorsOrigins(value: string | undefined): boolean {
+  if (!value?.trim()) return true;
+  return value.split(",").map((origin) => origin.trim()).filter(Boolean).every((origin) => {
+    try {
+      const url = new URL(origin);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  });
+}
+
 export function inspectRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): RuntimeConfigCheck {
@@ -58,6 +70,7 @@ export function inspectRuntimeConfig(
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
     "JEV_MODEL_VERSION",
+    "CORS_ORIGINS",
     "GEMINI_API_BASE",
     "GEMINI_TIMEOUT_MS",
     "TRUST_PROXY",
@@ -73,6 +86,7 @@ export function inspectRuntimeConfig(
   if (!validPositiveNumber(env.RATE_LIMIT_HEAVY_MAX)) invalid.push("RATE_LIMIT_HEAVY_MAX");
   if (!validBoolean(env.TRUST_PROXY)) invalid.push("TRUST_PROXY");
   if (!validBoolean(env.OBSERVABILITY_LOGS)) invalid.push("OBSERVABILITY_LOGS");
+  if (!validCorsOrigins(env.CORS_ORIGINS)) invalid.push("CORS_ORIGINS");
 
   if (!validUrl(env.BINANCE_REST_BASE?.trim(), ["http:", "https:"])) {
     invalid.push("BINANCE_REST_BASE");
