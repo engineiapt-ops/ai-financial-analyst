@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "backtest": "tsx src/backtest/run.ts",
-    "build": "npm run check:server && vite build",
+    "build": "npm run check:server && npm run check:tests && vite build",
     "lint": "npm run check:server && tsc --noEmit",
     "start": "tsx server.ts",
     "test:indicators": "tsx src/features/indicators.test.ts",
@@ -69,7 +69,8 @@
     "test:risk": "tsx src/risk/riskEngine.test.ts",
     "check:server": "tsc -p tsconfig.server.json --noEmit",
     "test:research-snapshot-schema": "tsx src/db/researchSnapshotSchema.test.ts",
-    "test:jev-client": "tsx src/jev/jevClient.test.ts"
+    "test:jev-client": "tsx src/jev/jevClient.test.ts",
+    "check:tests": "tsc -p tsconfig.tests.json --noEmit"
   },
   "dependencies": {
     "express": "^5.2.1",
