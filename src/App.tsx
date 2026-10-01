@@ -1,4 +1,4 @@
-import { apiFetch } from './utils/apiFetch.js';
+import { API_AUTH_ERROR_EVENT, type ApiFetchErrorDetail, apiFetch } from './utils/apiFetch.js';
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { TickerTape } from './components/TickerTape';
@@ -45,6 +45,16 @@ export const App: React.FC = () => {
     },
     featuredTickers: ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'BRK.B']
   });
+
+  useEffect(() => {
+    const handleApiAuthError = (event: Event) => {
+      const detail = (event as CustomEvent<ApiFetchErrorDetail>).detail;
+      if (detail?.message) setError(detail.message);
+    };
+
+    window.addEventListener(API_AUTH_ERROR_EVENT, handleApiAuthError);
+    return () => window.removeEventListener(API_AUTH_ERROR_EVENT, handleApiAuthError);
+  }, []);
 
   useEffect(() => {
     // Fetch live market data on initial load
