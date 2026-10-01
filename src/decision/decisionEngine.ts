@@ -3,7 +3,7 @@ import {
   assertFrozenForOOS,
   thresholds,
 } from "../config/thresholds.js";
-import { callJev, type JevResponse } from "../jev/jevClient.js";
+import { callJev, JevModelVersionMismatchError, JevUnavailableError, type JevResponse } from "../jev/jevClient.js";
 import type { DecisionResult, MarketState, Recomendacao } from "../types.js";
 
 const CHOICE_TO_RECOMENDACAO: Record<"ALTA" | "BAIXA" | "AGUARDAR", Recomendacao> = {
@@ -54,8 +54,29 @@ export function evaluateJevResponse(jev: JevResponse): DecisionResult {
 export async function decideWithJev(
   market: MarketState,
   mode: "dev" | "oos" = "dev",
+  callJevImpl: typeof callJev = callJev,
 ): Promise<DecisionResult> {
   assertFrozenForOOS(mode);
-  const jev = await callJev(market);
-  return evaluateJevResponse(jev);
+  try {
+    const jev = await callJevImpl(market);
+    return evaluateJevResponse(jev);
+  } catch (error) {
+    if (error instanceof JevModelVersionMismatchError) throw error;
+    if (error instanceof JevUnavailableError) {
+      return {
+        origem: "jev",
+        recomendacao: "WAIT",
+        tamanhoPosicaoPct: 0,
+        qualityScore: 0,
+        confidence: 0,
+        probabilidadeDirecional: 0,
+        riscoElevado: false,
+        jevChoice: "AGUARDAR",
+        jevProbs: {},
+        jevModelVersion: "unreported",
+        observacao: "jev=unavailable fallback=WAIT",
+      };
+    }
+    throw error;
+  }
 }
