@@ -53,7 +53,13 @@ export const App: React.FC = () => {
       .then(data => {
         if (data.indices) setMarketData(data);
       })
-      .catch(err => console.warn('Using fallback market overview:', err));
+      .catch(err => {
+        if (err instanceof ApiFetchError && (err.status === 401 || err.status === 503)) {
+          setError(err.message);
+          return;
+        }
+        console.warn('Using fallback market overview:', err);
+      });
   }, []);
 
   const handleSearchTicker = async (ticker: string) => {
