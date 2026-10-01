@@ -1288,7 +1288,17 @@ app.get("/api/system/readiness", async (_req, res) => {
     ],
   });
 
-  res.status(200).json({ status: "ok", ...overview });
+  const publicOverview = {
+    status: "ok" as const,
+    version: overview.version,
+    generatedAt: overview.generatedAt,
+    state: overview.state,
+    checks: Object.fromEntries(
+      Object.entries(overview.checks).map(([key, check]) => [key, { state: check.state }]),
+    ),
+  };
+
+  res.status(200).json(publicOverview);
 });
 
 app.get("/health", (_req, res) => {
