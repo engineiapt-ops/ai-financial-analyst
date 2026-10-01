@@ -445,7 +445,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
           <input type="number" id="validationRun" min="1" placeholder="e.g. 41" />
         </div>
         <div class="form-group" style="display:flex;align-items:end;">
-          <button type="button" onclick="window.refreshSystemValidation()" style="height:42px;">Run Validation</button>
+          <button type="button" id="refreshSystemValidationButton" style="height:42px;">Run Validation</button>
         </div>
       </div>
       <div id="validationPanel" style="display:none;">
@@ -778,6 +778,10 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
     apiKeyInput.value = sessionStorage.getItem('ai-financial-analyst-api-key') || '';
     apiKeyInput.addEventListener('input', () => {
       sessionStorage.setItem('ai-financial-analyst-api-key', apiKeyInput.value.trim());
+    });
+
+    document.getElementById('refreshSystemValidationButton').addEventListener('click', () => {
+      window.refreshSystemValidation();
     });
 
     refreshStatus();
