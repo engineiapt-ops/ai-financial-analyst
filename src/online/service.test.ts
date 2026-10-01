@@ -198,9 +198,8 @@ const input = {
 };
 
 try {
-  const happy = makeOnlineDependencies(async (market, options) =>
+  const happy = makeOnlineDependencies(async (market) =>
     callJev(market, {
-      ...options,
       credential: "mock-gateway-token",
       fetchImpl: makeJevFetch("jev-test-v1"),
       sleepImpl: async () => undefined,
@@ -233,9 +232,8 @@ try {
   );
   assert.equal(happyResult.packet.provenance.decisionLogId, 202);
 
-  const unavailable = makeOnlineDependencies(async (market, options) =>
+  const unavailable = makeOnlineDependencies(async (market) =>
     callJev(market, {
-      ...options,
       credential: "mock-gateway-token",
       fetchImpl: async () => {
         throw new TypeError("network offline");
@@ -257,9 +255,8 @@ try {
   assert.match(unavailableResult.analysis.decision.observacao ?? "", /fallback=WAIT/);
   assert.equal(unavailable.persistence.persistedSignals[0].entrada, null);
 
-  const mismatch = makeOnlineDependencies(async (market, options) =>
+  const mismatch = makeOnlineDependencies(async (market) =>
     callJev(market, {
-      ...options,
       credential: "mock-gateway-token",
       fetchImpl: makeJevFetch("jev-other-v2"),
       sleepImpl: async () => undefined,
