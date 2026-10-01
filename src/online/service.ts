@@ -16,6 +16,24 @@ export interface OnlineAnalysisResult {
 
 export type OnlineAiProvider = "none" | "gemini";
 
+export interface OnlineAnalysisDependencies {
+  analyzeMarket: typeof analyzeMarket;
+  generateAnalystReport: typeof generateAnalystReport;
+  buildResearchSnapshot: typeof buildResearchSnapshot;
+  saveResearchSnapshot: typeof saveResearchSnapshot;
+  buildOnlineAnalysisPacket: typeof buildOnlineAnalysisPacket;
+  getGeminiProvider: typeof getGeminiProvider;
+}
+
+const DEFAULT_DEPENDENCIES: OnlineAnalysisDependencies = {
+  analyzeMarket,
+  generateAnalystReport,
+  buildResearchSnapshot,
+  saveResearchSnapshot,
+  buildOnlineAnalysisPacket,
+  getGeminiProvider,
+};
+
 export function listAiProviders(): AiProviderDescriptor[] {
   const gemini = getGeminiProvider();
   return [
@@ -37,19 +55,21 @@ export function listAiProviders(): AiProviderDescriptor[] {
 export async function runOnlineAnalysis(
   input: AnalyzeInput,
   aiProvider: OnlineAiProvider = "none",
+  dependencies: Partial<OnlineAnalysisDependencies> = {},
 ): Promise<OnlineAnalysisResult> {
-  const analysis = await analyzeMarket(input);
-  const research = await generateAnalystReport(analysis);
-  const snapshot = buildResearchSnapshot(analysis, research);
-  const stored = await saveResearchSnapshot({
+  const deps = { ...DEFAULT_DEPENDENCIES, ...dependencies };
+  const analysis = await deps.analyzeMarket(input);
+  const research = await deps.generateAnalystReport(analysis);
+  const snapshot = deps.buildResearchSnapshot(analysis, research);
+  const stored = await deps.saveResearchSnapshot({
     snapshot,
     decisionLogId: analysis.decisionLogId,
   });
-  const packet = buildOnlineAnalysisPacket(analysis, research, stored.snapshot);
+  const packet = deps.buildOnlineAnalysisPacket(analysis, research, stored.snapshot);
 
   let ai: AiProviderResult | null = null;
   if (aiProvider === "gemini") {
-    ai = await getGeminiProvider().analyze(packet);
+    ai = await deps.getGeminiProvider().analyze(packet);
   }
 
   return {
