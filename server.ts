@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import { getGeminiModelConfig } from './src/ai/geminiProvider.js';
 import { app as coreApiApp } from './src/api/server.js';
 import { requireApiAuth } from './src/api/auth.js';
 import { createRateLimitMiddleware, getRequestClientKey } from './src/api/rateLimit.js';
@@ -15,6 +16,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const { model: GEMINI_MODEL, ttsModel: GEMINI_TTS_MODEL } = getGeminiModelConfig();
+
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -314,7 +317,7 @@ Output a VALID JSON object (and nothing else) adhering to this schema:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -477,7 +480,7 @@ Respond ONLY with a VALID JSON object matching this schema:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         temperature: 0.1,
@@ -627,7 +630,7 @@ Respond ONLY with a VALID JSON object:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         temperature: 0.1,
@@ -708,7 +711,7 @@ Include:
 Provide the output in structured Markdown with clear table headers and executive highlights.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -748,14 +751,14 @@ Content to summarize:
 ${text.slice(0, 3000)}`;
 
     const summaryResponse = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: condensedPrompt,
     });
 
     const scriptText = summaryResponse.text || text.slice(0, 500);
 
     const ttsResponse = await ai.models.generateContent({
-      model: 'gemini-3.8-flash-lite-tts',
+      model: GEMINI_TTS_MODEL,
       contents: [
         {
           role: 'user',
@@ -834,7 +837,7 @@ Be precise, structured, provide exact formulas where relevant, use bullet points
     }));
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: formattedContents,
       config: {
         systemInstruction,
