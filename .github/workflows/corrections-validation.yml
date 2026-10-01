@@ -32,6 +32,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Audit process.env references
+        run: |
+          grep -RIn --exclude-dir=node_modules "process.env" src server.ts
+
       - name: Lint
         run: npm run lint
 
