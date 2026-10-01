@@ -2134,7 +2134,7 @@ export function createRepository(db: RepositoryPool) {
            dl.timeframe,
            COALESCE(rs.snapshot->'risk'->'regime'->>'key', 'unknown') AS risk_regime
          FROM decision_log dl
-         LEFT JOIN research_snapshots rs ON rs.decision_log_id = dl.id
+         LEFT JOIN research_snapshots rs ON rs.decision_log_id::text = dl.id::text
          WHERE ${conditions.join(" AND ")}
          ORDER BY dl.decision_at ASC
          LIMIT 10000`,
