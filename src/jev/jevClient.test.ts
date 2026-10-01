@@ -102,8 +102,10 @@ try {
   }
   assert(timeoutFailed, "timeout should abort the request");
 
-  process.env.JEV_MODEL_VERSION = "different-version";
-  globalThis.fetch = async () => response(validPayload());
+  globalThis.fetch = async () => response({
+    ...validPayload(),
+    modelVersion: "different-version",
+  });
   let mismatchFailed = false;
   try { await callJev(market); } catch (error) {
     mismatchFailed = error instanceof Error && error.message.includes("model version mismatch");
