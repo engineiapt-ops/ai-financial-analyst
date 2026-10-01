@@ -48,6 +48,7 @@ import { buildGovernanceDashboardForScope } from "../product/governanceDashboard
 import { buildContinuousGovernanceForRun } from "../product/continuousGovernanceService.js";
 import { buildResearchIntelligenceForSnapshot } from "../research/researchIntelligenceService.js";
 import { runJevPaperCycle } from "../papertrading/jevPaperCycle.js";
+import { collectLatestMarketData } from "../marketdata/collector.js";
 
 
 
@@ -2069,6 +2070,24 @@ app.post("/api/analyze", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
+    res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/cron/market-data", async (req, res) => {
+  const expectedSecret = process.env.CRON_SECRET?.trim();
+  const provided = req.header("authorization")?.match(/^Bearer\\s+(.+)$/i)?.[1]?.trim();
+
+  if (!expectedSecret || !provided || provided !== expectedSecret) {
+    return res.status(401).json({ status: "error", error: "unauthorized" });
+  }
+
+  try {
+    const collection = await collectLatestMarketData("BTCUSDT", ["1h", "4h", "1d"]);
+    res.json({ status: "ok", ...collection });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
   }
 });

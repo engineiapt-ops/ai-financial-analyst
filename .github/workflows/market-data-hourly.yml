@@ -1,0 +1,24 @@
+name: Hourly Market Data Collection
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Collect latest BTCUSDT candles
+        env:
+          MARKET_DATA_URL: ${{ secrets.MARKET_DATA_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$MARKET_DATA_URL"
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --silent --show-error --retry 2 --retry-delay 5 --connect-timeout 15 --max-time 60 -H "Authorization: Bearer $CRON_SECRET" "$MARKET_DATA_URL/api/cron/market-data"
