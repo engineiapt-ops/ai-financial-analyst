@@ -4,6 +4,7 @@ import {
   API_AUTH_TOKEN_HEADER,
   hasValidApiToken,
   isProtectedApiRequest,
+  requireApiAuth,
 } from "./auth.js";
 
 function makeRequest(
