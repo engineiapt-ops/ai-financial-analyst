@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DCFModelResult } from '../types';
+import { apiFetch } from '../utils/apiFetch';
 import {
   Calculator,
   Sliders,

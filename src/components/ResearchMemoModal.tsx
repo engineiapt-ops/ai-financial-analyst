@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, FileText, Download, Loader2, Sparkles, CheckCircle2, Copy } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { apiFetch } from '../utils/apiFetch';
 
 interface ResearchMemoModalProps {
   isOpen: boolean;

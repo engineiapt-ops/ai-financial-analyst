@@ -37,7 +37,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAudioBriefing,
   onOpenResearchMemo,
   onToggleCopilot,
-  isCopilotOpen
+  isCopilotOpen,
+  apiKey,
+  onApiKeyChange
 }) => {
   const [searchInput, setSearchInput] = useState('');
 
