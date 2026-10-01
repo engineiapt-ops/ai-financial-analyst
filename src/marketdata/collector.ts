@@ -11,7 +11,7 @@ export interface MarketDataCollectionResult {
   collectedAt: string;
 }
 
-function isClosedCandle(candle: Kline, nowMs: number): boolean {
+export function isClosedCandle(candle: Kline, nowMs: number): boolean {
   return candle.closeTime.getTime() <= nowMs;
 }
 
