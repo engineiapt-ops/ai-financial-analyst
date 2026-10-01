@@ -445,7 +445,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
           <input type="number" id="validationRun" min="1" placeholder="e.g. 41" />
         </div>
         <div class="form-group" style="display:flex;align-items:end;">
-          <button type="button" onclick="refreshSystemValidation()" style="height:42px;">Run Validation</button>
+          <button type="button" onclick="window.refreshSystemValidation()" style="height:42px;">Run Validation</button>
         </div>
       </div>
       <div id="validationPanel" style="display:none;">
@@ -782,7 +782,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
 
     refreshStatus();
     refreshEvaluationOverview();
-    refreshSystemValidation();
+    window.refreshSystemValidation();
     refreshValidationHistory();
 
     const form = document.getElementById('analyzeForm');
