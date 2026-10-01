@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { TickerTape } from './components/TickerTape';
 import { AudioBriefingModal } from './components/AudioBriefingModal';
 import { ResearchMemoModal } from './components/ResearchMemoModal';
 import { CopilotDrawer } from './components/CopilotDrawer';
-import { TickerAnalysisView } from './views/TickerAnalysisView';
-import { LedgerAuditView } from './views/LedgerAuditView';
-import { DCFValuationView } from './views/DCFValuationView';
-import { PortfolioOptimizerView } from './views/PortfolioOptimizerView';
-import { MarketOverviewView } from './views/MarketOverviewView';
+const TickerAnalysisView = lazy(() => import('./views/TickerAnalysisView').then((module) => ({ default: module.TickerAnalysisView })));
+const LedgerAuditView = lazy(() => import('./views/LedgerAuditView').then((module) => ({ default: module.LedgerAuditView })));
+const DCFValuationView = lazy(() => import('./views/DCFValuationView').then((module) => ({ default: module.DCFValuationView })));
+const PortfolioOptimizerView = lazy(() => import('./views/PortfolioOptimizerView').then((module) => ({ default: module.PortfolioOptimizerView })));
+const MarketOverviewView = lazy(() => import('./views/MarketOverviewView').then((module) => ({ default: module.MarketOverviewView })));
 import { preloadedStocks } from './data/preloadedStocks';
 import { apiFetch, ApiFetchError } from './utils/apiFetch';
 import { TickerAnalysis, MarketOverviewData } from './types';
@@ -88,7 +88,7 @@ export const App: React.FC = () => {
       }
 
       setCurrentAnalysis(data.data);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Ticker search error:', err);
       setError(err.message || `Unable to fetch fundamental data for ${formattedTicker}`);
     } finally {
@@ -139,7 +139,14 @@ export const App: React.FC = () => {
             </div>
           </div>
         ) : (
-          <>
+          <Suspense
+            fallback={
+              <div className="py-28 flex items-center justify-center text-slate-400 text-sm">
+                Carregando análise...
+              </div>
+            }
+          >
+            <>
             {activeTab === 'ticker' && (
               <TickerAnalysisView
                 data={currentAnalysis}
@@ -173,7 +180,8 @@ export const App: React.FC = () => {
                 }}
               />
             )}
-          </>
+            </>
+          </Suspense>
         )}
       </main>
 
