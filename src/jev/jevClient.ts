@@ -5,7 +5,6 @@ const BASE_URL = (process.env.JEV_BASE_URL ?? "https://ai-gateway.vercel.sh/type
 const REQUEST_TIMEOUT_MS = 12_000;
 const MAX_RETRIES = 2;
 const RETRY_BASE_MS = 750;
-const STATIC_API_KEY = process.env.AI_GATEWAY_API_KEY ?? "";
 const JEV_MODEL = "typesafe-ai/jev";
 
 export interface JevClientOptions {
@@ -15,7 +14,8 @@ export interface JevClientOptions {
 }
 
 async function getGatewayCredential(): Promise<string> {
-  if (STATIC_API_KEY) return STATIC_API_KEY;
+  const staticApiKey = process.env.AI_GATEWAY_API_KEY?.trim();
+  if (staticApiKey) return staticApiKey;
   if (process.env.VERCEL_OIDC_TOKEN) return process.env.VERCEL_OIDC_TOKEN;
   if (process.env.VERCEL) return (await getVercelOidcToken()) ?? "";
   return "";
