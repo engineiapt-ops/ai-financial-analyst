@@ -102,7 +102,7 @@ function validateJevResponse(value: unknown): JevResponse {
   const risco = value.risco_elevado;
   const qualidade = value.qualidade;
 
-  if (!Number.isFinite(direcao.confidence)) {
+  if (!Number.isFinite(Number(direcao.confidence))) {
     throw new Error("Jev retornou confidence inválido.");
   }
   if (!["ALTA", "BAIXA", "AGUARDAR"].includes(String(direcao.choice))) {
