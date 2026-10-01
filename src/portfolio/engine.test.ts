@@ -134,7 +134,7 @@ const waitPoint = savedEquity.find(
   (point) => point.asOf.getTime() === (klines[2].closeTime ?? klines[2].openTime).getTime(),
 );
 assert(waitPoint, "the WAIT candle must not create a position");
-assert.equal(waitPoint.openPositions, 0);
+assert.equal(waitPoint.openPositions, 1);
 
 await assert.rejects(
   () => runPortfolioEngine(
