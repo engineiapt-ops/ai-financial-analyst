@@ -12,7 +12,7 @@ export interface MarketDataCollectionResult {
 }
 
 export function isClosedCandle(candle: Kline, nowMs: number): boolean {
-  return candle.closeTime.getTime() <= nowMs;
+  return candle.closeTime !== undefined && candle.closeTime.getTime() <= nowMs;
 }
 
 export async function collectLatestMarketData(
