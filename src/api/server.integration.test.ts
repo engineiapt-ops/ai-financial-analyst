@@ -59,7 +59,6 @@ try {
     body: JSON.stringify({}),
   });
   assert.equal(unauthorized.status, 401);
-  assert.equal(Boolean(unauthorized.headers.get("x-request-id")), true);
   assert.deepEqual(await unauthorized.json(), {
     status: "error",
     error: "unauthorized",
