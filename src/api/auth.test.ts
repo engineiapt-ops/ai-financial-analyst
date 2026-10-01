@@ -113,6 +113,7 @@ for (const [path, method] of [
 
 assert.equal(isProtectedApiRequest(makeRequest("/api/market/ping", "POST")), true);
 assert.equal(isProtectedApiRequest(makeRequest("/api/cron/paper-jev-cycle", "GET")), false);
+assert.equal(isProtectedApiRequest(makeRequest("/api/cron/market-data", "GET")), false);
 
 delete process.env.API_AUTH_TOKEN;
 
