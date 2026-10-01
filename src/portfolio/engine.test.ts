@@ -57,8 +57,8 @@ const result = await runPortfolioEngine(
     getBacktestRun: async () => run,
     getMarketDataRange: async () => klines,
     getPortfolioSourceTrades: async () => sourceTrades,
-    savePortfolioPositions: async () => { savedPositions = true; },
-    savePortfolioEquityPoints: async () => { savedEquity = true; },
+    savePortfolioPositions: async () => { savedPositions = true; return 0; },
+    savePortfolioEquityPoints: async () => { savedEquity = true; return 0; },
   },
 );
 
