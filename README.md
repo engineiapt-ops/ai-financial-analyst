@@ -158,6 +158,27 @@ GET /api/system/validation?asset=BTCUSDT&timeframe=1h&fromRun=41
 
 The contract is operational only: it does not create signals, alter thresholds or sizing, select strategies, authorize execution or treat research/sentiment as causal proof.
 
+## Controlled JEV paper sampling
+
+A scheduled read-only paper-analysis cycle can collect fresh JEV decision observations for BTCUSDT across the supported timeframes without placing real orders.
+
+The cycle:
+- analyzes only closed market candles;
+- uses the existing deterministic Decision Engine, Risk Engine and persistence flow;
+- records the JEV directional probability and confidence in the decision_log table;
+- skips a timeframe when a JEV decision already exists for the current closed candle;
+- never creates a real-order request.
+
+Vercel triggers GET /api/cron/paper-jev-cycle hourly. The route requires the CRON_SECRET bearer token and remains disabled unless PAPER_JEV_AUTORUN=true is configured in the deployment environment. Vercel Cron Jobs invoke production routes on the configured schedule. citeturn723769search0turn723769search2
+
+Required deployment configuration:
+```env
+CRON_SECRET=replace-with-a-random-secret
+PAPER_JEV_AUTORUN=true
+```
+
+The first calibration target is to accumulate at least 30 valid settled directional observations before interpreting directional probability calibration metrics.
+
 ## Outcome Settlement Audit
 
 Settled decision outcomes now produce an immutable `outcome-settlement-audit.v1` record. The audit links the decision log, evaluation timestamp, exact closed-candle evidence range, market-data SHA-256 hash, evaluation result and deterministic evidence hash.
