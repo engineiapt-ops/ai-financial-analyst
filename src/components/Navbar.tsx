@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getApiKey, setApiKey } from '../utils/apiFetch';
 import {
   TrendingUp,
   FileSpreadsheet,
@@ -38,6 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isCopilotOpen
 }) => {
   const [searchInput, setSearchInput] = useState('');
+  const [apiKey, setApiKeyValue] = useState(() => getApiKey() ?? '');
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,8 +93,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </form>
 
-          {/* Action CTAs: Audio Briefing, Research Memo, Copilot */}
+          {/* Action CTAs: API key, Audio Briefing, Research Memo, Copilot */}
           <div className="flex items-center gap-2">
+            <input
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="API key (session)"
+              placeholder="API key"
+              value={apiKey}
+              onChange={(e) => {
+                const value = e.target.value;
+                setApiKeyValue(value);
+                setApiKey(value);
+              }}
+              className="hidden lg:block w-32 bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              title="API key stored only in memory/sessionStorage"
+            />
             <button
               onClick={onOpenAudioBriefing}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 border border-slate-700/80 hover:border-emerald-500/50 hover:bg-slate-800 text-slate-200 hover:text-emerald-300 transition-all shadow-sm"
