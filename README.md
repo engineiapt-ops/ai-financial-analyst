@@ -26,15 +26,30 @@ MVP pessoal de análise financeira assistida por IA.
 12. Backtest Jev x Baseline
 
 ## Desenvolvimento
+
+```bash
 cp .env.example .env
-npm install
+npm ci
+npm run db:migrate
+npm run backfill:all
 npm run build
+npm test
+npm run start
+```
+
+Para subir a stack local com Docker:
+
+```bash
 docker compose up -d --build
+```
+
+O backend escuta em `0.0.0.0:3000`.
 
 Health:
-GET /health
+`GET /health`
 
 O MVP não executa ordens reais.
+
 
 ## Online analysis, provenance and Gemini
 
