@@ -30,6 +30,7 @@ const indicators: Indicators = {
   ema21: 100,
   rsi: 60,
   atr: 2.5,
+  vwap: 100,
 };
 
 const snapshot = classifyRegime(candle, indicators, thresholds);
