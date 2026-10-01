@@ -624,6 +624,8 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       }
     }
 
+    window.refreshSystemValidation = refreshSystemValidation;
+
     async function refreshValidationHistory() {
       try {
         const params = new URLSearchParams({
