@@ -90,7 +90,7 @@ export const App: React.FC = () => {
       setCurrentAnalysis(data.data);
     } catch (err) {
       console.error('Ticker search error:', err);
-      setError(err.message || `Unable to fetch fundamental data for ${formattedTicker}`);
+      setError(err instanceof Error ? err.message : `Unable to fetch fundamental data for ${formattedTicker}`);
     } finally {
       setIsLoading(false);
     }
