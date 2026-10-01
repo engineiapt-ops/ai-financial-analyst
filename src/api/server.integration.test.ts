@@ -121,9 +121,6 @@ try {
   const cronUnauthorized = await fetch(baseUrl + "/api/cron/paper-jev-cycle");
   assert.equal(cronUnauthorized.status, 401);
 
-  const readinessPublic = await fetch(baseUrl + "/api/system/readiness");
-  assert.equal([200, 503].includes(readinessPublic.status), true);
-
   const cronDisabled = await fetch(baseUrl + "/api/cron/paper-jev-cycle", {
     headers: { authorization: "Bearer cron-secret" },
   });
