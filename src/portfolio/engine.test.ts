@@ -92,7 +92,7 @@ const result = await runPortfolioEngine(
     getBacktestRun: async () => sourceRun,
     getMarketDataRange: async () => klines,
     getPortfolioSourceTrades: async () => [firstTrade, duplicateFirstTrade, secondTrade],
-    assertDatasetMatchesMetadata: () => undefined,
+    assertDatasetMatchesMetadata: () => "synthetic-hash",
     createPortfolioRun: async () => {
       createdPortfolioRunId = 501;
       return createdPortfolioRunId;
