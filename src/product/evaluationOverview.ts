@@ -53,6 +53,12 @@ export interface EvaluationOverview {
     sufficientSample: boolean;
     brierScore: number | null;
     expectedCalibrationError: number | null;
+    directionalProbability: {
+      sampleCount: number;
+      sufficientSample: boolean;
+      brierScore: number | null;
+      expectedCalibrationError: number | null;
+    };
   };
   governance: {
     auditCount: number;
@@ -119,6 +125,13 @@ export function buildEvaluationOverview(input: {
       sufficientSample: input.calibration.sufficientSample,
       brierScore: input.calibration.confidence.brierScore,
       expectedCalibrationError: input.calibration.confidence.expectedCalibrationError,
+      directionalProbability: {
+        sampleCount: input.calibration.directionalProbability.sampleCount,
+        sufficientSample: input.calibration.directionalProbability.sufficientSample,
+        brierScore: input.calibration.directionalProbability.brierScore,
+        expectedCalibrationError:
+          input.calibration.directionalProbability.expectedCalibrationError,
+      },
     },
     governance: {
       auditCount: input.audits.length,
