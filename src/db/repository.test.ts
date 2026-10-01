@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import type { PoolClient, QueryResultRow } from "pg";
 import { readFileSync } from "node:fs";
 import { createRepository, type RepositoryPool } from "./repository.js";
 import type { PoolClient, QueryResultRow } from "pg";
