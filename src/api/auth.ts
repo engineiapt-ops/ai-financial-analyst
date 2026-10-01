@@ -18,7 +18,7 @@ export function isProtectedApiRequest(req: Request): boolean {
 
   // The cron endpoint has its own CRON_SECRET authentication and must not also
   // require API_AUTH_TOKEN, otherwise the Vercel scheduler would need two secrets.
-  if (req.path === "/api/cron/paper-jev-cycle") return false;
+  if (req.path === "/api/cron/paper-jev-cycle" || req.path === "/api/cron/market-data") return false;
 
   return true;
 }
