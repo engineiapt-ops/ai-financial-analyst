@@ -51,6 +51,7 @@ const jev: JevResponse = {
   },
   risco_elevado: { noul: 0.1, probabilities: {}, confidence: 0.9 },
   qualidade: { score: 0.9, probabilities: {}, confidence: 0.9 },
+  modelVersion: "unreported",
 } as JevResponse;
 
 const decision = evaluateJevResponse(jev);
