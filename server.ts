@@ -20,9 +20,35 @@ const { model: GEMINI_MODEL, ttsModel: GEMINI_TTS_MODEL } = getGeminiModelConfig
 
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+const configuredCorsOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const productionMode =
+  process.env.NODE_ENV === "production" ||
+  process.env.VERCEL === "1" ||
+  process.env.VERCEL === "true";
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (configuredCorsOrigins.length > 0) {
+      callback(null, configuredCorsOrigins.includes(origin));
+      return;
+    }
+
+    // No CORS_ORIGINS means same-origin/browser requests only in production.
+    callback(null, !productionMode);
+  },
+}));
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 const extendedAiApiPaths = new Set([
   '/api/analyze/ticker',
