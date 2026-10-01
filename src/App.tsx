@@ -10,6 +10,7 @@ import { DCFValuationView } from './views/DCFValuationView';
 import { PortfolioOptimizerView } from './views/PortfolioOptimizerView';
 import { MarketOverviewView } from './views/MarketOverviewView';
 import { preloadedStocks } from './data/preloadedStocks';
+import { apiFetch, ApiFetchError } from './utils/apiFetch';
 import { TickerAnalysis, MarketOverviewData } from './types';
 import { Loader2, Sparkles, TrendingUp, AlertCircle } from 'lucide-react';
 
@@ -47,7 +48,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     // Fetch live market data on initial load
-    fetch('/api/market/overview')
+    apiFetch('/api/market/overview')
       .then(res => res.json())
       .then(data => {
         if (data.indices) setMarketData(data);
@@ -69,7 +70,7 @@ export const App: React.FC = () => {
     // Call server-side Gemini search grounded analysis
     setIsLoading(true);
     try {
-      const res = await fetch('/api/analyze/ticker', {
+      const res = await apiFetch('/api/analyze/ticker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticker: formattedTicker })
