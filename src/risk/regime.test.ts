@@ -42,7 +42,7 @@ assert.equal(snapshot.key, "BULLISH.HIGH.POSITIVE");
 
 const earlier = { ...snapshot, dataAsOf: new Date("2026-09-30T23:00:00.000Z") };
 const later = { ...snapshot, dataAsOf: new Date("2026-10-01T02:00:00.000Z") };
-assert.equal(findRegimeAtOrBefore([earlier, later], new Date("2026-10-01T01:30:00.000Z"))?.dataAsOf.getTime(), later.dataAsOf.getTime());
+assert.equal(findRegimeAtOrBefore([earlier, later], new Date("2026-10-01T01:30:00.000Z"))?.dataAsOf.getTime(), earlier.dataAsOf.getTime());
 assert.equal(findRegimeAtOrBefore([earlier, later], new Date("2026-09-30T22:00:00.000Z")), null);
 
 console.log("risk regime tests passed");
