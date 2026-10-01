@@ -9,6 +9,7 @@ const base = {
   BINANCE_WS_BASE: "wss://stream.binance.com:9443/ws",
   GEMINI_API_KEY: "gemini-secret",
   GEMINI_MODEL: "gemini-3.8-flash",
+  JEV_MODEL_VERSION: "jev-2026-09",
   GEMINI_API_BASE: "https://generativelanguage.googleapis.com/v1beta",
   GEMINI_TIMEOUT_MS: "30000",
   TRUST_PROXY: "false",
@@ -46,6 +47,7 @@ const deterministic = inspectRuntimeConfig({
 });
 assert.equal(deterministic.state, "degraded");
 assert.equal(deterministic.warnings.some((warning) => warning.includes("GEMINI_API_KEY")), true);
+assert.equal(deterministic.warnings.some((warning) => warning.includes("JEV_MODEL_VERSION")), true);
 
 const dev = inspectRuntimeConfig({ NODE_ENV: "development" });
 assert.equal(dev.state, "ready");

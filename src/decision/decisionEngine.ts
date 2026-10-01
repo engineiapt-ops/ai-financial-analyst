@@ -1,6 +1,5 @@
 import {
   FIXED_POSITION_PCT,
-  JEV_MODEL_VERSION,
   assertFrozenForOOS,
   thresholds,
 } from "../config/thresholds.js";
@@ -47,7 +46,7 @@ export function evaluateJevResponse(jev: JevResponse): DecisionResult {
     riscoElevado,
     jevChoice: escolha,
     jevProbs: Array.isArray(jev.direcao.probabilities) ? {} : jev.direcao.probabilities,
-    jevModelVersion: JEV_MODEL_VERSION,
+    jevModelVersion: jev.modelVersion ?? "unreported",
     observacao: `confidence=${jev.direcao.confidence.toFixed(2)} prob=${probEscolhida.toFixed(2)}`,
   };
 }

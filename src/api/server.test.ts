@@ -1,3 +1,5 @@
+export {}
+
 process.env.NODE_ENV = "test";
 
 const { AnalyzeSchema } = await import("./server.js");

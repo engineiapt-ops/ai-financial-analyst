@@ -3,14 +3,14 @@ import type { DecisionResult, Kline, Timeframe } from "../types.js";
 import type { ResearchSnapshot } from "../research/snapshot.js";
 import type { CalibrationObservation } from "../evaluation/calibration.js";
 import type { OosValidationGate } from "../evaluation/oosValidationGate.js";
-import type { OosValidationReport } from "../evaluation/oosValidationReport.js";
+import type { OosValidationReport, OosFoldRow } from "../evaluation/oosValidationReport.js";
 import type { OosRobustnessReport } from "../evaluation/oosRobustness.js";
 import type { PipelineAuditOverview } from "../product/pipelineAudit.js";
 import type { OutcomeSettlementAuditPayload } from "../evaluation/outcomeSettlementAudit.js";
 import type { SystemValidationOverview, SystemValidationState } from "../product/systemValidation.js";
 
 export interface RepositoryPool {
-  query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
+  query<T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
   connect(): Promise<PoolClient>;
 }
 
@@ -2429,7 +2429,7 @@ export function createRepository(db: RepositoryPool) {
         throw new Error("decision log id must be a positive integer");
       }
 
-      const { rows } = await db.query<any>(
+      const { rows } = await db.query<{ id: string | number; audit: unknown; created_at: Date | string }>(
         `SELECT id, decision_log_id, audit_version, ativo, timeframe, recommendation,
                 decision_at, data_as_of, evaluated_at, reference_price,
                 lookahead_candles, flat_threshold_pct, outcome_status,
@@ -2478,7 +2478,7 @@ export function createRepository(db: RepositoryPool) {
       }
 
       const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-      const { rows } = await db.query<any>(
+      const { rows } = await db.query<{ id: string | number; audit: unknown; created_at: Date | string }>(
         `SELECT id, decision_log_id, audit_version, ativo, timeframe, recommendation,
                 decision_at, data_as_of, evaluated_at, reference_price,
                 lookahead_candles, flat_threshold_pct, outcome_status,
@@ -2953,8 +2953,8 @@ export function createRepository(db: RepositoryPool) {
       return Number(rows[0]?.id);
     },
 
-    async getWalkForwardFolds(walkForwardRunId: number) {
-      const { rows } = await db.query(
+    async getWalkForwardFolds(walkForwardRunId: number): Promise<OosFoldRow[]> {
+      const { rows } = await db.query<OosFoldRow>(
         `SELECT fold_number, train_start, train_end, test_start, test_end, estrategia,
                 status, test_signals, total_trades, closed_trades, open_trades,
                 win_rate, profit_factor, total_profit_percent, avg_profit_percent,

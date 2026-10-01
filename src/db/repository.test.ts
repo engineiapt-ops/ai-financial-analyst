@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRepository, type RepositoryPool } from "./repository.js";
+import type { PoolClient, QueryResultRow } from "pg";
 import { computeDatasetHash } from "../marketdata/dataset.js";
 import type { DecisionResult } from "../types.js";
+import type { ResearchSnapshot } from "../research/snapshot.js";
 
 class FakeClient {
   queries: string[] = [];
-  async query<T = any>(text: string, _values?: unknown[]): Promise<{ rows: T[] }> {
+  async query<T extends QueryResultRow = QueryResultRow>(text: string, _values?: unknown[]): Promise<{ rows: T[] }> {
     this.queries.push(text);
     if (text.includes("INSERT INTO market_data")) return { rows: [] };
     if (text.includes("INSERT INTO research_snapshots")) {
@@ -26,7 +28,7 @@ class FakeClient {
             contentHash: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
           },
         }],
-      } as { rows: T[] };
+      } as unknown as { rows: T[] };
     }
     if (text.includes("FROM research_snapshots")) {
       return {
@@ -45,11 +47,11 @@ class FakeClient {
             contentHash: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
           },
         }],
-      } as { rows: T[] };
+      } as unknown as { rows: T[] };
     }
 
     if (text === "BEGIN" || text === "COMMIT" || text === "ROLLBACK") return { rows: [] };
-    return { rows: [{ id: 7 }] } as { rows: T[] };
+    return { rows: [{ id: 7 }] } as unknown as { rows: T[] };
   }
   release() {}
 }
@@ -57,7 +59,7 @@ class FakeClient {
 class FakeDb implements RepositoryPool {
   queries: string[] = [];
   client = new FakeClient();
-  async query<T = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }> {
+  async query<T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]): Promise<{ rows: T[] }> {
     this.queries.push(text);
     if (text.includes("SELECT 1")) return { rows: [] };
     if (text.includes("INSERT INTO research_snapshots") || text.includes("FROM research_snapshots")) {
@@ -85,7 +87,7 @@ class FakeDb implements RepositoryPool {
           fee_pct: 0.001,
           criado_em: new Date("2026-01-10T00:00:00Z"),
         }],
-      } as { rows: T[] };
+      } as unknown as { rows: T[] };
     }
     if (text.includes("WHERE ativo = $1 AND timeframe = $2 AND open_time >=")) {
       return {
@@ -97,7 +99,7 @@ class FakeDb implements RepositoryPool {
           close: 105,
           volume: 10,
         }],
-      } as { rows: T[] };
+      } as unknown as { rows: T[] };
     }
     if (text.includes("GROUP BY origem") || text.includes("GROUP BY s.origem")) {
       return {
@@ -118,12 +120,12 @@ class FakeDb implements RepositoryPool {
           total_slippage_percent: 0.1,
           avg_candles_held: 4,
         }],
-      } as { rows: T[] };
+      } as unknown as { rows: T[] };
     }
     if (text.includes("INSERT INTO config")) return { rows: [] };
-    return { rows: [{ id: 7 }] } as { rows: T[] };
+    return { rows: [{ id: 7 }] } as unknown as { rows: T[] };
   }
-  async connect() { return this.client as any; }
+  async connect(): Promise<PoolClient> { return this.client as unknown as PoolClient; }
 }
 
 const repositorySource = readFileSync(new URL("./repository.ts", import.meta.url), "utf8");
@@ -234,7 +236,7 @@ const snapshot = {
     confianca: 0.8,
     fonteDecisao: "quantitativo",
   },
-} as any;
+} as unknown as ResearchSnapshot;
 
 const storedSnapshot = await repo.saveResearchSnapshot({ snapshot });
 assert.equal(storedSnapshot.snapshotId, snapshot.snapshotId);

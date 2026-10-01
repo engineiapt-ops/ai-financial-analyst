@@ -92,6 +92,13 @@ export async function runJevPaperCycle(
   const news = options.news ?? true;
   const generatedAt = dependencies.now();
 
+  console.log(JSON.stringify({
+    event: "paper_jev_cron_timeframe_schedule",
+    schedule: "daily",
+    timeframes,
+    limitation: "1h and 4h advance only on each daily cron execution; vercel scheduler remains daily",
+  }));
+
   let analyzed = 0;
   let skippedExisting = 0;
   let notReady = 0;

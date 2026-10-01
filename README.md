@@ -27,8 +27,12 @@ MVP pessoal de análise financeira assistida por IA.
 
 ## Desenvolvimento
 cp .env.example .env
-npm install
+npm ci
+npm run db:migrate
+npm run backfill:all
+npm run backtest:walk-forward
 npm run build
+npm test
 docker compose up -d --build
 
 Health:
@@ -88,9 +92,9 @@ Configuration:
 API_AUTH_TOKEN=replace-with-a-random-secret
 ```
 
-The protected surface includes market analysis/report generation, research snapshot access, decision persistence, backtests, risk-regime analysis, portfolio operations and selected evaluation/governance routes. Read-only health, market connectivity and selected diagnostic evaluation endpoints remain accessible without the token.
+All `/api/*` routes require `X-API-Key` (or `Authorization: Bearer <token>`) by default. The only unauthenticated API routes are `GET /api/market/ping`, `GET /api/market/time` and `GET /api/system/readiness`; `GET /health` is also public. The paper-trading cron endpoint is authenticated separately with `CRON_SECRET`.
 
-The dashboard includes a session-only API key field for `/api/analyze`; the key is sent only in the request header and is not persisted server-side.
+The dashboard API key is stored only in memory/sessionStorage and sent through `X-API-Key`. It is never read from a build-time environment variable or localStorage.
 ## Observability
 
 The API emits structured JSON request logs with request ID, method, path, HTTP status and latency. Unhandled errors are logged with the same request ID and return a generic error response without exposing internal details.

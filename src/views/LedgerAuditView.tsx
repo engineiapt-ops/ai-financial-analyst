@@ -18,6 +18,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import Papa from 'papaparse';
+import { apiFetch } from '../utils/apiFetch';
 
 interface LedgerAuditViewProps {
   onAuditComplete?: (result: LedgerAuditResult) => void;
@@ -51,7 +52,7 @@ export const LedgerAuditView: React.FC<LedgerAuditViewProps> = ({ onAuditComplet
     setError(null);
 
     try {
-      const res = await fetch('/api/analyze/ledger', {
+      const res = await apiFetch('/api/analyze/ledger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

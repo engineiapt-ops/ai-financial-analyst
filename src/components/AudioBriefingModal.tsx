@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Play, Square, Loader2, Volume2, Sparkles, Mic, Headphones } from 'lucide-react';
 import { playAudioBase64, stopAudio } from '../utils/audioPlayer';
+import { apiFetch } from '../utils/apiFetch';
 
 interface AudioBriefingModalProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ export const AudioBriefingModal: React.FC<AudioBriefingModalProps> = ({
     setIsPlaying(false);
 
     try {
-      const res = await fetch('/api/briefing/tts', {
+      const res = await apiFetch('/api/briefing/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

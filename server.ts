@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { app as coreApiApp } from './src/api/server.js';
 import { requireApiAuth } from './src/api/auth.js';
+import { getGeminiModel, getGeminiTtsModel } from './src/ai/geminiProvider.js';
 import { createRateLimitMiddleware, getRequestClientKey } from './src/api/rateLimit.js';
 
 dotenv.config();
@@ -17,9 +18,43 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+const GEMINI_MODEL = getGeminiModel();
+const GEMINI_TTS_MODEL = getGeminiTtsModel();
+
+const corsOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsOptions = corsOrigins.length > 0
+  ? {
+      origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+        if (!origin || corsOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(new Error("Origin is not allowed by CORS"));
+      },
+    }
+  : {
+      origin: process.env.NODE_ENV === "production" || process.env.VERCEL ? false : true,
+    };
+
+app.use(cors(corsOptions));
+app.use((req, res, next) => {
+  if (req.path === "/api/analyze/ledger") {
+    express.json({ limit: "5mb" })(req, res, next);
+    return;
+  }
+  express.json({ limit: "1mb" })(req, res, next);
+});
+app.use((req, res, next) => {
+  if (req.path === "/api/analyze/ledger") {
+    express.urlencoded({ extended: true, limit: "5mb" })(req, res, next);
+    return;
+  }
+  express.urlencoded({ extended: true, limit: "1mb" })(req, res, next);
+});
 
 const extendedAiApiPaths = new Set([
   '/api/analyze/ticker',
@@ -314,7 +349,7 @@ Output a VALID JSON object (and nothing else) adhering to this schema:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -477,7 +512,7 @@ Respond ONLY with a VALID JSON object matching this schema:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         temperature: 0.1,
@@ -627,7 +662,7 @@ Respond ONLY with a VALID JSON object:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         temperature: 0.1,
@@ -708,7 +743,7 @@ Include:
 Provide the output in structured Markdown with clear table headers and executive highlights.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -748,14 +783,14 @@ Content to summarize:
 ${text.slice(0, 3000)}`;
 
     const summaryResponse = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: condensedPrompt,
     });
 
     const scriptText = summaryResponse.text || text.slice(0, 500);
 
     const ttsResponse = await ai.models.generateContent({
-      model: 'gemini-3.8-flash-lite-tts',
+      model: GEMINI_TTS_MODEL,
       contents: [
         {
           role: 'user',
@@ -834,7 +869,7 @@ Be precise, structured, provide exact formulas where relevant, use bullet points
     }));
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: formattedContents,
       config: {
         systemInstruction,

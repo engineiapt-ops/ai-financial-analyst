@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, FileText, Download, Loader2, Sparkles, CheckCircle2, Copy } from 'lucide-react';
-import jsPDF from 'jspdf';
+import { apiFetch } from '../utils/apiFetch';
 
 interface ResearchMemoModalProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ export const ResearchMemoModal: React.FC<ResearchMemoModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/research/memo', {
+      const res = await apiFetch('/api/research/memo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -40,8 +40,8 @@ export const ResearchMemoModal: React.FC<ResearchMemoModalProps> = ({
       }
 
       setMemoText(data.memoMarkdown);
-    } catch (err: any) {
-      setError(err.message || 'Generation failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
       setLoading(false);
     }
@@ -53,8 +53,9 @@ export const ResearchMemoModal: React.FC<ResearchMemoModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF({
+  const handleExportPDF = async () => {
+    const { default: JsPDF } = await import('jspdf');
+    const doc = new JsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'

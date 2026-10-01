@@ -8,8 +8,17 @@ import type { OnlineAnalysisPacket } from "../online/provenance.js";
 import { computeOnlineAnalysisPacketHash } from "../online/provenance.js";
 
 const DEFAULT_MODEL = "gemini-3.8-flash";
+const DEFAULT_TTS_MODEL = "gemini-3.8-flash-lite-tts";
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+export function getGeminiModel(): string {
+  return process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+}
+
+export function getGeminiTtsModel(): string {
+  return process.env.GEMINI_TTS_MODEL?.trim() || DEFAULT_TTS_MODEL;
+}
 
 interface GeminiGenerateResponse {
   candidates?: Array<{
@@ -81,7 +90,7 @@ export class GeminiProvider implements AnalystAiProvider {
     fetchImpl?: typeof fetch;
   } = {}) {
     this.apiKey = options.apiKey !== undefined ? options.apiKey.trim() : process.env.GEMINI_API_KEY?.trim();
-    this.model = options.model?.trim() || process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+    this.model = options.model?.trim() || getGeminiModel();
     this.baseUrl = (options.baseUrl?.trim() || process.env.GEMINI_API_BASE?.trim() || DEFAULT_BASE_URL).replace(/\/$/, "");
     this.timeoutMs = options.timeoutMs ?? Number(process.env.GEMINI_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
     this.fetchImpl = options.fetchImpl ?? fetch;

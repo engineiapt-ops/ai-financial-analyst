@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DCFModelResult } from '../types';
+import { apiFetch } from '../utils/apiFetch';
 import {
   Calculator,
   Sliders,
@@ -55,7 +56,7 @@ export const DCFValuationView: React.FC<DCFValuationViewProps> = ({ ticker, defa
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/valuation/dcf', {
+      const res = await apiFetch('/api/valuation/dcf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
