@@ -139,7 +139,13 @@ export async function callJev(market: MarketState): Promise<JevResponse> {
 
       if (res.ok) {
         const data: unknown = await res.json();
-        const modelVersion = extractModelVersion(data);
+        const responseRecord =
+          data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+        const modelVersion =
+          extractModelVersion(data) ??
+          (responseRecord && "answers" in responseRecord
+            ? extractModelVersion(responseRecord.answers)
+            : undefined);
         const effectiveModelVersion = modelVersion ?? "unreported";
 
         if (!modelVersion) {
