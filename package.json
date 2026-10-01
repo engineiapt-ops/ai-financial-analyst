@@ -58,6 +58,7 @@
     "test:outcome-settlement-audit": "tsx src/evaluation/outcomeSettlementAudit.test.ts",
     "test:system-validation": "tsx src/product/systemValidation.test.ts",
     "test:paper-e2e": "tsx src/product/paperTradingE2E.test.ts",
+    "test:jev-paper-cycle": "tsx src/papertrading/jevPaperCycle.test.ts",
     "release:gate:checks": "tsx src/product/releaseGate.ts",
     "release:gate": "npm run build && npm test && npm run release:gate:checks",
     "test:release-gate": "tsx src/product/releaseGate.test.ts",

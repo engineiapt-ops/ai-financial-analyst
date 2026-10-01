@@ -47,6 +47,7 @@ import { inspectRuntimeConfig } from "./runtimeConfig.js";
 import { buildGovernanceDashboardForScope } from "../product/governanceDashboardService.js";
 import { buildContinuousGovernanceForRun } from "../product/continuousGovernanceService.js";
 import { buildResearchIntelligenceForSnapshot } from "../research/researchIntelligenceService.js";
+import { runJevPaperCycle } from "../papertrading/jevPaperCycle.js";
 
 
 
@@ -2055,6 +2056,36 @@ app.post("/api/analyze", async (req, res) => {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
+  }
+});
+
+app.get("/api/cron/paper-jev-cycle", async (req, res) => {
+  const expectedSecret = process.env.CRON_SECRET?.trim();
+  const provided = req.header("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+
+  if (!expectedSecret || !provided || provided !== expectedSecret) {
+    return res.status(401).json({ status: "error", error: "unauthorized" });
+  }
+
+  if (process.env.PAPER_JEV_AUTORUN !== "true") {
+    return res.status(200).json({
+      status: "ok",
+      enabled: false,
+      note: "PAPER_JEV_AUTORUN is not enabled",
+    });
+  }
+
+  try {
+    const cycle = await runJevPaperCycle({
+      ativo: "BTCUSDT",
+      timeframes: ["1h", "4h", "1d"],
+      valorInvestimento: 100,
+      news: true,
+    });
+    res.json({ status: "ok", enabled: true, ...cycle });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ status: "error", error: message });
   }
 });
 
