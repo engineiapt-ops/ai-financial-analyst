@@ -26,6 +26,25 @@ function validBoolean(value: string | undefined): boolean {
   return value === "true" || value === "false";
 }
 
+
+function validCorsOrigins(value: string | undefined): boolean {
+  const origins = value
+    ?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? [];
+
+  if (origins.length === 0) return true;
+
+  return origins.every((origin) => {
+    try {
+      const url = new URL(origin);
+      return ["http:", "https:"].includes(url.protocol) && url.origin === origin;
+    } catch {
+      return false;
+    }
+  });
+}
+
 function validUrl(value: string | undefined, protocols: string[]): boolean {
   if (!value) return true;
   try {
@@ -66,6 +85,7 @@ export function inspectRuntimeConfig(
     "JEV_BASE_URL",
     "JEV_MODEL_VERSION",
     "AI_GATEWAY_API_KEY",
+    "CORS_ORIGINS",
   ]) {
     if (trimValue(env[key])) configured.push(key);
   }
@@ -84,6 +104,9 @@ export function inspectRuntimeConfig(
   }
   if (!validUrl(env.GEMINI_API_BASE?.trim(), ["http:", "https:"])) {
     invalid.push("GEMINI_API_BASE");
+  }
+  if (!validCorsOrigins(env.CORS_ORIGINS)) {
+    invalid.push("CORS_ORIGINS");
   }
 
   if (productionMode && !trimValue(env.GEMINI_API_KEY)) {
