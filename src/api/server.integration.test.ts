@@ -101,7 +101,7 @@ try {
   }) as typeof fetch;
 
   try {
-    const readinessPublic = await originalGlobalFetch(baseUrl + "/api/system/readiness");
+    const readinessPublic = await fetch(baseUrl + "/api/system/readiness");
     assert.equal(readinessPublic.status, 200);
     const readinessPublicPayload = await readinessPublic.json() as Record<string, unknown>;
     assert.deepEqual(
