@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 
 interface NavbarProps {
+  apiKey: string;
+  onApiKeyChange: (value: string) => void;
   activeTab: 'ticker' | 'ledger' | 'dcf' | 'portfolio' | 'market';
   setActiveTab: (tab: 'ticker' | 'ledger' | 'dcf' | 'portfolio' | 'market') => void;
   selectedTicker: string;
@@ -91,6 +93,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </form>
 
+          <div className="hidden xl:flex items-center">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => onApiKeyChange(e.target.value)}
+              placeholder="API key"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="API key"
+              className="w-28 bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[10px] text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
           {/* Action CTAs: Audio Briefing, Research Memo, Copilot */}
           <div className="flex items-center gap-2">
             <button

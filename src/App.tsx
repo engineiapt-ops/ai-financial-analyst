@@ -12,6 +12,7 @@ import { MarketOverviewView } from './views/MarketOverviewView';
 import { preloadedStocks } from './data/preloadedStocks';
 import { TickerAnalysis, MarketOverviewData } from './types';
 import { Loader2, Sparkles, TrendingUp, AlertCircle } from 'lucide-react';
+import { apiFetch, getApiKey, setApiKey } from './utils/apiFetch';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'ticker' | 'ledger' | 'dcf' | 'portfolio' | 'market'>('ticker');
@@ -19,6 +20,7 @@ export const App: React.FC = () => {
   const [currentAnalysis, setCurrentAnalysis] = useState<TickerAnalysis>(preloadedStocks['NVDA']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [apiKey, setApiKeyState] = useState<string>(() => getApiKey());
 
   // Modals & Drawers
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
@@ -47,12 +49,15 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     // Fetch live market data on initial load
-    fetch('/api/market/overview')
+    apiFetch('/api/market/overview')
       .then(res => res.json())
       .then(data => {
         if (data.indices) setMarketData(data);
       })
-      .catch(err => console.warn('Using fallback market overview:', err));
+      .catch(err => {
+        setError(err instanceof Error ? err.message : 'Não foi possível carregar o resumo do mercado.');
+        console.warn('Using fallback market overview:', err);
+      });
   }, []);
 
   const handleSearchTicker = async (ticker: string) => {
@@ -69,7 +74,7 @@ export const App: React.FC = () => {
     // Call server-side Gemini search grounded analysis
     setIsLoading(true);
     try {
-      const res = await fetch('/api/analyze/ticker', {
+      const res = await apiFetch('/api/analyze/ticker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticker: formattedTicker })
@@ -104,6 +109,11 @@ export const App: React.FC = () => {
         onOpenAudioBriefing={() => setIsAudioModalOpen(true)}
         onOpenResearchMemo={() => setIsMemoModalOpen(true)}
         onToggleCopilot={() => setIsCopilotOpen(prev => !prev)}
+        apiKey={apiKey}
+        onApiKeyChange={(value) => {
+          setApiKeyState(value);
+          setApiKey(value);
+        }}
         isCopilotOpen={isCopilotOpen}
       />
 

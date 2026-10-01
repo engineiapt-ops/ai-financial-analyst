@@ -24,7 +24,7 @@ export const ResearchMemoModal: React.FC<ResearchMemoModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/research/memo', {
+      const res = await apiFetch('/api/research/memo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
