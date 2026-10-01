@@ -10,7 +10,7 @@ const market = {
   precoAtual: 100,
   indicators: { ema9: 101, ema21: 99, rsi: 55, vwap: 100, atr: 2 },
   noticiaSentimento: 0,
-  macroDolar: 0,
+  macroDolar: "0",
   indicadorMacro: 0,
 } as MarketState;
 
