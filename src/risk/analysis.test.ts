@@ -6,7 +6,7 @@ import { runRiskRegimeAnalysis } from "./analysis.js";
 function makeCandles(count: number): Kline[] {
   const start = Date.parse("2026-01-01T00:00:00.000Z");
   return Array.from({ length: count }, (_, index) => {
-    const range = index < 30 ? 1 : index < 45 ? 0.5 : 20;
+    const range = index < 40 ? 1 : index < 60 ? 0.5 : 20;
     const openTime = new Date(start + index * 60 * 60 * 1000);
     const closeTime = new Date(openTime.getTime() + 60 * 60 * 1000 - 1);
     return {
@@ -75,10 +75,10 @@ function makePosition(
   };
 }
 
-const klines = makeCandles(60);
+const klines = makeCandles(80);
 const sourceRun = makeRun(klines);
-const lowRiskPosition = makePosition(klines, 11, 32, "BUY", 1);
-const highRiskPosition = makePosition(klines, 12, 52, "SELL", -1);
+const lowRiskPosition = makePosition(klines, 11, 42, "BUY", 1);
+const highRiskPosition = makePosition(klines, 12, 72, "SELL", -1);
 
 const result = await runRiskRegimeAnalysis(7, 99, {
   getBacktestRun: async () => sourceRun,
@@ -89,8 +89,8 @@ const result = await runRiskRegimeAnalysis(7, 99, {
 
 assert.equal(result.asset, "BTCUSDT");
 assert.equal(result.timeframe, "1h");
-assert.equal(result.calibration.candles, 30);
-assert.equal(result.evaluation.candles, 30);
+assert.equal(result.calibration.candles, 40);
+assert.equal(result.evaluation.candles, 40);
 assert.equal(result.evaluation.highVolatilityCandles > 0, true);
 
 const lowMetric = result.regimes.find((metric) => metric.volatility === "LOW");
