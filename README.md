@@ -27,8 +27,12 @@ MVP pessoal de análise financeira assistida por IA.
 
 ## Desenvolvimento
 cp .env.example .env
-npm install
+npm ci
+npm run db:migrate
+npm run backfill:all
+npm run backtest:walk-forward
 npm run build
+npm test
 docker compose up -d --build
 
 Health:
