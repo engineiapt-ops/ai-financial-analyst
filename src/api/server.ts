@@ -1248,7 +1248,7 @@ app.post("/api/system/validation/history", async (req, res) => {
   }
 });
 
-app.get("/api/system/readiness", async (_req, res) => {
+async function collectSystemReadinessOverview() {
   const [marketDataCheck, databaseCheck] = await Promise.all([
     pingBinance()
       .then((ok) => ({ available: ok, detail: ok ? "Binance ping OK" : "Binance ping failed" }))
@@ -1264,7 +1264,7 @@ app.get("/api/system/readiness", async (_req, res) => {
       })),
   ]);
 
-  const overview = buildSystemReadinessOverview({
+  return buildSystemReadinessOverview({
     generatedAt: new Date(),
     marketData: marketDataCheck,
     database: databaseCheck,
@@ -1287,7 +1287,19 @@ app.get("/api/system/readiness", async (_req, res) => {
       "portfolio-stability.v1",
     ],
   });
+}
 
+app.get("/api/system/readiness", async (_req, res) => {
+  const overview = await collectSystemReadinessOverview();
+  res.status(200).json({
+    status: overview.state === "ready" ? "ok" : "degraded",
+    ready: overview.state === "ready",
+    timestamp: overview.generatedAt,
+  });
+});
+
+app.get("/api/system/readiness/details", async (_req, res) => {
+  const overview = await collectSystemReadinessOverview();
   res.status(200).json({ status: "ok", ...overview });
 });
 
