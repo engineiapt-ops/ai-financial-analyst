@@ -169,7 +169,7 @@ The cycle:
 - skips a timeframe when a JEV decision already exists for the current closed candle;
 - never creates a real-order request.
 
-Vercel triggers GET /api/cron/paper-jev-cycle hourly. The route requires the CRON_SECRET bearer token and remains disabled unless PAPER_JEV_AUTORUN=true is configured in the deployment environment. Vercel Cron Jobs invoke production routes on the configured schedule. citeturn723769search0turn723769search2
+Vercel triggers GET /api/cron/paper-jev-cycle hourly. The route requires the CRON_SECRET bearer token and remains disabled unless PAPER_JEV_AUTORUN=true is configured in the deployment environment. Vercel Cron Jobs invoke production routes on the configured schedule.
 
 Required deployment configuration:
 ```env
