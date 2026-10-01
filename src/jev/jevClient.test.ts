@@ -91,15 +91,17 @@ try {
   assert(retryCalls === 3, "429/5xx should retry before success");
   assert(retried.modelVersion === "jev-test-v1", "retry success should preserve model version");
 
-  globalThis.fetch = async (_input, init) => {
-    await Promise.resolve();
-    if (init?.signal?.aborted) {
+  globalThis.setTimeout = ((callback: (...args: unknown[]) => void) => {
+    queueMicrotask(() => callback());
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout;
+  globalThis.fetch = async (_input, init) => new Promise<Response>((_, reject) => {
+    init?.signal?.addEventListener("abort", () => {
       const error = new Error("aborted");
       error.name = "AbortError";
-      throw error;
-    }
-    return new Promise<Response>(() => {});
-  };
+      reject(error);
+    }, { once: true });
+  });
   let timeoutFailed = false;
   try { await callJev(market); } catch (error) {
     timeoutFailed = error instanceof Error && error.name === "AbortError";
