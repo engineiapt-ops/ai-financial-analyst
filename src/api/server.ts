@@ -575,7 +575,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       }
     }
 
-    window.refreshSystemValidation = async function refreshSystemValidation() {
+    async function refreshSystemValidation() {
       try {
         const params = new URLSearchParams({
           asset: document.getElementById('ativo').value,
@@ -623,6 +623,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         alert('System Validation Error: ' + err.message);
       }
     }
+    window.refreshSystemValidation = refreshSystemValidation;
 
     async function refreshValidationHistory() {
       try {
