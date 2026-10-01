@@ -67,7 +67,9 @@ try {
   assert(success.modelVersion === "jev-test-v1", "success should expose returned model version");
   assert(calls === 1, "success should make one request");
 
-  globalThis.fetch = async () => response({ answers: { invalid: true } });
+  globalThis.fetch = async () => response({
+    answers: { modelVersion: "jev-test-v1", invalid: true },
+  });
   let invalidFailed = false;
   try { await callJev(market); } catch (error) {
     invalidFailed = error instanceof Error && error.message.includes("campos obrigatórios ausentes");
