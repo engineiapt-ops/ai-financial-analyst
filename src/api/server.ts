@@ -879,7 +879,7 @@ app.get("/api/evaluation/pipeline-audit", async (req, res) => {
     });
 
     res.json({ status: "ok", ...audit });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -925,7 +925,7 @@ app.post("/api/evaluation/pipeline-audit/snapshots", async (req, res) => {
       regression,
       audit,
     });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -966,7 +966,7 @@ app.get("/api/evaluation/pipeline-audit/history", async (req, res) => {
       count: history.length,
       history,
     });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1092,7 +1092,7 @@ app.get("/api/evaluation/operational-quality", async (req, res) => {
     });
 
     res.json({ status: "ok", ...quality });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1111,7 +1111,7 @@ app.get("/api/product/governance-dashboard", async (req, res) => {
 
     const dashboard = await buildGovernanceDashboardForScope(query);
     res.json({ status: "ok", ...dashboard });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1134,7 +1134,7 @@ app.get("/api/product/continuous-governance", async (req, res) => {
     });
 
     res.json({ status: "ok", ...governance });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1157,7 +1157,7 @@ app.post("/api/product/continuous-governance/check", async (req, res) => {
     });
 
     res.status(201).json({ status: "ok", ...governance });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1172,7 +1172,7 @@ app.get("/api/product/research-intelligence", async (req, res) => {
 
     const intelligence = await buildResearchIntelligenceForSnapshot(query.snapshotId);
     res.json({ status: "ok", ...intelligence });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status =
       message.includes("not found") ? 404 :
@@ -1194,7 +1194,7 @@ app.get("/api/system/validation", async (req, res) => {
 
     const validation = await buildSystemValidationForScope(query);
     res.json({ status: "ok", ...validation });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("not found") ? 404 : message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1212,7 +1212,7 @@ app.get("/api/system/validation/history", async (req, res) => {
 
     const history = await buildValidationHistoryForScope(query);
     res.json({ status: "ok", ...history });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1238,7 +1238,7 @@ app.post("/api/system/validation/history", async (req, res) => {
       state: result.snapshot.state,
       history: result.history,
     });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status =
       message.includes("not found") ? 404 :
@@ -1299,7 +1299,7 @@ app.get("/api/market/ping", async (_req, res) => {
   try {
     const isAlive = await pingBinance();
     res.json({ status: "ok", ping: isAlive });
-  } catch (err: any) {
+  } catch (err) {
     res.status(502).json({ status: "error", error: err.message });
   }
 });
@@ -1308,7 +1308,7 @@ app.get("/api/market/time", async (_req, res) => {
   try {
     const serverTime = await getServerTime();
     res.json({ status: "ok", serverTime, serverTimeUTC: new Date(serverTime).toISOString() });
-  } catch (err: any) {
+  } catch (err) {
     res.status(502).json({ status: "error", error: err.message });
   }
 });
@@ -1318,7 +1318,7 @@ app.get("/api/market/info", async (req, res) => {
     const symbol = String(req.query.symbol ?? "BTCUSDT");
     const info = await getExchangeInfo(symbol);
     res.json({ status: "ok", info });
-  } catch (err: any) {
+  } catch (err) {
     res.status(400).json({ status: "error", error: err.message });
   }
 });
@@ -1340,7 +1340,7 @@ app.get("/api/market/klines", async (req, res) => {
       count: klines.length,
       klines,
     });
-  } catch (err: any) {
+  } catch (err) {
     res.status(400).json({ status: "error", error: err.message });
   }
 });
@@ -1374,7 +1374,7 @@ app.post("/api/report", async (req, res) => {
         createdAt: stored.createdAt,
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1404,7 +1404,7 @@ app.get("/api/research/snapshots/:snapshotId", async (req, res) => {
         createdAt: stored.createdAt,
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -1436,7 +1436,7 @@ app.post("/api/evaluation/decisions/settle-pending", async (req, res) => {
       status: "ok",
       ...result,
     });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1515,7 +1515,7 @@ app.post("/api/evaluation/decisions/:decisionLogId", async (req, res) => {
         },
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503
       : message.includes("Insufficient future closed candles") ? 422
@@ -1537,7 +1537,7 @@ app.get("/api/evaluation/decisions/:decisionLogId/audit", async (req, res) => {
     }
 
     res.json({ status: "ok", ...audit });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1562,7 +1562,7 @@ app.get("/api/evaluation/settlement-audit", async (req, res) => {
     });
 
     res.json({ status: "ok", generatedAt: now.toISOString(), ...summary });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1612,7 +1612,7 @@ app.get("/api/evaluation/overview", async (req, res) => {
     });
 
     res.json({ status: "ok", ...overview });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1660,7 +1660,7 @@ app.get("/api/evaluation/kpis", async (req, res) => {
       },
       ...kpis,
     });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1712,7 +1712,7 @@ app.get("/api/evaluation/calibration", async (req, res) => {
       },
       ...calibration,
     });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1772,7 +1772,7 @@ app.get("/api/evaluation/oos-report", async (req, res) => {
     });
 
     res.json({ status: "ok", ...report });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1788,7 +1788,7 @@ app.get("/api/metrics", async (req, res) => {
     }
     const metrics = await getMetricsByOrigem(runId);
     res.json({ status: "ok", metrics });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -1826,7 +1826,7 @@ app.get("/api/backtest/walk-forward", async (req, res) => {
       includeJev,
     });
     res.json({ status: "ok", ...result });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("Insufficient market_data") ? 422 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -1846,7 +1846,7 @@ app.get("/api/backtest/baseline", async (req, res) => {
     }
     const result = await runRemoteBaselineBacktest(fromRunId, candles);
     res.json({ status: "ok", ...result });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -1872,7 +1872,7 @@ app.get("/api/risk/regimes", async (req, res) => {
 
     const result = await runRiskRegimeAnalysis(fromRun, portfolioRun);
     res.json({ status: "ok", ...result });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -1897,7 +1897,7 @@ app.get("/api/portfolio/run", async (req, res) => {
       riskGate,
     });
     res.json({ status: "ok", ...result });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -1922,7 +1922,7 @@ app.get("/api/portfolio/walk-forward", async (req, res) => {
       maxGrossExposurePct,
     });
     res.json({ status: "ok", ...result });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -1951,7 +1951,7 @@ app.get("/api/evaluation/portfolio-overview", async (req, res) => {
     });
 
     res.json({ status: "ok", ...overview });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
@@ -1970,7 +1970,7 @@ app.get("/api/evaluation/portfolio-walk-forward", async (req, res) => {
 
     const report = await buildPortfolioWalkForwardReport(fromRun);
     res.json({ status: "ok", ...report });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -1990,7 +1990,7 @@ app.get("/api/evaluation/portfolio-regimes", async (req, res) => {
 
     const report = await buildPortfolioRegimeDiagnostics(fromRun);
     res.json({ status: "ok", ...report });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -2007,7 +2007,7 @@ app.get("/api/portfolio", async (req, res) => {
     if (!run) return res.status(404).json({ status: "error", error: "portfolio run not found" });
     const curve = await getPortfolioEquityCurve(runId);
     res.json({ status: "ok", run, equityCurve: curve });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -2024,7 +2024,7 @@ app.get("/api/backtest/benchmark", async (req, res) => {
     const includeJev = String(req.query.includeJev ?? "true").toLowerCase() !== "false";
     const result = await runBenchmarkSuite(fromRunId, includeJev);
     res.json({ status: "ok", ...result });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -2040,7 +2040,7 @@ app.get("/api/backtest/jev", async (req, res) => {
     }
     const result = await runRemoteJevBacktest(fromRunId);
     res.json({ status: "ok", ...result });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 500;
     res.status(status).json({ status: "error", error: message });
@@ -2052,7 +2052,7 @@ app.post("/api/analyze", async (req, res) => {
     const parsed = AnalyzeSchema.parse(req.body);
     const result = await analyzeMarket(parsed);
     res.json({ status: "ok", ...result });
-  } catch (err: any) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const status = message.includes("DATABASE_URL") ? 503 : 400;
     res.status(status).json({ status: "error", error: message });
