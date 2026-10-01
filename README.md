@@ -70,7 +70,7 @@ The product API exposes `GET /api/evaluation/portfolio-overview?fromRun=<walk-fo
 
 ## System readiness
 
-The API exposes `GET /api/system/readiness` as a read-only operational check for market connectivity, database availability, configured AI providers, paper-only execution mode, and governance contract presence.
+The API exposes `GET /api/system/readiness` as a public, read-only liveness/readiness check returning only `status`, `ready` and `timestamp`. Detailed operational diagnostics (market/database checks, configuration, providers and governance contracts) are available only through authenticated `GET /api/system/readiness/details`.
 ## API hardening
 
 The API now assigns a unique `X-Request-ID` to every request and applies an in-memory rate limit to API routes. The default limit is 120 requests per minute per client, with a stricter 20 requests per minute limit for analysis, report, backtest, portfolio and risk-regime endpoints.
@@ -92,7 +92,7 @@ Configuration:
 API_AUTH_TOKEN=replace-with-a-random-secret
 ```
 
-All `/api/*` routes require `X-API-Key` (or `Authorization: Bearer <token>`) by default. The only unauthenticated API routes are `GET /api/market/ping`, `GET /api/market/time` and `GET /api/system/readiness`; `GET /health` is also public. The paper-trading cron endpoint is authenticated separately with `CRON_SECRET`.
+All `/api/*` routes require `X-API-Key` (or `Authorization: Bearer <token>`) by default. The only unauthenticated API routes are `GET /api/market/ping`, `GET /api/market/time` and `GET /api/system/readiness`; detailed readiness at `GET /api/system/readiness/details` is authenticated. `GET /health` is also public. The paper-trading cron endpoint is authenticated separately with `CRON_SECRET`.
 
 The dashboard API key is stored only in memory/sessionStorage and sent through `X-API-Key`. It is never read from a build-time environment variable or localStorage.
 ## Observability
