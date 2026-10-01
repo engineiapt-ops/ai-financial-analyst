@@ -16,6 +16,7 @@ function response(overrides: Partial<JevResponse["direcao"]> = {}): JevResponse 
     },
     risco_elevado: { probabilities: {}, confidence: 1, noul: 0 },
     qualidade: { probabilities: {}, confidence: 1, score: 0.8 },
+    modelVersion: "unreported",
   };
 }
 

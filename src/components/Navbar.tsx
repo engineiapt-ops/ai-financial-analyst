@@ -1,3 +1,4 @@
+import { getApiKey, setApiKey } from '../utils/apiFetch.js';
 import React, { useState } from 'react';
 import {
   TrendingUp,
@@ -11,7 +12,8 @@ import {
   Sparkles,
   Bot,
   Layers,
-  ArrowUpRight
+  ArrowUpRight,
+  Key
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -38,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isCopilotOpen
 }) => {
   const [searchInput, setSearchInput] = useState('');
+  const [apiKey, setApiKeyState] = useState(() => getApiKey() ?? '');
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +93,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               Analyze
             </button>
           </form>
+
+          <label className="hidden xl:flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-1 text-[10px] text-slate-500" title="API key kept only in memory/sessionStorage">
+            <Key className="h-3 w-3" />
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => {
+                setApiKeyState(e.target.value);
+                setApiKey(e.target.value);
+              }}
+              placeholder="API key"
+              autoComplete="off"
+              spellCheck={false}
+              className="w-24 bg-transparent text-[10px] text-slate-200 placeholder-slate-600 focus:outline-none"
+            />
+          </label>
 
           {/* Action CTAs: Audio Briefing, Research Memo, Copilot */}
           <div className="flex items-center gap-2">

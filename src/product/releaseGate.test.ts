@@ -28,6 +28,17 @@ assert.deepEqual(report.guardrails, {
   dashboardReadOnly: true,
 });
 
+
+const explicitTestTypecheck = buildReleaseGateReport({
+  packageScripts: {
+    build: "npm run check:server && npm run check:tests && vite build",
+    "check:server": "tsc -p tsconfig.server.json --noEmit",
+    "check:tests": "tsc --noEmit",
+    test: completeTestScript,
+  },
+});
+assert.equal(explicitTestTypecheck.ready, true);
+
 const missingE2E = buildReleaseGateReport({
   packageScripts: {
     build: "tsc -p .",

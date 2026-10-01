@@ -13,6 +13,18 @@ import {
 } from "./regime.js";
 import { evaluateRisk } from "./riskEngine.js";
 
+export interface RiskRegimeAnalysisDependencies {
+  getBacktestRun: typeof getBacktestRun;
+  getMarketDataRange: typeof getMarketDataRange;
+  getPortfolioPositions: typeof getPortfolioPositions;
+}
+
+const defaultDependencies: RiskRegimeAnalysisDependencies = {
+  getBacktestRun,
+  getMarketDataRange,
+  getPortfolioPositions,
+};
+
 interface RegimeMetrics {
   regime: string;
   trend: RegimeSnapshot["trend"];
@@ -60,11 +72,12 @@ function upsertMetric(map: Map<string, RegimeMetrics>, regime: RegimeSnapshot): 
 export async function runRiskRegimeAnalysis(
   sourceRunId: number,
   portfolioRunId?: number,
+  dependencies: RiskRegimeAnalysisDependencies = defaultDependencies,
 ) {
-  const sourceRun = await getBacktestRun(sourceRunId);
+  const sourceRun = await dependencies.getBacktestRun(sourceRunId);
   if (!sourceRun) throw new Error(`Run ${sourceRunId} not found`);
 
-  const klines = await getMarketDataRange(
+  const klines = await dependencies.getMarketDataRange(
     sourceRun.ativo,
     sourceRun.timeframe,
     sourceRun.periodoInicio,
@@ -95,7 +108,7 @@ export async function runRiskRegimeAnalysis(
   }
 
   const portfolioPositions: PortfolioPositionRow[] = portfolioRunId
-    ? await getPortfolioPositions(portfolioRunId)
+    ? await dependencies.getPortfolioPositions(portfolioRunId)
     : [];
 
   for (const position of portfolioPositions) {

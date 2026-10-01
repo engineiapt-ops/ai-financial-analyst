@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiFetch.js';
 import React, { useState } from 'react';
 import { LedgerAuditResult } from '../types';
 import { sampleLedgerCSV_SaaS, sampleLedgerCSV_Retail } from '../data/mockLedger';
@@ -51,7 +52,7 @@ export const LedgerAuditView: React.FC<LedgerAuditViewProps> = ({ onAuditComplet
     setError(null);
 
     try {
-      const res = await fetch('/api/analyze/ledger', {
+      const res = await apiFetch('/api/analyze/ledger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

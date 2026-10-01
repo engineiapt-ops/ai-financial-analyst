@@ -142,6 +142,26 @@ function isSameOrBefore(a: Date, b: Date): boolean {
   return a.getTime() <= b.getTime();
 }
 
+export interface PortfolioEngineDependencies {
+  createPortfolioRun: typeof createPortfolioRun;
+  finalizePortfolioRun: typeof finalizePortfolioRun;
+  getBacktestRun: typeof getBacktestRun;
+  getMarketDataRange: typeof getMarketDataRange;
+  getPortfolioSourceTrades: typeof getPortfolioSourceTrades;
+  savePortfolioPositions: typeof savePortfolioPositions;
+  savePortfolioEquityPoints: typeof savePortfolioEquityPoints;
+}
+
+const defaultDependencies: PortfolioEngineDependencies = {
+  createPortfolioRun,
+  finalizePortfolioRun,
+  getBacktestRun,
+  getMarketDataRange,
+  getPortfolioSourceTrades,
+  savePortfolioPositions,
+  savePortfolioEquityPoints,
+};
+
 export interface PortfolioRunOptions {
   sourceRunId: number;
   initialCapital?: number;
@@ -150,7 +170,10 @@ export interface PortfolioRunOptions {
   riskGate?: boolean;
 }
 
-export async function runPortfolioEngine(options: PortfolioRunOptions) {
+export async function runPortfolioEngine(
+  options: PortfolioRunOptions,
+  dependencies: PortfolioEngineDependencies = defaultDependencies,
+) {
   const initialCapital = options.initialCapital ?? DEFAULT_INITIAL_CAPITAL;
   const positionSizePct = options.positionSizePct ?? DEFAULT_POSITION_SIZE_PCT;
   const maxGrossExposurePct = options.maxGrossExposurePct ?? DEFAULT_MAX_GROSS_EXPOSURE_PCT;
@@ -169,9 +192,9 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     throw new Error("positionSizePct cannot exceed maxGrossExposurePct");
   }
 
-  const sourceRun = await getBacktestRun(options.sourceRunId);
+  const sourceRun = await dependencies.getBacktestRun(options.sourceRunId);
   if (!sourceRun) throw new Error(`Run ${options.sourceRunId} not found`);
-  const klines = await getMarketDataRange(
+  const klines = await dependencies.getMarketDataRange(
     sourceRun.ativo,
     sourceRun.timeframe,
     sourceRun.periodoInicio,
@@ -192,8 +215,8 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     : [];
   const riskRegimeByTime = new Map(riskRegimes.map((regime) => [regime.dataAsOf.getTime(), regime]));
 
-  const trades = await getPortfolioSourceTrades(options.sourceRunId);
-  const portfolioRunId = await createPortfolioRun({
+  const trades = await dependencies.getPortfolioSourceTrades(options.sourceRunId);
+  const portfolioRunId = await dependencies.createPortfolioRun({
     sourceBacktestRunId: options.sourceRunId,
     ativo: sourceRun.ativo,
     timeframe: sourceRun.timeframe,
@@ -457,8 +480,8 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     totalSlippage,
   };
 
-  await savePortfolioPositions(positionResults);
-  await savePortfolioEquityPoints(equityCurve.map((point) => ({
+  await dependencies.savePortfolioPositions(positionResults);
+  await dependencies.savePortfolioEquityPoints(equityCurve.map((point) => ({
     portfolioRunId,
     asOf: point.asOf,
     equity: point.equity,
@@ -470,7 +493,7 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     drawdownPct: point.drawdownPct,
   })));
 
-  await finalizePortfolioRun(portfolioRunId, summary);
+  await dependencies.finalizePortfolioRun(portfolioRunId, summary);
 
   return {
     portfolioRunId,

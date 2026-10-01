@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiFetch.js';
 import React, { useState } from 'react';
 import { X, FileText, Download, Loader2, Sparkles, CheckCircle2, Copy } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -24,7 +25,7 @@ export const ResearchMemoModal: React.FC<ResearchMemoModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/research/memo', {
+      const res = await apiFetch('/api/research/memo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

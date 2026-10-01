@@ -27,9 +27,19 @@ MVP pessoal de análise financeira assistida por IA.
 
 ## Desenvolvimento
 cp .env.example .env
-npm install
+npm ci
 npm run build
+npm test
+npm run lint
+
+# Desenvolvimento local
+npm run dev
+
+# Docker com a aplicação e PostgreSQL
 docker compose up -d --build
+
+# Produção local
+NODE_ENV=production PORT=3000 npm start
 
 Health:
 GET /health
@@ -90,7 +100,7 @@ API_AUTH_TOKEN=replace-with-a-random-secret
 
 The protected surface includes market analysis/report generation, research snapshot access, decision persistence, backtests, risk-regime analysis, portfolio operations and selected evaluation/governance routes. Read-only health, market connectivity and selected diagnostic evaluation endpoints remain accessible without the token.
 
-The dashboard includes a session-only API key field for `/api/analyze`; the key is sent only in the request header and is not persisted server-side.
+The dashboard includes a session-only API key field for protected API requests; the key is sent only in the request header and is never stored in build-time environment variables or localStorage.
 ## Observability
 
 The API emits structured JSON request logs with request ID, method, path, HTTP status and latency. Unhandled errors are logged with the same request ID and return a generic error response without exposing internal details.
@@ -169,7 +179,7 @@ The cycle:
 - skips a timeframe when a JEV decision already exists for the current closed candle;
 - never creates a real-order request.
 
-Vercel triggers GET /api/cron/paper-jev-cycle once per day in the current deployment. The route requires the CRON_SECRET bearer token and remains disabled unless PAPER_JEV_AUTORUN=true is configured in the deployment environment. The current daily schedule is required by Vercel Hobby limits; Pro/Enterprise can use a higher-frequency schedule.
+Vercel triggers GET /api/cron/paper-jev-cycle once per day in the current deployment. The route requires the CRON_SECRET bearer token and remains disabled unless PAPER_JEV_AUTORUN=true is configured in the deployment environment. With the current daily scheduler, the 1h and 4h observations advance at most once per day; the 1d observation also advances once per invocation. This is a scheduling limitation, not a change to decision logic. See docs/JEV-CRON-CADENCE.md.
 
 Required deployment configuration:
 ```env

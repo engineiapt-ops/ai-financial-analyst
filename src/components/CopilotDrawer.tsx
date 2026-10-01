@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiFetch.js';
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Send, Bot, User, Sparkles, Loader2, ArrowRight, HelpCircle } from 'lucide-react';
 import { ChatMessage } from '../types';
@@ -59,7 +60,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
         content: m.content
       }));
 
-      const res = await fetch('/api/copilot/chat', {
+      const res = await apiFetch('/api/copilot/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

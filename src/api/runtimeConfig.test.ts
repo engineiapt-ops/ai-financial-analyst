@@ -9,6 +9,8 @@ const base = {
   BINANCE_WS_BASE: "wss://stream.binance.com:9443/ws",
   GEMINI_API_KEY: "gemini-secret",
   GEMINI_MODEL: "gemini-3.8-flash",
+  JEV_MODEL_VERSION: "typesafe-ai/jev@v1",
+  CORS_ORIGINS: "https://example.com,https://app.example.com",
   GEMINI_API_BASE: "https://generativelanguage.googleapis.com/v1beta",
   GEMINI_TIMEOUT_MS: "30000",
   TRUST_PROXY: "false",
@@ -39,6 +41,14 @@ assert.equal(invalid.state, "blocked");
 assert.equal(invalid.invalid.includes("RATE_LIMIT_MAX"), true);
 assert.equal(invalid.invalid.includes("GEMINI_API_BASE"), true);
 
+
+const invalidCors = inspectRuntimeConfig({
+  ...base,
+  CORS_ORIGINS: "https://example.com/path,not-a-url",
+});
+assert.equal(invalidCors.state, "blocked");
+assert.equal(invalidCors.invalid.includes("CORS_ORIGINS"), true);
+
 const deterministic = inspectRuntimeConfig({
   NODE_ENV: "production",
   DATABASE_URL: "postgres://example",
@@ -46,6 +56,7 @@ const deterministic = inspectRuntimeConfig({
 });
 assert.equal(deterministic.state, "degraded");
 assert.equal(deterministic.warnings.some((warning) => warning.includes("GEMINI_API_KEY")), true);
+assert.equal(deterministic.warnings.some((warning) => warning.includes("JEV_MODEL_VERSION")), true);
 
 const dev = inspectRuntimeConfig({ NODE_ENV: "development" });
 assert.equal(dev.state, "ready");
