@@ -13,6 +13,22 @@ import {
 } from "./regime.js";
 import { evaluateRisk } from "./riskEngine.js";
 
+export interface RiskRegimeAnalysisDependencies {
+  getBacktestRun: typeof getBacktestRun;
+  getMarketDataRange: typeof getMarketDataRange;
+  getPortfolioPositions: typeof getPortfolioPositions;
+  assertDatasetMatchesMetadata: typeof assertDatasetMatchesMetadata;
+  evaluateRisk: typeof evaluateRisk;
+}
+
+const DEFAULT_DEPENDENCIES: RiskRegimeAnalysisDependencies = {
+  getBacktestRun,
+  getMarketDataRange,
+  getPortfolioPositions,
+  assertDatasetMatchesMetadata,
+  evaluateRisk,
+};
+
 interface RegimeMetrics {
   regime: string;
   trend: RegimeSnapshot["trend"];
@@ -60,17 +76,19 @@ function upsertMetric(map: Map<string, RegimeMetrics>, regime: RegimeSnapshot): 
 export async function runRiskRegimeAnalysis(
   sourceRunId: number,
   portfolioRunId?: number,
+  dependencies: Partial<RiskRegimeAnalysisDependencies> = {},
 ) {
-  const sourceRun = await getBacktestRun(sourceRunId);
+  const deps = { ...DEFAULT_DEPENDENCIES, ...dependencies };
+  const sourceRun = await deps.getBacktestRun(sourceRunId);
   if (!sourceRun) throw new Error(`Run ${sourceRunId} not found`);
 
-  const klines = await getMarketDataRange(
+  const klines = await deps.getMarketDataRange(
     sourceRun.ativo,
     sourceRun.timeframe,
     sourceRun.periodoInicio,
     sourceRun.periodoFim,
   );
-  assertDatasetMatchesMetadata(klines, sourceRun.candlesTotal, sourceRun.datasetHash);
+  deps.assertDatasetMatchesMetadata(klines, sourceRun.candlesTotal, sourceRun.datasetHash);
 
   const calibrationCandles = Math.floor(
     klines.length * (sourceRun.oosStartRatio ?? 0.7),
@@ -95,7 +113,7 @@ export async function runRiskRegimeAnalysis(
   }
 
   const portfolioPositions: PortfolioPositionRow[] = portfolioRunId
-    ? await getPortfolioPositions(portfolioRunId)
+    ? await deps.getPortfolioPositions(portfolioRunId)
     : [];
 
   for (const position of portfolioPositions) {
@@ -112,7 +130,7 @@ export async function runRiskRegimeAnalysis(
       tamanhoPosicaoPct: 2,
     };
     const wouldRiskBlock =
-      evaluateRisk(syntheticDecision, regime).reason === "high_volatility";
+      deps.evaluateRisk(syntheticDecision, regime).reason === "high_volatility";
     if (wouldRiskBlock) metric.highVolatilityBlocksWouldOccur += 1;
 
     if (position.status === "rejected") {

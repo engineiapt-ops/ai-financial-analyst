@@ -31,7 +31,31 @@ export interface AnalyzeOutput {
   risk: ReturnType<typeof evaluateRisk>;
 }
 
-export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput> {
+export interface AnalyzeMarketDependencies {
+  fetchKlines: typeof fetchKlines;
+  getSentiment: typeof getSentiment;
+  evaluateBaseline: typeof evaluateBaseline;
+  decideWithJev: typeof decideWithJev;
+  saveSignal: typeof saveSignal;
+  saveDecisionLog: typeof saveDecisionLog;
+  saveMarketData: typeof saveMarketData;
+}
+
+const DEFAULT_DEPENDENCIES: AnalyzeMarketDependencies = {
+  fetchKlines,
+  getSentiment,
+  evaluateBaseline,
+  decideWithJev,
+  saveSignal,
+  saveDecisionLog,
+  saveMarketData,
+};
+
+export async function analyzeMarket(
+  input: AnalyzeInput,
+  dependencies: Partial<AnalyzeMarketDependencies> = {},
+): Promise<AnalyzeOutput> {
+  const deps = { ...DEFAULT_DEPENDENCIES, ...dependencies };
   const ativo = input.ativo.trim().toUpperCase();
   if (!ativo) throw new Error("ativo is required");
   if (!Number.isFinite(input.valorInvestimento) || input.valorInvestimento <= 0) {
@@ -40,7 +64,7 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
 
   const now = new Date();
   const klines = filterKlinesByAsOf(
-    await fetchKlines(ativo, input.timeframe, 100),
+    await deps.fetchKlines(ativo, input.timeframe, 100),
     now,
   );
   if (klines.length < 21) {
@@ -57,7 +81,7 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
   const dataAsOf = last.closeTime ?? last.openTime;
   const indicators = computeIndicators(klines);
   const noticiaSentimento = input.news
-    ? await getSentiment(ativo, [new GdeltSource()], dataAsOf)
+    ? await deps.getSentiment(ativo, [new GdeltSource()], dataAsOf)
     : 0;
 
   const market: MarketState = {
@@ -72,8 +96,8 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
 
   const rawDecision =
     input.engine === "jev"
-      ? await decideWithJev(market)
-      : evaluateBaseline(market);
+      ? await deps.decideWithJev(market)
+      : deps.evaluateBaseline(market);
 
   // Risk calibration uses only candles strictly before the decision candle.
   const calibrationCandles = Math.max(30, klines.length - 1);
@@ -90,11 +114,11 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
   const valorExposto =
     input.valorInvestimento * (decision.tamanhoPosicaoPct / 100);
 
-  const signalId = await saveSignal(ativo, input.timeframe, decision, {
+  const signalId = await deps.saveSignal(ativo, input.timeframe, decision, {
     entrada: decision.recomendacao === "WAIT" ? null : last.close,
   });
 
-  const decisionLogId = await saveDecisionLog({
+  const decisionLogId = await deps.saveDecisionLog({
     ativo,
     timeframe: input.timeframe,
     decisionAt: new Date(),
@@ -103,7 +127,7 @@ export async function analyzeMarket(input: AnalyzeInput): Promise<AnalyzeOutput>
     referencePrice: last.close,
   });
 
-  await saveMarketData(ativo, input.timeframe, klines);
+  await deps.saveMarketData(ativo, input.timeframe, klines);
 
   return {
     signalId,

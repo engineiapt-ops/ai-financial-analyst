@@ -150,7 +150,39 @@ export interface PortfolioRunOptions {
   riskGate?: boolean;
 }
 
-export async function runPortfolioEngine(options: PortfolioRunOptions) {
+export interface PortfolioEngineDependencies {
+  createPortfolioRun: typeof createPortfolioRun;
+  finalizePortfolioRun: typeof finalizePortfolioRun;
+  getBacktestRun: typeof getBacktestRun;
+  getMarketDataRange: typeof getMarketDataRange;
+  getPortfolioSourceTrades: typeof getPortfolioSourceTrades;
+  savePortfolioPositions: typeof savePortfolioPositions;
+  savePortfolioEquityPoints: typeof savePortfolioEquityPoints;
+  assertDatasetMatchesMetadata: typeof assertDatasetMatchesMetadata;
+  calibrateRegimeThresholds: typeof calibrateRegimeThresholds;
+  buildRegimeSeries: typeof buildRegimeSeries;
+  evaluateRisk: typeof evaluateRisk;
+}
+
+const DEFAULT_DEPENDENCIES: PortfolioEngineDependencies = {
+  createPortfolioRun,
+  finalizePortfolioRun,
+  getBacktestRun,
+  getMarketDataRange,
+  getPortfolioSourceTrades,
+  savePortfolioPositions,
+  savePortfolioEquityPoints,
+  assertDatasetMatchesMetadata,
+  calibrateRegimeThresholds,
+  buildRegimeSeries,
+  evaluateRisk,
+};
+
+export async function runPortfolioEngine(
+  options: PortfolioRunOptions,
+  dependencies: Partial<PortfolioEngineDependencies> = {},
+) {
+  const deps = { ...DEFAULT_DEPENDENCIES, ...dependencies };
   const initialCapital = options.initialCapital ?? DEFAULT_INITIAL_CAPITAL;
   const positionSizePct = options.positionSizePct ?? DEFAULT_POSITION_SIZE_PCT;
   const maxGrossExposurePct = options.maxGrossExposurePct ?? DEFAULT_MAX_GROSS_EXPOSURE_PCT;
@@ -169,20 +201,20 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     throw new Error("positionSizePct cannot exceed maxGrossExposurePct");
   }
 
-  const sourceRun = await getBacktestRun(options.sourceRunId);
+  const sourceRun = await deps.getBacktestRun(options.sourceRunId);
   if (!sourceRun) throw new Error(`Run ${options.sourceRunId} not found`);
-  const klines = await getMarketDataRange(
+  const klines = await deps.getMarketDataRange(
     sourceRun.ativo,
     sourceRun.timeframe,
     sourceRun.periodoInicio,
     sourceRun.periodoFim,
   );
-  assertDatasetMatchesMetadata(klines, sourceRun.candlesTotal, sourceRun.datasetHash);
+  deps.assertDatasetMatchesMetadata(klines, sourceRun.candlesTotal, sourceRun.datasetHash);
 
   const riskRegimes = riskGate
     ? buildRegimeSeries(
         klines,
-        calibrateRegimeThresholds(
+        deps.calibrateRegimeThresholds(
           klines,
           Math.floor(klines.length * (sourceRun.oosStartRatio ?? 0.7)),
           new Date((klines[Math.floor(klines.length * (sourceRun.oosStartRatio ?? 0.7)) - 1].closeTime
@@ -192,8 +224,8 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     : [];
   const riskRegimeByTime = new Map(riskRegimes.map((regime) => [regime.dataAsOf.getTime(), regime]));
 
-  const trades = await getPortfolioSourceTrades(options.sourceRunId);
-  const portfolioRunId = await createPortfolioRun({
+  const trades = await deps.getPortfolioSourceTrades(options.sourceRunId);
+  const portfolioRunId = await deps.createPortfolioRun({
     sourceBacktestRunId: options.sourceRunId,
     ativo: sourceRun.ativo,
     timeframe: sourceRun.timeframe,
@@ -289,7 +321,7 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
         if (!regime) {
           throw new Error(`Missing frozen regime for entry timestamp ${asOf.toISOString()}`);
         }
-        const risk = evaluateRisk(
+        const risk = deps.evaluateRisk(
           {
             origem: "baseline",
             recomendacao: trade.side,
@@ -457,8 +489,8 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     totalSlippage,
   };
 
-  await savePortfolioPositions(positionResults);
-  await savePortfolioEquityPoints(equityCurve.map((point) => ({
+  await deps.savePortfolioPositions(positionResults);
+  await deps.savePortfolioEquityPoints(equityCurve.map((point) => ({
     portfolioRunId,
     asOf: point.asOf,
     equity: point.equity,
@@ -470,7 +502,7 @@ export async function runPortfolioEngine(options: PortfolioRunOptions) {
     drawdownPct: point.drawdownPct,
   })));
 
-  await finalizePortfolioRun(portfolioRunId, summary);
+  await deps.finalizePortfolioRun(portfolioRunId, summary);
 
   return {
     portfolioRunId,
