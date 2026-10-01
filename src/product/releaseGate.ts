@@ -78,8 +78,11 @@ export function buildReleaseGateReport(input: {
   const buildScriptPassed =
     buildScript === "tsc -p ." ||
     (
-      buildScript === "npm run check:server && vite build" &&
-      serverTypecheckScript === "tsc -p tsconfig.server.json --noEmit"
+      serverTypecheckScript === "tsc -p tsconfig.server.json --noEmit" &&
+      (
+        buildScript === "npm run check:server && vite build" ||
+        buildScript === "npm run check:server && npm run check:tests && vite build"
+      )
     );
   checks.push({
     key: "build-script",
