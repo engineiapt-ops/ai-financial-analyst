@@ -549,6 +549,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       </div>
     </div>
 
+  <script>
     async function loadResearchIntelligence() {
       try {
         const snapshotId = document.getElementById('researchSnapshotId').value.trim();
@@ -684,7 +685,6 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       }
     }
 
-  <script>
     async function refreshGovernanceDashboard() {
       try {
         const params = new URLSearchParams({
