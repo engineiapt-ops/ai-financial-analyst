@@ -45,7 +45,7 @@ assert.equal(
 assert.equal(isProtectedApiRequest(makeRequest("/api/analyze", "POST")), true);
 assert.equal(isProtectedApiRequest(makeRequest("/api/report", "POST")), true);
 assert.equal(isProtectedApiRequest(makeRequest("/api/research/snapshots/rs_123", "GET")), true);
-assert.equal(isProtectedApiRequest(makeRequest("/api/evaluation/overview", "GET")), false);
+assert.equal(isProtectedApiRequest(makeRequest("/api/evaluation/overview", "GET")), true);
 assert.equal(isProtectedApiRequest(makeRequest("/api/evaluation/kpis", "GET")), true);
 assert.equal(isProtectedApiRequest(makeRequest("/api/evaluation/oos-report", "GET")), true);
 assert.equal(isProtectedApiRequest(makeRequest("/api/evaluation/pipeline-audit", "GET")), true);
@@ -60,7 +60,7 @@ assert.equal(
 );
 assert.equal(
   isProtectedApiRequest(makeRequest("/api/evaluation/pipeline-audit/snapshots", "GET")),
-  false,
+  true,
 );
 assert.equal(isProtectedApiRequest(makeRequest("/api/evaluation/decisions/12", "POST")), true);
 assert.equal(isProtectedApiRequest(makeRequest("/api/metrics", "GET")), true);
