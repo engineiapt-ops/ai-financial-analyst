@@ -63,6 +63,9 @@ export function inspectRuntimeConfig(
     "RATE_LIMIT_MAX",
     "RATE_LIMIT_HEAVY_MAX",
     "OBSERVABILITY_LOGS",
+    "JEV_BASE_URL",
+    "JEV_MODEL_VERSION",
+    "AI_GATEWAY_API_KEY",
   ]) {
     if (trimValue(env[key])) configured.push(key);
   }
@@ -89,6 +92,10 @@ export function inspectRuntimeConfig(
 
   if (productionMode && !trimValue(env.GEMINI_MODEL)) {
     warnings.push("GEMINI_MODEL is not configured; provider default will be used when Gemini is enabled");
+  }
+
+  if (productionMode && !trimValue(env.JEV_MODEL_VERSION)) {
+    warnings.push("JEV_MODEL_VERSION is not configured; the gateway-reported JEV version will be recorded as advisory metadata");
   }
 
   if (missing.length > 0 || invalid.length > 0) {
