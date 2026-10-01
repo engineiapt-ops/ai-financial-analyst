@@ -179,7 +179,7 @@ The cycle:
 - skips a timeframe when a JEV decision already exists for the current closed candle;
 - never creates a real-order request.
 
-Vercel triggers GET /api/cron/paper-jev-cycle once per day in the current deployment. The route requires the CRON_SECRET bearer token and remains disabled unless PAPER_JEV_AUTORUN=true is configured in the deployment environment. The current daily schedule is required by Vercel Hobby limits; Pro/Enterprise can use a higher-frequency schedule.
+Vercel triggers GET /api/cron/paper-jev-cycle once per day in the current deployment. The route requires the CRON_SECRET bearer token and remains disabled unless PAPER_JEV_AUTORUN=true is configured in the deployment environment. With the current daily scheduler, the 1h and 4h observations advance at most once per day; the 1d observation also advances once per invocation. This is a scheduling limitation, not a change to decision logic. See docs/JEV-CRON-CADENCE.md.
 
 Required deployment configuration:
 ```env
