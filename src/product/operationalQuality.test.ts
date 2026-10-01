@@ -65,6 +65,12 @@ const evaluation = {
     sufficientSample: true,
     brierScore: 0.19,
     expectedCalibrationError: 0.07,
+    directionalProbability: {
+      sampleCount: 90,
+      sufficientSample: true,
+      brierScore: 0.21,
+      expectedCalibrationError: 0.08,
+    },
   },
   governance: {
     auditCount: 2,
