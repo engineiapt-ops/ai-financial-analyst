@@ -64,7 +64,7 @@
     "test:release-gate": "tsx src/product/releaseGate.test.ts",
     "test:validation-history": "tsx src/product/validationHistory.test.ts",
     "backfill:all": "npm run market:backfill -- --symbol BTCUSDT --timeframe 1h && npm run market:backfill -- --symbol BTCUSDT --timeframe 4h && npm run market:backfill -- --symbol BTCUSDT --timeframe 1d",
-    "setup:personal": "echo \"1) Configure .env (cp .env.example .env)\" && echo \"2) npm install && npm run db:migrate\" && echo \"3) npm run backfill:all\" && echo \"4) npm run backtest:walk-forward\" && echo \"Ver PLANO-ATIVACAO.md para detalhes\"",
+    "setup:personal": "echo \"1) Configure .env (cp .env.example .env)\" && echo \"2) npm ci && npm run db:migrate\" && echo \"3) npm run backfill:all\" && echo \"4) npm run backtest:walk-forward\" && echo \"Setup complete\"",
     "test:execution-levels": "tsx src/config/executionLevels.test.ts",
     "test:risk": "tsx src/risk/riskEngine.test.ts",
     "check:server": "tsc -p tsconfig.server.json --noEmit",
