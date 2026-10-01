@@ -575,7 +575,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       }
     }
 
-    async function refreshSystemValidation() {
+    window.refreshSystemValidation = async function refreshSystemValidation() {
       try {
         const params = new URLSearchParams({
           asset: document.getElementById('ativo').value,
