@@ -1,0 +1,46 @@
+name: Corrections Validation
+
+on:
+  push:
+    branches:
+      - chore/corrections-2026-10
+  pull_request:
+    branches:
+      - chore/corrections-2026-10
+      - main
+
+concurrency:
+  group: corrections-validation
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit process.env references
+        run: |
+          grep -RIn --exclude-dir=node_modules "process.env" src server.ts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Test suite
+        run: npm test

@@ -78,7 +78,10 @@ try {
   assert.equal(cronUnauthorized.status, 401);
 
   const cronDisabled = await fetch(baseUrl + "/api/cron/paper-jev-cycle", {
-    headers: { authorization: "Bearer cron-secret" },
+    headers: {
+    "x-api-key": "integration-secret",
+    authorization: "Bearer cron-secret",
+  },
   });
   assert.equal(cronDisabled.status, 200);
   assert.deepEqual(await cronDisabled.json(), {
