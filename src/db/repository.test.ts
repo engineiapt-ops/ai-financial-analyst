@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import type { PoolClient, QueryResultRow } from "pg";
 import { readFileSync } from "node:fs";
 import { createRepository, type RepositoryPool } from "./repository.js";
+import type { PoolClient, QueryResultRow } from "pg";
 import { computeDatasetHash } from "../marketdata/dataset.js";
 import type { DecisionResult } from "../types.js";
 
@@ -58,7 +59,7 @@ class FakeClient {
 class FakeDb implements RepositoryPool {
   queries: string[] = [];
   client = new FakeClient();
-  async query<T = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }> {
+  async query<T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]): Promise<{ rows: T[] }> {
     this.queries.push(text);
     if (text.includes("SELECT 1")) return { rows: [] };
     if (text.includes("INSERT INTO research_snapshots") || text.includes("FROM research_snapshots")) {
