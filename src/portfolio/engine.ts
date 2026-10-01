@@ -142,6 +142,14 @@ function isSameOrBefore(a: Date, b: Date): boolean {
   return a.getTime() <= b.getTime();
 }
 
+export interface PortfolioRunOptions {
+  sourceRunId: number;
+  initialCapital?: number;
+  positionSizePct?: number;
+  maxGrossExposurePct?: number;
+  riskGate?: boolean;
+}
+
 export interface PortfolioEngineDependencies {
   createPortfolioRun: typeof createPortfolioRun;
   finalizePortfolioRun: typeof finalizePortfolioRun;
