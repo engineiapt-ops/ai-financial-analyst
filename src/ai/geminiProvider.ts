@@ -7,7 +7,8 @@ import {
 import type { OnlineAnalysisPacket } from "../online/provenance.js";
 import { computeOnlineAnalysisPacketHash } from "../online/provenance.js";
 
-const DEFAULT_MODEL = "gemini-3.8-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+export const DEFAULT_GEMINI_TTS_MODEL = "gemini-3.8-flash-lite-tts";
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -81,7 +82,7 @@ export class GeminiProvider implements AnalystAiProvider {
     fetchImpl?: typeof fetch;
   } = {}) {
     this.apiKey = options.apiKey !== undefined ? options.apiKey.trim() : process.env.GEMINI_API_KEY?.trim();
-    this.model = options.model?.trim() || process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+    this.model = options.model?.trim() || process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
     this.baseUrl = (options.baseUrl?.trim() || process.env.GEMINI_API_BASE?.trim() || DEFAULT_BASE_URL).replace(/\/$/, "");
     this.timeoutMs = options.timeoutMs ?? Number(process.env.GEMINI_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
     this.fetchImpl = options.fetchImpl ?? fetch;
@@ -165,4 +166,14 @@ export class GeminiProvider implements AnalystAiProvider {
 
 export function getGeminiProvider(): GeminiProvider {
   return new GeminiProvider();
+}
+
+
+export function getGeminiModelConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): { model: string; ttsModel: string } {
+  return {
+    model: env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+    ttsModel: env.GEMINI_TTS_MODEL?.trim() || DEFAULT_GEMINI_TTS_MODEL,
+  };
 }
