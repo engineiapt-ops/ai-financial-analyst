@@ -4,6 +4,7 @@ import { callJev } from "./jevClient.js";
 
 const market = {
   ativo: "BTCUSDT",
+  timeframe: "1h",
   timestamp: "2026-09-30T10:00:00.000Z",
   dataAsOf: "2026-09-30T09:00:00.000Z",
   precoAtual: 100,
