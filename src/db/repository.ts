@@ -10,7 +10,7 @@ import type { OutcomeSettlementAuditPayload } from "../evaluation/outcomeSettlem
 import type { SystemValidationOverview, SystemValidationState } from "../product/systemValidation.js";
 
 export interface RepositoryPool {
-  query<T extends QueryResultRow = any>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
+  query<T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
   connect(): Promise<PoolClient>;
 }
 
@@ -2429,7 +2429,7 @@ export function createRepository(db: RepositoryPool) {
         throw new Error("decision log id must be a positive integer");
       }
 
-      const { rows } = await db.query<any>(
+      const { rows } = await db.query<{ id: string | number; audit: unknown; created_at: Date | string }>(
         `SELECT id, decision_log_id, audit_version, ativo, timeframe, recommendation,
                 decision_at, data_as_of, evaluated_at, reference_price,
                 lookahead_candles, flat_threshold_pct, outcome_status,
@@ -2478,7 +2478,7 @@ export function createRepository(db: RepositoryPool) {
       }
 
       const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-      const { rows } = await db.query<any>(
+      const { rows } = await db.query<{ id: string | number; audit: unknown; created_at: Date | string }>(
         `SELECT id, decision_log_id, audit_version, ativo, timeframe, recommendation,
                 decision_at, data_as_of, evaluated_at, reference_price,
                 lookahead_candles, flat_threshold_pct, outcome_status,
