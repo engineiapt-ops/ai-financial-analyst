@@ -3,56 +3,16 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 export const API_AUTH_TOKEN_HEADER = "X-API-Key";
 
+const PUBLIC_API_PATHS = new Set([
+  "/api/market/ping",
+  "/api/market/time",
+  "/api/system/readiness",
+]);
+
 export function isProtectedApiRequest(req: Request): boolean {
+  if (req.path === "/health") return false;
   if (!req.path.startsWith("/api/")) return false;
-
-  if (req.path === "/api/analyze" && req.method === "POST") return true;
-  if (req.method === "POST" && [
-    "/api/analyze/ticker",
-    "/api/analyze/ledger",
-    "/api/valuation/dcf",
-    "/api/research/memo",
-    "/api/briefing/tts",
-    "/api/copilot/chat",
-  ].includes(req.path)) return true;
-  if (req.path === "/api/report" && req.method === "POST") return true;
-  if (req.path === "/api/product/research-intelligence" && req.method === "GET") return true;
-
-  // Evaluation/governance endpoints expose run-scoped diagnostics or persist
-  // governance history. Require the same API authentication used by other
-  // non-public analytical endpoints.
-  if (
-    req.method === "GET" &&
-    [
-      "/api/evaluation/kpis",
-      "/api/evaluation/oos-report",
-      "/api/evaluation/pipeline-audit",
-      "/api/product/governance-dashboard",
-    ].includes(req.path)
-  ) {
-    return true;
-  }
-  if (
-    req.method === "POST" &&
-    [
-      "/api/evaluation/pipeline-audit/snapshots",
-      "/api/product/continuous-governance/check",
-    ].includes(req.path)
-  ) {
-    return true;
-  }
-  if (req.path === "/api/system/validation/history" && req.method === "POST") return true;
-  if (
-    req.path.startsWith("/api/research/snapshots/") ||
-    req.path.startsWith("/api/evaluation/decisions/")
-  ) {
-    return true;
-  }
-  if (req.path.startsWith("/api/backtest/")) return true;
-  if (req.path === "/api/risk/regimes") return true;
-  if (req.path.startsWith("/api/portfolio")) return true;
-
-  return false;
+  return !PUBLIC_API_PATHS.has(req.path);
 }
 
 function extractProvidedToken(req: Request): string | undefined {
