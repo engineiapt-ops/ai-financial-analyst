@@ -6,7 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { app as coreApiApp } from './src/api/server.js';
-import { requireApiAuth } from './src/api/auth.js';
+import { isProtectedApiRequest, requireApiAuth } from './src/api/auth.js';
 import { getGeminiModel, getGeminiTtsModel } from './src/ai/geminiProvider.js';
 import { createRateLimitMiddleware, getRequestClientKey } from './src/api/rateLimit.js';
 
@@ -77,7 +77,15 @@ const extendedAiHeavyRateLimiter = createRateLimitMiddleware({
   key: (req) => `extended-heavy:${getRequestClientKey(req)}`,
 });
 
-const extendedAiAuth = requireApiAuth();
+const rootApiAuthMiddleware = requireApiAuth();
+
+app.use((req, res, next) => {
+  if (isProtectedApiRequest(req)) {
+    rootApiAuthMiddleware(req, res, next);
+    return;
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   if (!extendedAiApiPaths.has(req.path) || req.method !== 'POST') {
@@ -91,13 +99,6 @@ app.use((req, res, next) => {
     return next();
   }
   extendedAiHeavyRateLimiter(req, res, next);
-});
-
-app.use((req, res, next) => {
-  if (!extendedAiApiPaths.has(req.path) || req.method !== 'POST') {
-    return next();
-  }
-  extendedAiAuth(req, res, next);
 });
 
 // Helper to safely get initialized GoogleGenAI or null

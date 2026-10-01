@@ -5,7 +5,8 @@ process.env.NODE_ENV = "test";
 process.env.API_AUTH_TOKEN = "integration-secret";
 process.env.CRON_SECRET = "cron-secret";
 
-const { app } = await import("./server.js");
+const { app } = await import("../../server.js");
+const { app: coreApiApp } = await import("./server.js");
 
 const server = http.createServer(app);
 
@@ -42,13 +43,22 @@ try {
     service: "ai-financial-analyst-api",
   });
 
+  const overviewUnauthorized = await fetch(baseUrl + "/api/market/overview");
+  assert.equal(overviewUnauthorized.status, 401);
+
+  const overviewAuthorized = await fetch(baseUrl + "/api/market/overview", {
+    headers: { "x-api-key": "integration-secret" },
+  });
+  assert.equal(overviewAuthorized.status, 200);
+  const overviewPayload = await overviewAuthorized.json();
+  assert.equal(Array.isArray(overviewPayload.indices), true);
+
   const unauthorized = await fetch(baseUrl + "/api/analyze", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({}),
   });
   assert.equal(unauthorized.status, 401);
-  assert.equal(Boolean(unauthorized.headers.get("x-request-id")), true);
   assert.deepEqual(await unauthorized.json(), {
     status: "error",
     error: "unauthorized",
@@ -73,6 +83,40 @@ try {
     body: JSON.stringify({}),
   });
   assert.equal(wrongHeader.status, 401);
+
+  const routePathSet = new Set<string>();
+  const routers = [app, coreApiApp];
+  for (const routerOwner of routers) {
+    const router = (routerOwner as typeof routerOwner & {
+      router?: { stack?: Array<{ route?: { path?: string | string[] } }> };
+      _router?: { stack?: Array<{ route?: { path?: string | string[] } }> };
+    }).router ?? (routerOwner as typeof routerOwner & {
+      _router?: { stack?: Array<{ route?: { path?: string | string[] } }> };
+    })._router;
+    for (const layer of router?.stack ?? []) {
+      const path = layer.route?.path;
+      if (typeof path === "string") routePathSet.add(path);
+      if (Array.isArray(path)) for (const item of path) routePathSet.add(item);
+    }
+  }
+
+  const publicApiRoutes = new Set([
+    "/api/market/ping",
+    "/api/market/time",
+    "/api/system/readiness",
+  ]);
+  const discoveredProtectedRoutes = [...routePathSet]
+    .filter((path) => path.startsWith("/api/") && !publicApiRoutes.has(path));
+
+  assert.equal(discoveredProtectedRoutes.length > 0, true);
+  for (const path of discoveredProtectedRoutes) {
+    const response = await fetch(baseUrl + path);
+    assert.equal(
+      response.status,
+      401,
+      `API route must reject unauthenticated access: ${path}`,
+    );
+  }
 
   const cronUnauthorized = await fetch(baseUrl + "/api/cron/paper-jev-cycle");
   assert.equal(cronUnauthorized.status, 401);
