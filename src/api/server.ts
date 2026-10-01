@@ -2061,7 +2061,7 @@ app.post("/api/analyze", async (req, res) => {
 
 app.get("/api/cron/paper-jev-cycle", async (req, res) => {
   const expectedSecret = process.env.CRON_SECRET?.trim();
-  const provided = req.header("authorization")?.match(/^Bearer\\s+(.+)$/i)?.[1]?.trim();
+  const provided = req.header("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
 
   if (!expectedSecret || !provided || provided !== expectedSecret) {
     return res.status(401).json({ status: "error", error: "unauthorized" });
