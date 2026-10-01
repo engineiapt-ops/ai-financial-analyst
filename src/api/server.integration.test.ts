@@ -3,6 +3,7 @@ import http from "node:http";
 
 process.env.NODE_ENV = "test";
 process.env.API_AUTH_TOKEN = "integration-secret";
+process.env.CRON_SECRET = "cron-secret";
 
 const { app } = await import("./server.js");
 
@@ -73,8 +74,22 @@ try {
   });
   assert.equal(wrongHeader.status, 401);
 
+  const cronUnauthorized = await fetch(baseUrl + "/api/cron/paper-jev-cycle");
+  assert.equal(cronUnauthorized.status, 401);
+
+  const cronDisabled = await fetch(baseUrl + "/api/cron/paper-jev-cycle", {
+    headers: { authorization: "Bearer cron-secret" },
+  });
+  assert.equal(cronDisabled.status, 200);
+  assert.deepEqual(await cronDisabled.json(), {
+    status: "ok",
+    enabled: false,
+    note: "PAPER_JEV_AUTORUN is not enabled",
+  });
+
   console.log("API integration tests passed");
 } finally {
   await close();
   delete process.env.API_AUTH_TOKEN;
+  delete process.env.CRON_SECRET;
 }
