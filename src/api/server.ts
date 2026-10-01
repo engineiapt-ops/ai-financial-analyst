@@ -1250,13 +1250,15 @@ app.post("/api/system/validation/history", async (req, res) => {
 
 async function collectSystemReadinessOverview() {
   const [marketDataCheck, databaseCheck] = await Promise.all([
-    pingBinance()
+    Promise.resolve()
+      .then(() => pingBinance())
       .then((ok) => ({ available: ok, detail: ok ? "Binance ping OK" : "Binance ping failed" }))
       .catch((error: unknown) => ({
         available: false,
         detail: error instanceof Error ? error.message : String(error),
       })),
-    healthDatabase()
+    Promise.resolve()
+      .then(() => healthDatabase())
       .then(() => ({ available: true, detail: "Database query OK" }))
       .catch((error: unknown) => ({
         available: false,
