@@ -1300,7 +1300,7 @@ app.get("/api/market/ping", async (_req, res) => {
     const isAlive = await pingBinance();
     res.json({ status: "ok", ping: isAlive });
   } catch (err) {
-    res.status(502).json({ status: "error", error: err.message });
+    res.status(502).json({ status: "error", error: err instanceof Error ? err.message : String(err) });
   }
 });
 
@@ -1309,7 +1309,7 @@ app.get("/api/market/time", async (_req, res) => {
     const serverTime = await getServerTime();
     res.json({ status: "ok", serverTime, serverTimeUTC: new Date(serverTime).toISOString() });
   } catch (err) {
-    res.status(502).json({ status: "error", error: err.message });
+    res.status(502).json({ status: "error", error: err instanceof Error ? err.message : String(err) });
   }
 });
 
@@ -1319,7 +1319,7 @@ app.get("/api/market/info", async (req, res) => {
     const info = await getExchangeInfo(symbol);
     res.json({ status: "ok", info });
   } catch (err) {
-    res.status(400).json({ status: "error", error: err.message });
+    res.status(400).json({ status: "error", error: err instanceof Error ? err.message : String(err) });
   }
 });
 
@@ -1341,7 +1341,7 @@ app.get("/api/market/klines", async (req, res) => {
       klines,
     });
   } catch (err) {
-    res.status(400).json({ status: "error", error: err.message });
+    res.status(400).json({ status: "error", error: err instanceof Error ? err.message : String(err) });
   }
 });
 
