@@ -1,4 +1,4 @@
-export const JEV_MODEL_VERSION = process.env.JEV_MODEL_VERSION ?? "gateway-managed";
+export const JEV_MODEL_VERSION = process.env.JEV_MODEL_VERSION?.trim() || undefined;
 
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name];
