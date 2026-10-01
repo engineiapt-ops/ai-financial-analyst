@@ -20,7 +20,7 @@
   "crons": [
     {
       "path": "/api/cron/paper-jev-cycle",
-      "schedule": "0 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
