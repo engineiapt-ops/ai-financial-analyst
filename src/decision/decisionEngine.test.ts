@@ -27,6 +27,7 @@ export function runDecisionEngineTests() {
     const result = evaluateJevResponse(response());
     assert(result.recomendacao === "BUY", "ALTA forte deve produzir BUY");
     assert(result.tamanhoPosicaoPct === 1.5, "posição fixa deve ser 1,5%");
+    assert(result.probabilidadeDirecional === 0.8, "probabilidade direcional selecionada deve ser preservada");
     console.log("PASS");
   }
 
