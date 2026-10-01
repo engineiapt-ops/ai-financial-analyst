@@ -14,7 +14,7 @@
     "start": "tsx server.ts",
     "test:indicators": "tsx src/features/indicators.test.ts",
     "test:sentiment": "tsx src/features/sentimentPipeline.test.ts",
-    "test": "npm run test:indicators && npm run test:jev-client && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:pending-settlement && npm run test:outcome-settlement-audit && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:evaluation-overview && npm run test:portfolio-governance-overview && npm run test:portfolio-stability && npm run test:operational-quality && npm run test:pipeline-audit && npm run test:pipeline-audit-repository && npm run test:governance-dashboard && npm run test:continuous-governance && npm run test:research-intelligence && npm run test:system-readiness && npm run test:system-validation && npm run test:paper-e2e && npm run test:validation-history && npm run test:release-gate && npm run test:rate-limit && npm run test:auth && npm run test:observability && npm run test:runtime-config && npm run test:api-integration && npm run test:gemini && npm run test:pit && npm run test:market-data-quality && npm run test:decision && npm run test:baseline && npm run test:execution-levels && npm run test:risk && npm run test:paper && npm run test:portfolio-walk-forward && npm run test:dataset && npm run test:repository && npm run test:research-snapshot-schema && npm run test:server",
+    "test": "npm run npm run test:binance-client && npm run npm run test:risk-regime && npm run npm run test:risk-analysis && npm run npm run test:portfolio-engine && npm run npm run test:online-service && npm run test:indicators && npm run test:jev-client && npm run test:jev-paper-cycle && npm run test:sentiment && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:pending-settlement && npm run test:outcome-settlement-audit && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:evaluation-overview && npm run test:portfolio-governance-overview && npm run test:portfolio-stability && npm run test:operational-quality && npm run test:pipeline-audit && npm run test:pipeline-audit-repository && npm run test:governance-dashboard && npm run test:continuous-governance && npm run test:research-intelligence && npm run test:system-readiness && npm run test:system-validation && npm run test:paper-e2e && npm run test:validation-history && npm run test:release-gate && npm run test:rate-limit && npm run test:auth && npm run test:observability && npm run test:runtime-config && npm run test:api-integration && npm run test:gemini && npm run test:pit && npm run test:market-data-quality && npm run test:decision && npm run test:baseline && npm run test:execution-levels && npm run test:risk && npm run test:paper && npm run test:portfolio-walk-forward && npm run test:dataset && npm run test:repository && npm run test:research-snapshot-schema && npm run test:server",
     "test:decision": "tsx src/decision/decisionEngine.test.ts",
     "test:baseline": "tsx src/decision/baselineEngine.test.ts",
     "test:paper": "tsx src/papertrading/simulator.test.ts",
@@ -70,7 +70,12 @@
     "check:server": "tsc -p tsconfig.server.json --noEmit",
     "test:research-snapshot-schema": "tsx src/db/researchSnapshotSchema.test.ts",
     "test:jev-client": "tsx src/jev/jevClient.test.ts",
-    "check:tests": "tsc -p tsconfig.tests.json --noEmit"
+    "check:tests": "tsc -p tsconfig.tests.json --noEmit",
+    "test:binance-client": "tsx src/marketdata/binanceClient.test.ts",
+    "test:risk-regime": "tsx src/risk/regime.test.ts",
+    "test:risk-analysis": "tsx src/risk/analysis.test.ts",
+    "test:portfolio-engine": "tsx src/portfolio/engine.test.ts",
+    "test:online-service": "tsx src/online/service.test.ts"
   },
   "dependencies": {
     "express": "^5.2.1",
