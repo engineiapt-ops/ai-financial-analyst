@@ -84,7 +84,7 @@ const result = await runRiskRegimeAnalysis(7, 99, {
   getBacktestRun: async () => sourceRun,
   getMarketDataRange: async () => klines,
   getPortfolioPositions: async () => [lowRiskPosition, highRiskPosition],
-  assertDatasetMatchesMetadata: () => undefined,
+  assertDatasetMatchesMetadata: () => "synthetic-hash",
 });
 
 assert.equal(result.asset, "BTCUSDT");
@@ -110,7 +110,7 @@ await assert.rejects(
   () => runRiskRegimeAnalysis(8, undefined, {
     getBacktestRun: async () => insufficientRun,
     getMarketDataRange: async () => insufficientCandles,
-    assertDatasetMatchesMetadata: () => undefined,
+    assertDatasetMatchesMetadata: () => "synthetic-portfolio-hash",
   }),
   /Invalid calibration window for regime analysis/,
 );
