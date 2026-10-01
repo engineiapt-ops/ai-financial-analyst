@@ -57,6 +57,7 @@ const decision = evaluateJevResponse(jev);
 assert.equal(decision.recomendacao, "BUY");
 assert.equal(decision.tamanhoPosicaoPct, 1.5);
 assert.equal(decision.riscoElevado, false);
+assert.equal(decision.probabilidadeDirecional, 0.8);
 
 const regime = { key: "normal", volatility: "NORMAL" } as any;
 const risk = evaluateRisk(decision, regime);
