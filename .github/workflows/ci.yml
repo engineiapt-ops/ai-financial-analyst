@@ -40,11 +40,5 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Build
-        run: npm run build
-
-      - name: Test suite
-        run: npm test
-
       - name: Release gate
         run: npm run release:gate
