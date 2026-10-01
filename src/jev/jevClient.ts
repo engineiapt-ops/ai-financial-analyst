@@ -30,6 +30,24 @@ export interface JevResponse {
   modelVersion?: string;
 }
 
+export class JevUnavailableError extends Error {
+  readonly code = "JEV_UNAVAILABLE" as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "JevUnavailableError";
+  }
+}
+
+export class JevModelVersionMismatchError extends Error {
+  readonly code = "JEV_MODEL_VERSION_MISMATCH" as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "JevModelVersionMismatchError";
+  }
+}
+
 export interface JevClientOptions {
   baseUrl?: string;
   credential?: string;
@@ -155,7 +173,7 @@ function validateExpectedModelVersion(
   }
 
   if (expected && reported !== expected) {
-    throw new Error(
+    throw new JevModelVersionMismatchError(
       `Jev model version mismatch: expected "${expected}", gateway returned "${reported}".`,
     );
   }
@@ -169,7 +187,7 @@ export async function callJev(
 ): Promise<JevResponse> {
   const credential = options.credential ?? (await getGatewayCredential());
   if (!credential) {
-    throw new Error("AI_GATEWAY_API_KEY não configurada.");
+    throw new JevUnavailableError("AI_GATEWAY_API_KEY não configurada.");
   }
 
   const baseUrl = (
@@ -254,14 +272,20 @@ export async function callJev(
         continue;
       }
 
-      throw new Error(
+      throw new JevUnavailableError(
         `Jev API error: ${res.status} ${res.statusText}${
           body ? ` — ${body.slice(0, 500)}` : ""
         }`,
       );
     } catch (error) {
+      if (error instanceof JevModelVersionMismatchError || error instanceof JevUnavailableError) {
+        throw error;
+      }
       if (error instanceof Error && error.name === "AbortError") {
-        throw new Error(`Jev request timed out after ${timeoutMs}ms`);
+        throw new JevUnavailableError(`Jev request timed out after ${timeoutMs}ms`);
+      }
+      if (error instanceof TypeError) {
+        throw new JevUnavailableError(`Jev request failed: ${error.message}`);
       }
       throw error;
     } finally {
