@@ -2110,6 +2110,9 @@ export function createRepository(db: RepositoryPool) {
         confidence: string | number;
         quality_score: string | number | null;
         trade_profit_percent: string | number;
+        jev_choice: DecisionResult["jevChoice"] | null;
+        predicted_probability: string | number | null;
+        outcome_direction: "up" | "down" | "flat" | null;
         origem: string;
         ativo: string;
         timeframe: Timeframe;
@@ -2119,6 +2122,13 @@ export function createRepository(db: RepositoryPool) {
            dl.confidence,
            dl.quality_score,
            dl.trade_profit_percent,
+           dl.jev_choice,
+           CASE
+             WHEN dl.jev_choice = 'ALTA' THEN dl.jev_probs->>'ALTA'
+             WHEN dl.jev_choice = 'BAIXA' THEN dl.jev_probs->>'BAIXA'
+             ELSE NULL
+           END AS predicted_probability,
+           dl.outcome_direction,
            dl.origem,
            dl.ativo,
            dl.timeframe,
@@ -2135,6 +2145,11 @@ export function createRepository(db: RepositoryPool) {
         confidence: Number(row.confidence),
         qualityScore: row.quality_score === null ? null : Number(row.quality_score),
         tradeProfitPercent: Number(row.trade_profit_percent),
+        predictedProbability:
+          row.predicted_probability === null ? null : Number(row.predicted_probability),
+        predictedDirection:
+          row.jev_choice === "ALTA" ? "up" : row.jev_choice === "BAIXA" ? "down" : null,
+        outcomeDirection: row.outcome_direction,
         origem: row.origem,
         ativo: row.ativo,
         timeframe: row.timeframe,

@@ -8,6 +8,9 @@ export interface CalibrationObservation {
   ativo: string;
   timeframe: "1h" | "4h" | "1d";
   riskRegime: string;
+  predictedProbability?: number | null;
+  predictedDirection?: "up" | "down" | null;
+  outcomeDirection?: "up" | "down" | "flat" | null;
 }
 
 export interface ConfidenceCalibrationBin {
@@ -30,6 +33,16 @@ export interface QualityScoreBand {
   avgTradeProfitPercent: number;
 }
 
+export interface DirectionalProbabilityCalibrationBin {
+  label: string;
+  lowerBound: number;
+  upperBound: number;
+  count: number;
+  avgProbability: number;
+  observedDirectionAccuracy: number;
+  calibrationGap: number;
+}
+
 export interface CalibrationReport {
   filters: DecisionKpiFilters;
   sampleCount: number;
@@ -39,6 +52,14 @@ export interface CalibrationReport {
     brierScore: number | null;
     expectedCalibrationError: number | null;
     bins: ConfidenceCalibrationBin[];
+  };
+  directionalProbability: {
+    sampleCount: number;
+    sufficientSample: boolean;
+    minimumRecommendedSample: number;
+    brierScore: number | null;
+    expectedCalibrationError: number | null;
+    bins: DirectionalProbabilityCalibrationBin[];
   };
   qualityScore: {
     bands: QualityScoreBand[];
@@ -147,6 +168,57 @@ export function buildCalibrationReport(
       )
     : null;
 
+  const directionalValid = observations.filter(
+    (observation) =>
+      Number.isFinite(observation.predictedProbability) &&
+      (observation.predictedProbability ?? 0) >= 0 &&
+      (observation.predictedProbability ?? 0) <= 1 &&
+      (observation.predictedDirection === "up" || observation.predictedDirection === "down") &&
+      (observation.outcomeDirection === "up" || observation.outcomeDirection === "down"),
+  );
+
+  const directionalBins = Array.from({ length: BIN_COUNT }, (_, index) => {
+    const { lower, upper } = binBounds(index);
+    const items = directionalValid.filter((observation) => {
+      const probability = clamp01(observation.predictedProbability!);
+      return probability >= lower && probability <= upper && (
+        index === BIN_COUNT - 1 || probability < upper
+      );
+    });
+
+    const correct = items.filter(
+      (observation) => observation.predictedDirection === observation.outcomeDirection,
+    ).length;
+    const avgProbability = safeAverage(
+      items.map((observation) => clamp01(observation.predictedProbability!)),
+    ) ?? 0;
+    const observedDirectionAccuracy = items.length ? correct / items.length : 0;
+
+    return {
+      label: binLabel(lower, upper),
+      lowerBound: lower,
+      upperBound: upper,
+      count: items.length,
+      avgProbability,
+      observedDirectionAccuracy,
+      calibrationGap: observedDirectionAccuracy - avgProbability,
+    };
+  });
+
+  const directionalBrierValues = directionalValid.map((observation) => {
+    const expected = clamp01(observation.predictedProbability!);
+    const observed = observation.predictedDirection === observation.outcomeDirection ? 1 : 0;
+    return (expected - observed) ** 2;
+  });
+
+  const directionalEce = directionalValid.length
+    ? directionalBins.reduce(
+        (sum, bin) =>
+          sum + (bin.count / directionalValid.length) * Math.abs(bin.calibrationGap),
+        0,
+      )
+    : null;
+
   const qualityBands = Array.from({ length: BIN_COUNT }, (_, index) => {
     const { lower, upper } = binBounds(index);
     const items = valid.filter((observation) => {
@@ -179,6 +251,14 @@ export function buildCalibrationReport(
       brierScore: safeAverage(brierValues),
       expectedCalibrationError: ece,
       bins: confidenceBins,
+    },
+    directionalProbability: {
+      sampleCount: directionalValid.length,
+      sufficientSample: directionalValid.length >= MINIMUM_RECOMMENDED_SAMPLE,
+      minimumRecommendedSample: MINIMUM_RECOMMENDED_SAMPLE,
+      brierScore: safeAverage(directionalBrierValues),
+      expectedCalibrationError: directionalEce,
+      bins: directionalBins,
     },
     qualityScore: {
       bands: qualityBands,

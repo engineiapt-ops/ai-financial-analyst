@@ -43,6 +43,7 @@ export function evaluateJevResponse(jev: JevResponse): DecisionResult {
     tamanhoPosicaoPct: recomendacao === "WAIT" ? 0 : FIXED_POSITION_PCT,
     qualityScore: jev.qualidade.score,
     confidence: jev.direcao.confidence,
+    probabilidadeDirecional: probEscolhida,
     riscoElevado,
     jevChoice: escolha,
     jevProbs: Array.isArray(jev.direcao.probabilities) ? {} : jev.direcao.probabilities,
