@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import type { PoolClient, QueryResultRow } from "pg";
 import { readFileSync } from "node:fs";
 import { createRepository, type RepositoryPool } from "./repository.js";
 import { computeDatasetHash } from "../marketdata/dataset.js";
@@ -6,7 +7,7 @@ import type { DecisionResult } from "../types.js";
 
 class FakeClient {
   queries: string[] = [];
-  async query<T = any>(text: string, _values?: unknown[]): Promise<{ rows: T[] }> {
+  async query<T extends QueryResultRow = QueryResultRow>(text: string, _values?: unknown[]): Promise<{ rows: T[] }> {
     this.queries.push(text);
     if (text.includes("INSERT INTO market_data")) return { rows: [] };
     if (text.includes("INSERT INTO research_snapshots")) {
@@ -123,7 +124,7 @@ class FakeDb implements RepositoryPool {
     if (text.includes("INSERT INTO config")) return { rows: [] };
     return { rows: [{ id: 7 }] } as { rows: T[] };
   }
-  async connect() { return this.client as any; }
+  async connect(): Promise<PoolClient> { return this.client as unknown as PoolClient; }
 }
 
 const repositorySource = readFileSync(new URL("./repository.ts", import.meta.url), "utf8");
@@ -234,7 +235,7 @@ const snapshot = {
     confianca: 0.8,
     fonteDecisao: "quantitativo",
   },
-} as any;
+} as unknown as DecisionResult;
 
 const storedSnapshot = await repo.saveResearchSnapshot({ snapshot });
 assert.equal(storedSnapshot.snapshotId, snapshot.snapshotId);
