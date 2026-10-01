@@ -25,7 +25,6 @@
     "test:pit": "tsx src/marketdata/pointInTime.test.ts",
     "test:market-data-quality": "tsx src/marketdata/quality.test.ts",
     "test:market-data-collector": "tsx src/marketdata/collector.test.ts",
-    "test:market-data-collector": "tsx src/marketdata/collector.test.ts",
     "market:backfill": "tsx src/marketdata/backfill.ts",
     "backtest:walk-forward": "tsx src/backtest/walkForward.ts",
     "test:research": "tsx src/research/report.test.ts",
