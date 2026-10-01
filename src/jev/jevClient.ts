@@ -14,6 +14,7 @@ async function getGatewayCredential(): Promise<string> {
   return "";
 }
 const JEV_MODEL = "typesafe-ai/jev";
+const EXPECTED_JEV_MODEL_VERSION = process.env.JEV_MODEL_VERSION?.trim() ?? "";
 
 export interface JevAnswer<T> {
   choice?: T;
@@ -27,6 +28,7 @@ export interface JevResponse {
   direcao: JevAnswer<"ALTA" | "BAIXA" | "AGUARDAR">;
   risco_elevado: JevAnswer<never>;
   qualidade: JevAnswer<never>;
+  modelVersion?: string;
 }
 
 export function buildState(market: MarketState): Record<string, unknown> {
@@ -40,6 +42,28 @@ export function buildState(market: MarketState): Record<string, unknown> {
     noticia_sentimento: market.noticiaSentimento, macro_dolar: market.macroDolar,
     indicador_macro: market.indicadorMacro
   };
+}
+
+function extractModelVersion(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const root = value as Record<string, unknown>;
+
+  for (const key of ["modelVersion", "model_version", "version", "model"]) {
+    const candidate = root[key];
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+  }
+
+  for (const key of ["metadata", "meta"]) {
+    const nested = root[key];
+    if (!nested || typeof nested !== "object") continue;
+    const record = nested as Record<string, unknown>;
+    for (const versionKey of ["modelVersion", "model_version", "version", "model"]) {
+      const candidate = record[versionKey];
+      if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+    }
+  }
+
+  return undefined;
 }
 
 function validateJevResponse(value: any): JevResponse {
@@ -114,8 +138,33 @@ export async function callJev(market: MarketState): Promise<JevResponse> {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        return validateJevResponse(data.answers ?? data);
+        const data: unknown = await res.json();
+        const modelVersion = extractModelVersion(data);
+        const effectiveModelVersion = modelVersion ?? "unreported";
+
+        if (!modelVersion) {
+          console.warn(JSON.stringify({
+            event: "jev_model_version_unreported",
+            configuredExpectedVersion: EXPECTED_JEV_MODEL_VERSION || null,
+            providerModel: JEV_MODEL,
+          }));
+        }
+
+        if (EXPECTED_JEV_MODEL_VERSION && effectiveModelVersion !== EXPECTED_JEV_MODEL_VERSION) {
+          throw new Error(
+            `Jev model version mismatch: expected "${EXPECTED_JEV_MODEL_VERSION}", received "${effectiveModelVersion}".`,
+          );
+        }
+
+        const payload =
+          data && typeof data === "object" && "answers" in data
+            ? (data as Record<string, unknown>).answers
+            : data;
+
+        return {
+          ...validateJevResponse(payload),
+          modelVersion: effectiveModelVersion,
+        };
       }
 
       const body = await res.text().catch(() => "");

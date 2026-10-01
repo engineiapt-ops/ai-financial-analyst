@@ -57,6 +57,7 @@ export function inspectRuntimeConfig(
     "BINANCE_WS_BASE",
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
+    "JEV_MODEL_VERSION",
     "GEMINI_API_BASE",
     "GEMINI_TIMEOUT_MS",
     "TRUST_PROXY",
@@ -89,6 +90,10 @@ export function inspectRuntimeConfig(
 
   if (productionMode && !trimValue(env.GEMINI_MODEL)) {
     warnings.push("GEMINI_MODEL is not configured; provider default will be used when Gemini is enabled");
+  }
+
+  if (productionMode && !trimValue(env.JEV_MODEL_VERSION)) {
+    warnings.push("JEV_MODEL_VERSION is not configured; the gateway-reported Jev version will be recorded when available, otherwise unreported");
   }
 
   if (missing.length > 0 || invalid.length > 0) {
