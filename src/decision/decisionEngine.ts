@@ -17,10 +17,9 @@ function choiceToRecomendacao(choice: "ALTA" | "BAIXA" | "AGUARDAR"): Recomendac
 }
 
 function probabilityForChoice(
-  probabilities: Record<string, number> | number[],
+  probabilities: Record<string, number>,
   choice: "ALTA" | "BAIXA" | "AGUARDAR",
 ): number {
-  if (Array.isArray(probabilities)) return 0;
   const value = probabilities[choice];
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
@@ -45,7 +44,7 @@ export function evaluateJevResponse(jev: JevResponse): DecisionResult {
     probabilidadeDirecional: probEscolhida,
     riscoElevado,
     jevChoice: escolha,
-    jevProbs: Array.isArray(jev.direcao.probabilities) ? {} : jev.direcao.probabilities,
+    jevProbs: jev.direcao.probabilities,
     jevModelVersion: jev.modelVersion ?? "unreported",
     observacao: `confidence=${jev.direcao.confidence.toFixed(2)} prob=${probEscolhida.toFixed(2)}`,
   };
