@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import type { BacktestRun, PortfolioEquityPointInput, PortfolioPositionInput, PortfolioRunSummary, PortfolioSourceTrade } from "../db/repository.js";
 import type { Kline } from "../types.js";
-import { runPortfolioEngine } from "./engine.js";
+import { DEFAULT_MAX_GROSS_EXPOSURE_PCT, DEFAULT_POSITION_SIZE_PCT, runPortfolioEngine } from "./engine.js";
 
 function makeCandles(): Kline[] {
   const start = Date.parse("2026-02-01T00:00:00.000Z");
@@ -112,7 +112,8 @@ const result = await runPortfolioEngine(
 );
 
 assert.equal(result.positionSizePct, 1.5);
-assert.equal(result.maxGrossExposurePct, 15);
+assert.equal(DEFAULT_POSITION_SIZE_PCT, 1.5);
+assert.equal(DEFAULT_MAX_GROSS_EXPOSURE_PCT, 15);
 assert.equal(result.initialCapital, 1000);
 assert.equal(result.portfolioRunId, 501);
 assert.equal(createdPortfolioRunId, 501);
