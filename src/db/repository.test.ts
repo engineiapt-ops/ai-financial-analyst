@@ -129,12 +129,26 @@ class FakeDb implements RepositoryPool {
 }
 
 const repositorySource = readFileSync(new URL("./repository.ts", import.meta.url), "utf8");
+const idempotencyMigration = readFileSync(new URL("../../db/migrations/021_decision_log_paper_idempotency.sql", import.meta.url), "utf8");
 assert.match(repositorySource, /if \(filters\.ativo\) add\("dl\.ativo = \?",/);
 assert.match(repositorySource, /if \(filters\.timeframe\) add\("dl\.timeframe = \?",/);
 assert.match(repositorySource, /if \(filters\.origem\) add\("dl\.origem = \?",/);
 assert.match(repositorySource, /if \(filters\.recomendacao\) add\("dl\.recomendacao = \?",/);
 assert.match(repositorySource, /if \(filters\.from\) add\("dl\.decision_at >= \?",/);
 assert.match(repositorySource, /if \(filters\.to\) add\("dl\.decision_at <= \?",/);
+assert.match(
+  repositorySource,
+  /ON CONFLICT \(ativo, timeframe, data_as_of, origem\)[\s\S]+WHERE backtest_run_id IS NULL/,
+);
+assert.match(repositorySource, /AND backtest_run_id IS NULL/);
+assert.match(
+  idempotencyMigration,
+  /CREATE UNIQUE INDEX IF NOT EXISTS idx_decision_log_paper_idempotency/,
+);
+assert.match(
+  idempotencyMigration,
+  /WHERE backtest_run_id IS NULL/,
+);
 
 const db = new FakeDb();
 const repo = createRepository(db);

@@ -139,6 +139,11 @@ CREATE INDEX IF NOT EXISTS idx_decision_log_run ON decision_log(backtest_run_id)
 CREATE INDEX IF NOT EXISTS idx_decision_log_time ON decision_log(ativo, timeframe, decision_at);
 CREATE INDEX IF NOT EXISTS idx_decision_log_outcome ON decision_log(outcome_status);
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_decision_log_paper_idempotency
+  ON decision_log (ativo, timeframe, data_as_of, origem)
+  WHERE backtest_run_id IS NULL;
+
+
 CREATE TABLE IF NOT EXISTS benchmark_runs (
   id BIGSERIAL PRIMARY KEY,
   source_run_id BIGINT REFERENCES backtest_runs(id) ON DELETE SET NULL,

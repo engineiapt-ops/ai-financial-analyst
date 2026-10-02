@@ -1723,6 +1723,9 @@ export function createRepository(db: RepositoryPool) {
            risco_elevado, tamanho_posicao_pct, observacao, reference_price,
            target_pct, stop_pct, lookahead_candles, execution_model_version)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+         ON CONFLICT (ativo, timeframe, data_as_of, origem)
+         WHERE backtest_run_id IS NULL
+         DO NOTHING
          RETURNING id`,
         [
           input.backtestRunId ?? null,
@@ -1747,7 +1750,21 @@ export function createRepository(db: RepositoryPool) {
           input.executionModelVersion ?? null,
         ],
       );
-      return Number(rows[0]?.id);
+      const insertedId = Number(rows[0]?.id);
+      if (Number.isInteger(insertedId) && insertedId > 0) return insertedId;
+
+      if (input.backtestRunId !== null && input.backtestRunId !== undefined) {
+        throw new Error("Database did not return a valid decision log id");
+      }
+
+      const existing = await this.findDecisionLogByAsOf(
+        input.ativo,
+        input.timeframe,
+        input.dataAsOf,
+        input.decision.origem,
+      );
+      if (!existing) throw new Error("Decision log could not be persisted");
+      return existing.id;
     },
 
     async findDecisionLogByAsOf(
@@ -1790,6 +1807,7 @@ export function createRepository(db: RepositoryPool) {
            AND timeframe = $2
            AND data_as_of = $3
            AND origem = $4
+           AND backtest_run_id IS NULL
          ORDER BY id DESC
          LIMIT 1`,
         [ativo.trim().toUpperCase(), timeframe, dataAsOf, origem],
