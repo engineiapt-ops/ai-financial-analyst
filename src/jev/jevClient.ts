@@ -19,7 +19,7 @@ export interface JevAnswer<T> {
   choice?: T;
   noul?: number;
   score?: number;
-  probabilities: Record<string, number> | number[];
+  probabilities: Record<string, number>;
   confidence: number;
 }
 
@@ -122,6 +122,25 @@ function validateJevResponse(value: unknown): JevResponse {
 
   if (!Number.isFinite(Number(direcao.confidence))) {
     throw new Error("Jev retornou confidence inválido.");
+  }
+  if (!isRecord(direcao.probabilities) || !isRecord(risco.probabilities) || !isRecord(qualidade.probabilities)) {
+    throw new Error("Jev retornou probabilities inválidas: esperado objeto.");
+  }
+  for (const probabilities of [
+    direcao.probabilities,
+    risco.probabilities,
+    qualidade.probabilities,
+  ]) {
+    for (const probability of Object.values(probabilities)) {
+      if (
+        typeof probability !== "number" ||
+        !Number.isFinite(probability) ||
+        probability < 0 ||
+        probability > 1
+      ) {
+        throw new Error("Jev retornou probability inválida.");
+      }
+    }
   }
   if (!["ALTA", "BAIXA", "AGUARDAR"].includes(String(direcao.choice))) {
     throw new Error("Jev retornou choice de direção inválida.");
