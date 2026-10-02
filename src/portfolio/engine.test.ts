@@ -112,6 +112,7 @@ const result = await runPortfolioEngine(
 );
 
 assert.equal(result.positionSizePct, 1.5);
+assert.equal(result.maxGrossExposurePct, 15);
 assert.equal(result.initialCapital, 1000);
 assert.equal(result.portfolioRunId, 501);
 assert.equal(createdPortfolioRunId, 501);
