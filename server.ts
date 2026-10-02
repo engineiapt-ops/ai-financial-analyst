@@ -168,7 +168,7 @@ app.get('/api/market/overview', async (_req: Request, res: Response) => {
     };
     res.json(marketData);
   } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Failed to fetch market overview' });
+    res.status(500).json({ error: 'Failed to fetch market overview' });
   }
 });
 
@@ -372,7 +372,7 @@ Output a VALID JSON object (and nothing else) adhering to this schema:
     });
   } catch (error: any) {
     console.error('Error in /api/analyze/ticker:', error);
-    res.status(500).json({ error: error.message || 'Financial analysis generation failed' });
+    res.status(500).json({ error: 'Financial analysis generation failed' });
   }
 });
 
@@ -529,7 +529,7 @@ Respond ONLY with a VALID JSON object matching this schema:
     res.json({ data: parsed });
   } catch (error: any) {
     console.error('Error in /api/analyze/ledger:', error);
-    res.status(500).json({ error: error.message || 'Forensic ledger analysis failed' });
+    res.status(500).json({ error: 'Forensic ledger analysis failed' });
   }
 });
 
@@ -679,7 +679,7 @@ Respond ONLY with a VALID JSON object:
     res.json({ data: parsed });
   } catch (error: any) {
     console.error('Error in /api/valuation/dcf:', error);
-    res.status(500).json({ error: error.message || 'DCF calculation failed' });
+    res.status(500).json({ error: 'DCF calculation failed' });
   }
 });
 
@@ -758,7 +758,7 @@ Provide the output in structured Markdown with clear table headers and executive
     });
   } catch (error: any) {
     console.error('Error in /api/research/memo:', error);
-    res.status(500).json({ error: error.message || 'Research memo generation failed' });
+    res.status(500).json({ error: 'Research memo generation failed' });
   }
 });
 
@@ -827,7 +827,7 @@ ${text.slice(0, 3000)}`;
     });
   } catch (error: any) {
     console.error('Error in /api/briefing/tts:', error);
-    res.status(500).json({ error: error.message || 'Audio briefing generation failed' });
+    res.status(500).json({ error: 'Audio briefing generation failed' });
   }
 });
 
@@ -885,7 +885,7 @@ Be precise, structured, provide exact formulas where relevant, use bullet points
     });
   } catch (error: any) {
     console.error('Error in /api/copilot/chat:', error);
-    res.status(500).json({ error: error.message || 'Chat completion failed' });
+    res.status(500).json({ error: 'Chat completion failed' });
   }
 });
 
