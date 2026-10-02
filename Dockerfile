@@ -9,11 +9,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY tsconfig.server.json ./
+COPY tsconfig.tests.json ./
 COPY vite.config.ts ./
 COPY index.html ./
 COPY server.ts ./
 COPY api ./api
 COPY src ./src
+COPY db ./db
 RUN npm run build
 
 FROM node:22-alpine AS runtime
@@ -27,6 +29,7 @@ COPY --from=build /app/api ./api
 COPY --from=build /app/server.ts ./server.ts
 COPY --from=build /app/index.html ./index.html
 COPY --from=build /app/tsconfig.server.json ./tsconfig.server.json
+COPY --from=build /app/db ./db
 COPY --from=build /app/vite.config.ts ./vite.config.ts
 COPY package*.json ./
 EXPOSE 3000
