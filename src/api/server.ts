@@ -43,7 +43,7 @@ import { buildOperationalQualityOverview } from "../product/operationalQuality.j
 import { comparePipelineAudits } from "../product/pipelineAudit.js";
 import { buildPipelineAuditForRun } from "../product/pipelineAuditService.js";
 import { listAiProviders } from "../ai/providers.js";
-import { isProtectedApiRequest, requireApiAuth } from "./auth.js";
+import { hasValidCronSecret, isProtectedApiRequest, requireApiAuth } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
 import { buildGovernanceDashboardForScope } from "../product/governanceDashboardService.js";
 import { buildContinuousGovernanceForRun } from "../product/continuousGovernanceService.js";
@@ -2091,10 +2091,9 @@ app.post("/api/analyze", async (req, res) => {
 });
 
 app.get("/api/cron/market-data", async (req, res) => {
-  const expectedSecret = process.env.CRON_SECRET?.trim();
   const provided = req.header("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
 
-  if (!expectedSecret || !provided || provided !== expectedSecret) {
+  if (!hasValidCronSecret(provided)) {
     return res.status(401).json({ status: "error", error: "unauthorized" });
   }
 
@@ -2109,10 +2108,9 @@ app.get("/api/cron/market-data", async (req, res) => {
 });
 
 app.get("/api/cron/paper-jev-cycle", async (req, res) => {
-  const expectedSecret = process.env.CRON_SECRET?.trim();
   const provided = req.header("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
 
-  if (!expectedSecret || !provided || provided !== expectedSecret) {
+  if (!hasValidCronSecret(provided)) {
     return res.status(401).json({ status: "error", error: "unauthorized" });
   }
 
