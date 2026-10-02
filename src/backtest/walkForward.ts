@@ -22,7 +22,7 @@ import { computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds, thresholds } from "../config/thresholds.js";
 import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
-import { evaluateRisk } from "../risk/riskEngine.js";
+import { evaluateRisk, RISK_MAX_GROSS_EXPOSURE_PCT, RISK_POSITION_SIZE_PCT } from "../risk/riskEngine.js";
 import {
   simulateWalkForwardPortfolio,
   WALK_FORWARD_PORTFOLIO_MODEL_VERSION,
@@ -223,8 +223,8 @@ export async function runWalkForward(options = getOptions()) {
   let foldNumber = 0;
 
   const portfolioInitialCapital = 1000;
-  const portfolioPositionSizePct = 2;
-  const portfolioMaxGrossExposurePct = 20;
+  const portfolioPositionSizePct = RISK_POSITION_SIZE_PCT;
+  const portfolioMaxGrossExposurePct = RISK_MAX_GROSS_EXPOSURE_PCT;
 
   const baselinePortfolioRunId = await createWalkForwardPortfolioRun({
     walkForwardRunId,
