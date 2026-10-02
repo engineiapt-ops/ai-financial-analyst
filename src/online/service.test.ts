@@ -70,7 +70,7 @@ function makeJevFetch(modelVersion: string): typeof fetch {
         },
         qualidade: {
           score: 0.9,
-          probabilities: [0.1, 0.2, 0.7],
+          probabilities: { Baixa: 0.1, Moderada: 0.2, Alta: 0.7 },
           confidence: 0.9,
         },
       },
