@@ -53,7 +53,7 @@ let invalid = false;
 try {
   await callJev(market, {
     credential: "test-secret",
-    fetchImpl: async () => response({ answers: { direcao: {} } }),
+    fetchImpl: async () => response({ modelVersion: "jev-2026-09", answers: { direcao: {} } }),
   });
 } catch (error) {
   invalid = error instanceof Error && error.message.includes("campos obrigatórios");
