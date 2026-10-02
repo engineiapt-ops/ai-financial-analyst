@@ -3,6 +3,21 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 export const API_AUTH_TOKEN_HEADER = "X-API-Key";
 
+export function hasValidCronSecret(
+  providedSecret: string | undefined,
+  expectedSecret = process.env.CRON_SECRET,
+): boolean {
+  const provided = providedSecret?.trim();
+  const expected = expectedSecret?.trim();
+  if (!provided || !expected) return false;
+
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+  if (providedBuffer.length !== expectedBuffer.length) return false;
+
+  return timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
 const PUBLIC_API_GET_ROUTES = new Set([
   "/api/market/ping",
   "/api/market/time",
