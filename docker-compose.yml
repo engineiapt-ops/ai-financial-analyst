@@ -1,19 +1,4 @@
 services:
-  app:
-    build:
-      context: .
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    environment:
-      NODE_ENV: production
-      PORT: 3000
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_financial_analyst
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   postgres:
     image: postgres:16-alpine
     environment:
@@ -27,6 +12,35 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  migrate:
+    build:
+      context: .
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_financial_analyst
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["npm", "run", "db:migrate"]
+    restart: "no"
+
+  app:
+    build:
+      context: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_financial_analyst
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
