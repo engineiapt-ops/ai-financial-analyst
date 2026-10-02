@@ -57,7 +57,7 @@ export function inspectRuntimeConfig(
   const invalid: string[] = [];
   const warnings: string[] = [];
 
-  const requiredInProduction = ["DATABASE_URL", "API_AUTH_TOKEN"];
+  const requiredInProduction = ["DATABASE_URL", "API_AUTH_TOKEN", "CRON_SECRET"];
 
   for (const key of requiredInProduction) {
     if (trimValue(env[key])) configured.push(key);
@@ -70,6 +70,7 @@ export function inspectRuntimeConfig(
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
     "JEV_MODEL_VERSION",
+    "PAPER_JEV_AUTORUN",
     "CORS_ORIGINS",
     "GEMINI_API_BASE",
     "GEMINI_TIMEOUT_MS",
@@ -86,6 +87,7 @@ export function inspectRuntimeConfig(
   if (!validPositiveNumber(env.RATE_LIMIT_HEAVY_MAX)) invalid.push("RATE_LIMIT_HEAVY_MAX");
   if (!validBoolean(env.TRUST_PROXY)) invalid.push("TRUST_PROXY");
   if (!validBoolean(env.OBSERVABILITY_LOGS)) invalid.push("OBSERVABILITY_LOGS");
+  if (!validBoolean(env.PAPER_JEV_AUTORUN)) invalid.push("PAPER_JEV_AUTORUN");
   if (!validCorsOrigins(env.CORS_ORIGINS)) invalid.push("CORS_ORIGINS");
 
   if (!validUrl(env.BINANCE_REST_BASE?.trim(), ["http:", "https:"])) {
@@ -106,7 +108,13 @@ export function inspectRuntimeConfig(
     warnings.push("GEMINI_MODEL is not configured; provider default will be used when Gemini is enabled");
   }
 
-  if (productionMode && !trimValue(env.JEV_MODEL_VERSION)) {
+  if (productionMode && env.PAPER_JEV_AUTORUN !== "true") {
+    warnings.push("PAPER_JEV_AUTORUN is not true; the paper JEV cycle is disabled");
+  }
+
+  if (productionMode && env.PAPER_JEV_AUTORUN === "true" && !trimValue(env.JEV_MODEL_VERSION)) {
+    missing.push("JEV_MODEL_VERSION");
+  } else if (productionMode && !trimValue(env.JEV_MODEL_VERSION)) {
     warnings.push("JEV_MODEL_VERSION is not configured; gateway-reported JEV version will be recorded for observability only");
   }
 
