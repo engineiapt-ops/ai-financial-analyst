@@ -42,3 +42,6 @@ jobs:
 
       - name: Release gate
         run: npm run release:gate
+
+      - name: Docker build
+        run: docker build --tag ai-financial-analyst:ci .
