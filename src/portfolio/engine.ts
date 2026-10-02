@@ -15,13 +15,13 @@ import { assertDatasetMatchesMetadata } from "../marketdata/dataset.js";
 import { FEE_PCT, SLIPPAGE_PCT } from "../papertrading/simulator.js";
 import type { Kline, Timeframe } from "../types.js";
 import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
-import { evaluateRisk } from "../risk/riskEngine.js";
+import { evaluateRisk, RISK_MAX_GROSS_EXPOSURE_PCT, RISK_POSITION_SIZE_PCT } from "../risk/riskEngine.js";
 
 export const PORTFOLIO_MODEL_VERSION = "portfolio-v1";
 export const RISK_AWARE_PORTFOLIO_MODEL_VERSION = "portfolio-v1-risk-regime-v1";
 export const DEFAULT_INITIAL_CAPITAL = 1000;
-export const DEFAULT_POSITION_SIZE_PCT = 2;
-export const DEFAULT_MAX_GROSS_EXPOSURE_PCT = 20;
+export const DEFAULT_POSITION_SIZE_PCT = RISK_POSITION_SIZE_PCT;
+export const DEFAULT_MAX_GROSS_EXPOSURE_PCT = RISK_MAX_GROSS_EXPOSURE_PCT;
 
 interface ActivePosition {
   trade: PortfolioSourceTrade;
