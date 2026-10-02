@@ -38,7 +38,17 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Lint
-        run: npm run lint
+        id: lint
+        continue-on-error: true
+        run: npm run lint 2>&1 | tee /tmp/lint.log
+
+      - name: Report lint diagnostics
+        if: steps.lint.outcome == "failure"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/lint.log
+          exit 1
 
       - name: Release gate
         run: npm run release:gate
