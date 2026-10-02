@@ -191,11 +191,11 @@ try {
   const cronDisabled = await fetch(baseUrl + "/api/cron/paper-jev-cycle", {
     headers: { authorization: "Bearer cron-secret" },
   });
-  assert.equal(cronDisabled.status, 200);
+  assert.equal(cronDisabled.status, 503);
   assert.deepEqual(await cronDisabled.json(), {
-    status: "ok",
-    enabled: false,
-    note: "PAPER_JEV_AUTORUN is not enabled",
+    status: "error",
+    code: "PAPER_JEV_AUTORUN_DISABLED",
+    error: "Paper JEV cycle is disabled by runtime configuration",
   });
 
   console.log("API integration tests passed");
