@@ -40,6 +40,11 @@ const legacyServerSource = readFileSync(
   new URL("../../server.ts", import.meta.url),
   "utf8",
 );
+
+const coreApiServerSource = readFileSync(
+  new URL("./server.ts", import.meta.url),
+  "utf8",
+);
 for (const rawExpression of [
   "error.message || 'Failed to fetch market overview'",
   "error.message || 'Financial analysis generation failed'",
@@ -60,6 +65,11 @@ try {
   invalidRunId = !Number.isInteger(value) || value <= 0;
 } catch {}
 assert(invalidRunId, "invalid runId must be rejected");
+
+assert(
+  !coreApiServerSource.includes("error: message"),
+  "core API must not expose raw caught error messages",
+);
 
 assert(
   legacyServerSource.includes("RISK_POSITION_SIZE_PCT"),
