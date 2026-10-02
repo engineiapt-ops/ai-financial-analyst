@@ -60,6 +60,51 @@ try {
 }
 assert.equal(invalid, true);
 
+let missingProbabilitiesRejected = false;
+try {
+  await callJev(market, {
+    credential: "test-secret",
+    fetchImpl: async () => response({
+      modelVersion: "jev-2026-09",
+      answers: {
+        direcao: { choice: "ALTA", confidence: 0.9 },
+        risco_elevado: { noul: 0.1, probabilities: {}, confidence: 0.9 },
+        qualidade: { score: 0.9, probabilities: {}, confidence: 0.9 },
+      },
+    }),
+  });
+} catch (error) {
+  missingProbabilitiesRejected =
+    error instanceof Error &&
+    error.message.includes("probabilities inválidas");
+}
+assert.equal(missingProbabilitiesRejected, true);
+
+let arrayProbabilitiesRejected = false;
+try {
+  await callJev(market, {
+    credential: "test-secret",
+    fetchImpl: async () => response({
+      modelVersion: "jev-2026-09",
+      answers: {
+        direcao: {
+          choice: "ALTA",
+          probabilities: [0.7, 0.2, 0.1],
+          confidence: 0.9,
+        },
+        risco_elevado: { noul: 0.1, probabilities: {}, confidence: 0.9 },
+        qualidade: { score: 0.9, probabilities: {}, confidence: 0.9 },
+      },
+    }),
+  });
+} catch (error) {
+  arrayProbabilitiesRejected =
+    error instanceof Error &&
+    error.message.includes("probabilities inválidas");
+}
+assert.equal(arrayProbabilitiesRejected, true);
+
+
 const retryStatuses = [429, 500, 200];
 let retryCalls = 0;
 const retried = await callJev(market, {
