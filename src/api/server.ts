@@ -28,6 +28,7 @@ import { runPortfolioEngine } from "../portfolio/engine.js";
 import { runWalkForwardPortfolio } from "../portfolio/walkForwardPortfolio.js";
 import { getPortfolioRun, getPortfolioEquityCurve } from "../db/repository.js";
 import { runRiskRegimeAnalysis } from "../risk/analysis.js";
+import { RISK_MAX_GROSS_EXPOSURE_PCT, RISK_POSITION_SIZE_PCT } from "../risk/riskEngine.js";
 import { buildEvaluationOverview } from "../product/evaluationOverview.js";
 import { buildOutcomeSettlementAudit } from "../evaluation/outcomeSettlementAudit.js";
 import { buildSystemValidationForScope } from "../product/systemValidationService.js";
@@ -1901,8 +1902,8 @@ app.get("/api/portfolio/run", async (req, res) => {
       return res.status(400).json({ status: "error", error: "fromRun must be a positive integer" });
     }
     const initialCapital = Number(req.query.initialCapital ?? 1000);
-    const positionSizePct = Number(req.query.positionSizePct ?? 2);
-    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? 20);
+    const positionSizePct = Number(req.query.positionSizePct ?? RISK_POSITION_SIZE_PCT);
+    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? RISK_MAX_GROSS_EXPOSURE_PCT);
     const riskGate = String(req.query.riskGate ?? "false").toLowerCase() === "true";
     const result = await runPortfolioEngine({
       sourceRunId: fromRun,
@@ -1927,8 +1928,8 @@ app.get("/api/portfolio/walk-forward", async (req, res) => {
     }
 
     const initialCapital = Number(req.query.initialCapital ?? 1000);
-    const positionSizePct = Number(req.query.positionSizePct ?? 2);
-    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? 20);
+    const positionSizePct = Number(req.query.positionSizePct ?? RISK_POSITION_SIZE_PCT);
+    const maxGrossExposurePct = Number(req.query.maxGrossExposurePct ?? RISK_MAX_GROSS_EXPOSURE_PCT);
 
     const result = await runWalkForwardPortfolio({
       walkForwardRunId: fromRun,
