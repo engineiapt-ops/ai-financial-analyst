@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 export {}
 
 process.env.NODE_ENV = "test";
@@ -33,6 +35,23 @@ try {
   rejected = true;
 }
 assert(rejected, "zero investment must be rejected");
+
+const legacyServerSource = readFileSync(
+  new URL("../../server.ts", import.meta.url),
+  "utf8",
+);
+for (const rawExpression of [
+  "error.message || 'Failed to fetch market overview'",
+  "error.message || 'Financial analysis generation failed'",
+  "error.message || 'Forensic ledger analysis failed'",
+  "error.message || 'DCF calculation failed'",
+  "error.message || 'Research memo generation failed'",
+  "error.message || 'Audio briefing generation failed'",
+  "error.message || 'Chat completion failed'",
+]) {
+  assert(!legacyServerSource.includes(rawExpression), "legacy API must not expose raw error.message");
+}
+
 
 let invalidRunId = false;
 try {
