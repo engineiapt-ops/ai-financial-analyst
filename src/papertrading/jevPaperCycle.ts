@@ -94,9 +94,9 @@ export async function runJevPaperCycle(
 
   console.log(JSON.stringify({
     event: "paper_jev_cron_timeframe_schedule",
-    schedule: "daily",
+    schedule: "hourly",
     timeframes,
-    limitation: "1h and 4h advance only on each daily cron execution; vercel scheduler remains daily",
+    limitation: "hourly paper cycle via GitHub/external scheduler; Vercel Hobby cron remains daily fallback",
   }));
 
   let analyzed = 0;
