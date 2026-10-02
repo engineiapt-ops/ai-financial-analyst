@@ -76,7 +76,8 @@
     "test:risk-regime": "tsx src/risk/regime.test.ts",
     "test:risk-analysis": "tsx src/risk/analysis.test.ts",
     "test:portfolio-engine": "tsx src/portfolio/engine.test.ts",
-    "test:online-service": "tsx src/online/service.test.ts"
+    "test:online-service": "tsx src/online/service.test.ts",
+    "test:thresholds": "tsx src/config/thresholds.test.ts"
   },
   "dependencies": {
     "express": "^5.2.1",
