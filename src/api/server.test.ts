@@ -70,6 +70,10 @@ assert(
   !coreApiServerSource.includes("error: message"),
   "core API must not expose raw caught error messages",
 );
+assert(
+  coreApiServerSource.includes("clientSafeApiError"),
+  "core API should centralize safe error mapping",
+);
 
 assert(
   legacyServerSource.includes("RISK_POSITION_SIZE_PCT"),
