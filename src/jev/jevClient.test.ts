@@ -53,7 +53,7 @@ let invalid = false;
 try {
   await callJev(market, {
     credential: "test-secret",
-    fetchImpl: async () => response({ answers: { direcao: {} } }),
+    fetchImpl: async () => response({ modelVersion: "jev-2026-09", answers: { direcao: {} } }),
   });
 } catch (error) {
   invalid = error instanceof Error && error.message.includes("campos obrigatórios");
@@ -106,21 +106,24 @@ try {
 }
 assert.equal(divergence, true);
 
-delete process.env.JEV_MODEL_VERSION;
-let unreportedWarning = false;
-const originalWarn = console.warn;
-console.warn = (message?: unknown) => {
-  unreportedWarning = String(message).includes("jev_model_version_unreported");
-};
+let unreportedRejected = false;
 try {
-  const unreported = await callJev(market, {
+  await callJev(market, {
     credential: "test-secret",
     fetchImpl: async () => response(validBody()),
   });
-  assert.equal(unreported.modelVersion, "unreported");
-  assert.equal(unreportedWarning, true);
-} finally {
-  console.warn = originalWarn;
+} catch (error) {
+  unreportedRejected =
+    error instanceof Error &&
+    error.message.includes("gateway returned no model version");
 }
+assert.equal(unreportedRejected, true);
+
+delete process.env.JEV_MODEL_VERSION;
+const unpinned = await callJev(market, {
+  credential: "test-secret",
+  fetchImpl: async () => response(validBody()),
+});
+assert.equal(unpinned.modelVersion, "unreported");
 
 console.log("jev client tests passed");

@@ -169,6 +169,11 @@ function validateExpectedModelVersion(
 ): string {
   if (!reported) {
     reportUnreportedModelVersion(expected);
+    if (expected) {
+      throw new JevModelVersionMismatchError(
+        `Jev model version mismatch: expected "${expected}", gateway returned no model version.`,
+      );
+    }
     return "unreported";
   }
 
