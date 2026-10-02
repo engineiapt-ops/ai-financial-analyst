@@ -40,6 +40,11 @@ const legacyServerSource = readFileSync(
   new URL("../../server.ts", import.meta.url),
   "utf8",
 );
+
+const coreApiServerSource = readFileSync(
+  new URL("./server.ts", import.meta.url),
+  "utf8",
+);
 for (const rawExpression of [
   "error.message || 'Failed to fetch market overview'",
   "error.message || 'Financial analysis generation failed'",
@@ -62,19 +67,28 @@ try {
 assert(invalidRunId, "invalid runId must be rejected");
 
 assert(
-  legacyServerSource.includes("RISK_POSITION_SIZE_PCT"),
+  !coreApiServerSource.includes("error: message"),
+  "core API must not expose raw caught error messages",
+);
+assert(
+  coreApiServerSource.includes("clientSafeApiError"),
+  "core API should centralize safe error mapping",
+);
+
+assert(
+  coreApiServerSource.includes("RISK_POSITION_SIZE_PCT"),
   "portfolio API should use the shared position-size risk constant",
 );
 assert(
-  legacyServerSource.includes("RISK_MAX_GROSS_EXPOSURE_PCT"),
+  coreApiServerSource.includes("RISK_MAX_GROSS_EXPOSURE_PCT"),
   "portfolio API should use the shared gross-exposure risk constant",
 );
 assert(
-  !legacyServerSource.includes("req.query.positionSizePct ?? 2"),
+  !coreApiServerSource.includes("req.query.positionSizePct ?? 2"),
   "portfolio API must not default position size to 2%",
 );
 assert(
-  !legacyServerSource.includes("req.query.maxGrossExposurePct ?? 20"),
+  !coreApiServerSource.includes("req.query.maxGrossExposurePct ?? 20"),
   "portfolio API must not default gross exposure to 20%",
 );
 
