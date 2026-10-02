@@ -106,11 +106,6 @@ try {
 }
 assert.equal(divergence, true);
 
-let unreportedWarning = false;
-const originalWarn = console.warn;
-console.warn = (message?: unknown) => {
-  unreportedWarning = String(message).includes("jev_model_version_unreported");
-};
 let unreportedRejected = false;
 try {
   await callJev(market, {
@@ -121,11 +116,15 @@ try {
   unreportedRejected =
     error instanceof Error &&
     error.message.includes("gateway returned no model version");
-} finally {
-  console.warn = originalWarn;
 }
 assert.equal(unreportedRejected, true);
-assert.equal(unreportedWarning, true);
+
+delete process.env.JEV_MODEL_VERSION;
+const unpinned = await callJev(market, {
+  credential: "test-secret",
+  fetchImpl: async () => response(validBody()),
+});
+assert.equal(unpinned.modelVersion, "unreported");
 
 delete process.env.JEV_MODEL_VERSION;
 const unpinned = await callJev(market, {
