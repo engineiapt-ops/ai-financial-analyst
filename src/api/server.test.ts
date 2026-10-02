@@ -76,19 +76,19 @@ assert(
 );
 
 assert(
-  legacyServerSource.includes("RISK_POSITION_SIZE_PCT"),
+  coreApiServerSource.includes("RISK_POSITION_SIZE_PCT"),
   "portfolio API should use the shared position-size risk constant",
 );
 assert(
-  legacyServerSource.includes("RISK_MAX_GROSS_EXPOSURE_PCT"),
+  coreApiServerSource.includes("RISK_MAX_GROSS_EXPOSURE_PCT"),
   "portfolio API should use the shared gross-exposure risk constant",
 );
 assert(
-  !legacyServerSource.includes("req.query.positionSizePct ?? 2"),
+  !coreApiServerSource.includes("req.query.positionSizePct ?? 2"),
   "portfolio API must not default position size to 2%",
 );
 assert(
-  !legacyServerSource.includes("req.query.maxGrossExposurePct ?? 20"),
+  !coreApiServerSource.includes("req.query.maxGrossExposurePct ?? 20"),
   "portfolio API must not default gross exposure to 20%",
 );
 
