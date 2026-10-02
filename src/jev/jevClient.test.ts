@@ -126,11 +126,4 @@ const unpinned = await callJev(market, {
 });
 assert.equal(unpinned.modelVersion, "unreported");
 
-delete process.env.JEV_MODEL_VERSION;
-const unpinned = await callJev(market, {
-  credential: "test-secret",
-  fetchImpl: async () => response(validBody()),
-});
-assert.equal(unpinned.modelVersion, "unreported");
-
 console.log("jev client tests passed");
