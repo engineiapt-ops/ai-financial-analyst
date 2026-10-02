@@ -5,6 +5,8 @@ const base = {
   NODE_ENV: "production",
   DATABASE_URL: "postgres://example",
   API_AUTH_TOKEN: "secret",
+  CRON_SECRET: "cron-secret",
+  PAPER_JEV_AUTORUN: "true",
   BINANCE_REST_BASE: "https://api.binance.com",
   BINANCE_WS_BASE: "wss://stream.binance.com:9443/ws",
   GEMINI_API_KEY: "gemini-secret",
@@ -44,10 +46,35 @@ const deterministic = inspectRuntimeConfig({
   NODE_ENV: "production",
   DATABASE_URL: "postgres://example",
   API_AUTH_TOKEN: "secret",
+  CRON_SECRET: "cron-secret",
+  PAPER_JEV_AUTORUN: "false",
 });
 assert.equal(deterministic.state, "degraded");
 assert.equal(deterministic.warnings.some((warning) => warning.includes("GEMINI_API_KEY")), true);
+assert.equal(deterministic.warnings.some((warning) => warning.includes("PAPER_JEV_AUTORUN")), true);
 assert.equal(deterministic.warnings.some((warning) => warning.includes("JEV_MODEL_VERSION")), true);
+
+const paperJevWithoutPin = inspectRuntimeConfig({
+  ...base,
+  JEV_MODEL_VERSION: "",
+  PAPER_JEV_AUTORUN: "true",
+});
+assert.equal(paperJevWithoutPin.state, "blocked");
+assert.equal(paperJevWithoutPin.missing.includes("JEV_MODEL_VERSION"), true);
+
+const invalidPaperFlag = inspectRuntimeConfig({
+  ...base,
+  PAPER_JEV_AUTORUN: "1",
+});
+assert.equal(invalidPaperFlag.state, "blocked");
+assert.equal(invalidPaperFlag.invalid.includes("PAPER_JEV_AUTORUN"), true);
+
+const missingCronSecret = inspectRuntimeConfig({
+  ...base,
+  CRON_SECRET: "",
+});
+assert.equal(missingCronSecret.state, "blocked");
+assert.equal(missingCronSecret.missing.includes("CRON_SECRET"), true);
 
 const dev = inspectRuntimeConfig({ NODE_ENV: "development" });
 assert.equal(dev.state, "ready");
