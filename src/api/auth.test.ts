@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import {
   API_AUTH_TOKEN_HEADER,
   hasValidApiToken,
+  hasValidCronSecret,
   isProtectedApiRequest,
   requireApiAuth,
 } from "./auth.js";
@@ -76,6 +77,13 @@ assert.equal(
   ),
   false,
 );
+
+assert.equal(hasValidCronSecret("cron-secret", "cron-secret"), true);
+assert.equal(hasValidCronSecret("wrong-secret", "cron-secret"), false);
+assert.equal(hasValidCronSecret(" cron-secret ", "cron-secret"), true);
+assert.equal(hasValidCronSecret(undefined, "cron-secret"), false);
+assert.equal(hasValidCronSecret("cron-secret", undefined), false);
+
 
 assert.equal(isProtectedApiRequest(makeRequest("/api/analyze", "POST")), true);
 assert.equal(isProtectedApiRequest(makeRequest("/api/report", "POST")), true);
