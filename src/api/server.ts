@@ -2101,10 +2101,10 @@ app.get("/api/cron/paper-jev-cycle", async (req, res) => {
   }
 
   if (process.env.PAPER_JEV_AUTORUN !== "true") {
-    return res.status(200).json({
-      status: "ok",
-      enabled: false,
-      note: "PAPER_JEV_AUTORUN is not enabled",
+    return res.status(503).json({
+      status: "error",
+      code: "PAPER_JEV_AUTORUN_DISABLED",
+      error: "Paper JEV cycle is disabled by runtime configuration",
     });
   }
 
