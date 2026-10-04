@@ -61,7 +61,7 @@ function blocked(
     stop: null,
     targetPct: execution?.targetPct ?? null,
     stopPct: execution?.stopPct ?? null,
-    estimatedRoundTripCostPct: roundTripCostPct,
+    estimatedRoundTripCostPct: input.roundTripCostPct ?? ESTIMATED_ROUND_TRIP_COST_PCT,
     execution,
   };
 }
@@ -110,7 +110,7 @@ export function buildExecutableSignal(
     stop: resolved.levels.stop,
     targetPct: resolved.execution.targetPct,
     stopPct: resolved.execution.stopPct,
-    estimatedRoundTripCostPct: ESTIMATED_ROUND_TRIP_COST_PCT,
+    estimatedRoundTripCostPct: roundTripCostPct,
     execution: resolved.execution,
   };
 }
