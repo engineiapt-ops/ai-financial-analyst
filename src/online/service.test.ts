@@ -43,8 +43,8 @@ function makeCandles(): Kline[] {
       openTime,
       closeTime,
       open: close - 0.1,
-      high: close + 1,
-      low: close - 1,
+      high: close + 0.5,
+      low: close - 0.5,
       close,
       volume: 1000 + index,
     };
