@@ -25,7 +25,9 @@ const win = simulateCfdTradeV3({
   side: "BUY",
   signalCandle: candle("2026-01-01T10:00:00Z"),
   futureCandles: [candle("2026-01-01T11:00:00Z", {
-    bidHigh: 101.5, askHigh: 101.6, bidLow: 100, bidClose: 101,
+    bidHigh: 101.5, askHigh: 101.6,
+    bidLow: 100, askLow: 100.1,
+    bidClose: 101, askClose: 101.1,
     high: 101.6, low: 100, close: 101.1,
   })],
   targetPct: 0.01,
