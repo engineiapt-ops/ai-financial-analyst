@@ -54,7 +54,10 @@ const gap = simulateCfdTradeV3({
   side: "BUY",
   signalCandle: candle("2026-01-01T10:00:00Z"),
   futureCandles: [candle("2026-01-01T11:00:00Z", {
-    bidOpen: 98, bidLow: 97, bidHigh: 99, bidClose: 98.5,
+    bidOpen: 98, askOpen: 98.1,
+    bidLow: 97, askLow: 97.1,
+    bidHigh: 99, askHigh: 99.1,
+    bidClose: 98.5, askClose: 98.6,
   })],
   targetPct: 0.01,
   stopPct: 0.005,
