@@ -39,7 +39,7 @@ export interface BuildExecutableSignalInput {
 }
 
 export const ESTIMATED_ROUND_TRIP_COST_PCT =
-  2 * (FEE_PCT + SLIPPAGE_PCT) * 100;
+  2 * (FEE_PCT + SLIPPAGE_PCT);
 
 function blocked(
   input: BuildExecutableSignalInput,
