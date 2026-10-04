@@ -1,6 +1,7 @@
 import { FEE_PCT, SLIPPAGE_PCT } from "../papertrading/simulator.js";
 import { resolvePriceLevels, type ExecutionLevels } from "../config/executionLevels.js";
 import type { DecisionResult, Timeframe } from "../types.js";
+import { assessRiskReward, MIN_RISK_REWARD } from "../quant/riskReward.js";
 
 export const EXECUTABLE_SIGNAL_VERSION = "hourly-signal-v1";
 
@@ -95,6 +96,15 @@ export function buildExecutableSignal(
 
   if (resolved.execution.targetPct <= roundTripCostPct) {
     return blocked(input, "cost_filter", resolved.execution);
+  }
+
+  const riskReward = assessRiskReward(
+    resolved.execution.targetPct,
+    resolved.execution.stopPct,
+    MIN_RISK_REWARD,
+  );
+  if (!riskReward.passed) {
+    return blocked(input, "risk_reward_filter", resolved.execution);
   }
 
   return {
