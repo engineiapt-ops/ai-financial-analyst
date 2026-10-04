@@ -167,7 +167,7 @@ export class IgPriceProvider implements PriceProvider {
     return {
       epic,
       bid: asFiniteNumber(snapshot.bid, "bid"),
-      ask: asFiniteNumber(snapshot.offer, "offer"),
+      ask: asFiniteNumber(snapshot.offer, "ask"),
       snapshotTime: String(snapshot.snapshotTime ?? snapshot.updateTime ?? ""),
       marketStatus: snapshot.marketStatus,
     };
@@ -189,6 +189,15 @@ export class IgPriceProvider implements PriceProvider {
         lotSize?: unknown;
         expiry?: unknown;
         currencies?: Array<{ symbol?: unknown }>;
+        marginDepositBands?: Array<{
+          currency?: unknown;
+          min?: unknown;
+          max?: unknown;
+          margin?: unknown;
+          marginFactor?: unknown;
+          marginFactorUnit?: unknown;
+        }>;
+        openingHours?: { marketTimes?: Array<{ openTime?: unknown; closeTime?: unknown }> };
       };
       dealingRules?: {
         minDealSize?: unknown;
@@ -197,15 +206,6 @@ export class IgPriceProvider implements PriceProvider {
         minControlledRiskStopDistance?: unknown;
         maxStopOrLimitDistance?: unknown;
       };
-      marginDepositBands?: Array<{
-        currency?: unknown;
-        min?: unknown;
-        max?: unknown;
-        margin?: unknown;
-        marginFactor?: unknown;
-        marginFactorUnit?: unknown;
-      }>;
-      openingHours?: { marketTimes?: Array<{ openTime?: unknown; closeTime?: unknown }> };
       snapshot?: {
         bid?: unknown;
         offer?: unknown;
@@ -219,8 +219,11 @@ export class IgPriceProvider implements PriceProvider {
     if (!instrument) throw new Error("IG market response missing instrument");
     if (String(instrument.epic ?? "") !== epic) throw new Error("IG market response epic mismatch");
 
-    const currencies = (instrument.currencies ?? []).map((currency) => String(currency.symbol ?? "")).filter(Boolean);
-    const marketTimes = payload.openingHours?.marketTimes ?? [];
+    const currencies = (instrument.currencies ?? [])
+      .map((currency) => String(currency.symbol ?? ""))
+      .filter(Boolean);
+
+    const marketTimes = instrument.openingHours?.marketTimes ?? [];
     const openingHours = marketTimes
       .map((window) => ({
         openTime: String(window.openTime ?? ""),
@@ -240,14 +243,16 @@ export class IgPriceProvider implements PriceProvider {
       marketStatus: String(snapshot.marketStatus ?? ""),
     };
 
-    const marginDepositBands = (payload.marginDepositBands ?? []).map((band) => ({
-      currency: String(band.currency ?? ""),
-      min: asNonNegativeNumber(band.min, "margin min"),
-      max: asNonNegativeNumber(band.max, "margin max"),
-      margin: asFiniteNumber(band.margin, "margin"),
-      marginFactor: asFiniteNumber(band.marginFactor, "marginFactor"),
-      marginFactorUnit: String(band.marginFactorUnit ?? ""),
-    })).filter((band) => band.currency && band.marginFactorUnit);
+    const marginDepositBands = (instrument.marginDepositBands ?? [])
+      .map((band) => ({
+        currency: String(band.currency ?? ""),
+        min: asNonNegativeNumber(band.min, "margin min"),
+        max: asNonNegativeNumber(band.max, "margin max"),
+        margin: asFiniteNumber(band.margin, "margin"),
+        marginFactor: asFiniteNumber(band.marginFactor, "marginFactor"),
+        marginFactorUnit: String(band.marginFactorUnit ?? ""),
+      }))
+      .filter((band) => band.currency && band.marginFactorUnit);
 
     return {
       epic,
