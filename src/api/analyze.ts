@@ -142,11 +142,13 @@ export async function analyzeMarket(
     entryPrice: last.close,
     atr: indicators.atr,
   });
-  const decision = execution.status === "ready"
-    ? riskAdjustedDecision
-    : execution.reason === "wait_decision"
-      ? riskAdjustedDecision
-      : blockDecisionForExecution(riskAdjustedDecision, execution.reason);
+
+  let decision = riskAdjustedDecision;
+  if (execution.status === "not_executable") {
+    if (execution.reason === "cost_filter" || execution.reason === "invalid_price") {
+      decision = blockDecisionForExecution(riskAdjustedDecision, execution.reason);
+    }
+  }
 
   const valorExposto =
     input.valorInvestimento * (decision.tamanhoPosicaoPct / 100);
