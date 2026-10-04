@@ -1,0 +1,67 @@
+name: IG Demo Market Data Validation
+on:
+  workflow_dispatch:
+    inputs:
+      epic:
+        description: "IG Demo EPIC to validate (read-only market data)"
+        required: true
+        type: string
+      timeframe:
+        description: "Primary timeframe to validate"
+        required: true
+        default: "1h"
+        type: choice
+        options: ["1h","4h","1d"]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      IG_API_BASE_URL: ${{ secrets.IG_API_BASE_URL }}
+      IG_API_KEY: ${{ secrets.IG_API_KEY }}
+      IG_USERNAME: ${{ secrets.IG_USERNAME }}
+      IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
+      IG_EPIC: ${{ inputs.epic }}
+      IG_TIMEFRAME: ${{ inputs.timeframe }}
+    steps:
+      - name: Validate required configuration
+        run: |
+          set -euo pipefail
+          test -n "$IG_API_BASE_URL"
+          test -n "$IG_API_KEY"
+          test -n "$IG_USERNAME"
+          test -n "$IG_PASSWORD"
+          test -n "$IG_EPIC"
+      - name: Authenticate, quote and candles
+        shell: bash
+        run: |
+          set -euo pipefail
+          h="$(mktemp)"
+          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30 \
+            -H "Accept: application/json; charset=UTF-8" -H "Content-Type: application/json" \
+            -H "X-IG-API-KEY: $IG_API_KEY" -H "Version: 2" -D "$h" -o /dev/null \
+            --request POST "$IG_API_BASE_URL/session" \
+            --data "$(jq -cn --arg id "$IG_USERNAME" --arg pw "$IG_PASSWORD" '{identifier:$id,password:$pw}')"
+          cst="$(awk 'BEGIN{IGNORECASE=1}/^CST:/{sub(/\r$/,"");sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$h")"
+          token="$(awk 'BEGIN{IGNORECASE=1}/^X-SECURITY-TOKEN:/{sub(/\r$/,"");sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$h")"
+          test -n "$cst" && test -n "$token"
+          q="$(mktemp)"
+          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30 \
+            -H "Accept: application/json; charset=UTF-8" -H "X-IG-API-KEY: $IG_API_KEY" \
+            -H "CST: $cst" -H "X-SECURITY-TOKEN: $token" -H "Version: 3" \
+            -o "$q" "$IG_API_BASE_URL/markets/$IG_EPIC"
+          jq -e '.snapshot and ((.snapshot.bid|tonumber)>0) and ((.snapshot.offer|tonumber)>0) and ((.snapshot.offer|tonumber)>=(.snapshot.bid|tonumber)) and (.snapshot.snapshotTime!=null)' "$q" >/dev/null
+          resolution=HOUR
+          case "$IG_TIMEFRAME" in 4h) resolution=HOUR_4;; 1d) resolution=DAY;; esac
+          p="$(mktemp)"
+          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30 \
+            -H "Accept: application/json; charset=UTF-8" -H "X-IG-API-KEY: $IG_API_KEY" \
+            -H "CST: $cst" -H "X-SECURITY-TOKEN: $token" -H "Version: 3" \
+            -o "$p" "$IG_API_BASE_URL/prices/$IG_EPIC?resolution=$resolution&max=5"
+          jq -e '(.prices|type=="array") and (.prices|length>0) and all(.prices[]?; (.snapshotTimeUTC!=null or .snapshotTime!=null) and ((.openPrice.bid|tonumber)>0) and ((.highPrice.bid|tonumber)>0) and ((.lowPrice.bid|tonumber)>0) and ((.closePrice.bid|tonumber)>0))' "$p" >/dev/null
+          echo "IG_DEMO_VALIDATION=PASS"
+          echo "EPIC=$IG_EPIC"
+          echo "TIMEFRAME=$IG_TIMEFRAME"
+          echo "No order endpoint was called."
