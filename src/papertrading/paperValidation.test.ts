@@ -44,15 +44,18 @@ const validated = validatePaperSignal({
   signalCandle: candle("2026-10-01T10:00:00Z"),
   futureCandles: [
     candle("2026-10-01T11:00:00Z", {
-      bidHigh: 101.5,
-      askHigh: 101.6,
+      // The 1h ATR execution profile produces a 2% target.
+      // For BUY, execution exits on bid prices, so the bid high must
+      // actually cross the target derived from the ask-side entry.
+      bidHigh: 103,
+      askHigh: 103.1,
       bidLow: 100,
       askLow: 100.1,
-      bidClose: 101,
-      askClose: 101.1,
-      high: 101.6,
+      bidClose: 102.5,
+      askClose: 102.6,
+      high: 103.1,
       low: 100,
-      close: 101.1,
+      close: 102.6,
     }),
   ],
   executionConfig: {
@@ -71,7 +74,8 @@ assert.equal(validated.riskPct, 0.1);
 assert.equal(validated.trade?.outcome, "win");
 
 const blockedRisk = validatePaperSignal({
-  signal: { ...signal, positionSizePct: 100 },
+  // 100% notional with a 2% stop creates 2% account risk and must be blocked.
+  signal: { ...signal, positionSizePct: 100, stopPct: 0.02, targetPct: 0.04 },
   signalCandle: candle("2026-10-01T10:00:00Z"),
   futureCandles: [],
   executionConfig: {
@@ -85,7 +89,7 @@ const blockedRisk = validatePaperSignal({
 
 assert.equal(blockedRisk.status, "blocked");
 assert.equal(blockedRisk.reason, "risk_limit");
-assert.equal(blockedRisk.riskPct, 1);
+assert.equal(blockedRisk.riskPct, 2);
 
 const notReady = validatePaperSignal({
   signal: { ...signal, status: "not_executable", side: null, targetPct: null, stopPct: null },
