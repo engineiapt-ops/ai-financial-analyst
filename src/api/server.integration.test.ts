@@ -44,14 +44,20 @@ try {
   });
 
   const overviewUnauthorized = await fetch(baseUrl + "/api/market/overview");
-  assert.equal(overviewUnauthorized.status, 401);
+  assert.equal(overviewUnauthorized.status, 404);
+  assert.deepEqual(await overviewUnauthorized.json(), {
+    error: "legacy stock analyst disabled",
+    code: "LEGACY_STOCK_ANALYST_DISABLED",
+  });
 
   const overviewAuthorized = await fetch(baseUrl + "/api/market/overview", {
     headers: { "x-api-key": "integration-secret" },
   });
-  assert.equal(overviewAuthorized.status, 200);
-  const overviewPayload = await overviewAuthorized.json();
-  assert.equal(Array.isArray(overviewPayload.indices), true);
+  assert.equal(overviewAuthorized.status, 404);
+  assert.deepEqual(await overviewAuthorized.json(), {
+    error: "legacy stock analyst disabled",
+    code: "LEGACY_STOCK_ANALYST_DISABLED",
+  });
 
   const unauthorized = await fetch(baseUrl + "/api/analyze", {
     method: "POST",
