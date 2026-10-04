@@ -104,10 +104,16 @@ jobs:
           if not isinstance(data, list) or not data:
               raise SystemExit("Saxo chart response contains no candles")
 
-          required = ("Time", "Open", "High", "Low", "Close")
           valid = 0
           for candle in data:
-              if all(candle.get(key) is not None for key in required):
+              open_value = candle.get("OpenBid", candle.get("Open"))
+              high_value = candle.get("HighBid", candle.get("High"))
+              low_value = candle.get("LowBid", candle.get("Low"))
+              close_value = candle.get("CloseBid", candle.get("Close"))
+              if candle.get("Time") is not None and all(
+                  isinstance(value, (int, float)) and value > 0
+                  for value in (open_value, high_value, low_value, close_value)
+              ):
                   valid += 1
 
           if valid == 0:
