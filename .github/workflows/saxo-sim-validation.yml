@@ -1,0 +1,124 @@
+name: Saxo SIM validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      instrument:
+        description: "Saxo instrument in AssetType:UIC format"
+        required: true
+        default: "FxSpot:21"
+      timeframe:
+        description: "Candle timeframe"
+        required: true
+        type: choice
+        options:
+          - 1h
+          - 4h
+          - 1d
+        default: 1h
+
+permissions:
+  contents: read
+
+jobs:
+  validate-saxo-sim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SAXO_ACCESS_TOKEN: ${{ secrets.SAXO_ACCESS_TOKEN }}
+      SAXO_API_BASE_URL: https://gateway.saxobank.com/sim/openapi
+      SAXO_INSTRUMENT: ${{ inputs.instrument }}
+      SAXO_TIMEFRAME: ${{ inputs.timeframe }}
+
+    steps:
+      - name: Validate secret configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${SAXO_ACCESS_TOKEN:-}" ]; then
+            echo "::error::Missing GitHub secret SAXO_ACCESS_TOKEN"
+            exit 1
+          fi
+          echo "Saxo SIM token secret is configured."
+
+      - name: Validate Saxo SIM quote and candles
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base="${SAXO_API_BASE_URL}"
+          instrument="${SAXO_INSTRUMENT}"
+          timeframe="${SAXO_TIMEFRAME}"
+
+          asset_type="${instrument%%:*}"
+          uic="${instrument##*:}"
+
+          if ! [[ "${uic}" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid instrument format. Expected AssetType:UIC."
+            exit 1
+          fi
+
+          case "${timeframe}" in
+            1h) horizon=60 ;;
+            4h) horizon=240 ;;
+            1d) horizon=1440 ;;
+            *) echo "::error::Unsupported timeframe"; exit 1 ;;
+          esac
+
+          auth_header="Authorization: Bearer ${SAXO_ACCESS_TOKEN}"
+
+          quote_json="$(curl --fail-with-body --silent --show-error             --retry 2 --retry-delay 2             -H "${auth_header}"             -H "Accept: application/json"             "${base}/trade/v1/infoprices?AssetType=${asset_type}&Uic=${uic}&FieldGroups=Quote")"
+
+          python - "${quote_json}" "${instrument}" <<'PY'
+          import json
+          import sys
+
+          payload = json.loads(sys.argv[1])
+          instrument = sys.argv[2]
+          quote = payload.get("Quote") or {}
+
+          bid = quote.get("Bid")
+          ask = quote.get("Ask")
+          mid = quote.get("Mid")
+          error = quote.get("ErrorCode")
+
+          if error and str(error).lower() != "none":
+              raise SystemExit(f"Saxo quote returned ErrorCode={error}")
+          if not all(isinstance(v, (int, float)) and v > 0 for v in (bid, ask, mid)):
+              raise SystemExit("Saxo quote is missing valid Bid/Ask/Mid")
+
+          print(f"SAXO_SIM_QUOTE=PASS instrument={instrument} bid={bid} ask={ask} mid={mid}")
+          PY
+
+          chart_json="$(curl --fail-with-body --silent --show-error             --retry 2 --retry-delay 2             -H "${auth_header}"             -H "Accept: application/json"             "${base}/chart/v3/charts?AssetType=${asset_type}&Uic=${uic}&Horizon=${horizon}&Count=5&Mode=UpTo&Time=$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
+
+          python - "${chart_json}" "${instrument}" "${timeframe}" <<'PY'
+          import json
+          import sys
+
+          payload = json.loads(sys.argv[1])
+          instrument = sys.argv[2]
+          timeframe = sys.argv[3]
+          data = payload.get("Data")
+
+          if not isinstance(data, list) or not data:
+              raise SystemExit("Saxo chart response contains no candles")
+
+          valid = 0
+          for candle in data:
+              open_value = candle.get("OpenBid", candle.get("Open"))
+              high_value = candle.get("HighBid", candle.get("High"))
+              low_value = candle.get("LowBid", candle.get("Low"))
+              close_value = candle.get("CloseBid", candle.get("Close"))
+              if candle.get("Time") is not None and all(
+                  isinstance(value, (int, float)) and value > 0
+                  for value in (open_value, high_value, low_value, close_value)
+              ):
+                  valid += 1
+
+          if valid == 0:
+              raise SystemExit("Saxo chart response contains no valid OHLC candles")
+
+          print(f"SAXO_SIM_CANDLES=PASS instrument={instrument} timeframe={timeframe} candles={valid}")
+          print("No order endpoint was called.")
+          PY
