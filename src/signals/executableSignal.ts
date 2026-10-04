@@ -9,7 +9,8 @@ export type ExecutableSignalReason =
   | "ready"
   | "wait_decision"
   | "invalid_price"
-  | "cost_filter";
+  | "cost_filter"
+  | "risk_reward_filter";
 
 export interface ExecutableSignalTicket {
   version: typeof EXECUTABLE_SIGNAL_VERSION;
