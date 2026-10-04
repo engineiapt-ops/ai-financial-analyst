@@ -71,6 +71,7 @@ const provider = new IgPriceProvider({
   username: "demo-user",
   password: "demo-password",
   fetchImpl,
+  minRequestIntervalMs: 0,
 });
 
 const market = await provider.getMarketDetails("CS.D.EURUSD.MINI.IP");
@@ -109,3 +110,24 @@ assert.equal(authHeaders.get("X-SECURITY-TOKEN"), "security-test");
 assert.equal(authHeaders.get("X-IG-API-KEY"), "key");
 
 console.log("igPriceProvider tests passed");
+
+
+const failingProvider = new IgPriceProvider({
+  apiKey: "key",
+  username: "demo-user",
+  password: "demo-password",
+  minRequestIntervalMs: 0,
+  fetchImpl: async () =>
+    response(
+      { errorCode: "error.security.account-not-yet-activated" },
+      {},
+      401,
+    ),
+});
+
+await assert.rejects(
+  () => failingProvider.getQuote("CS.D.EURUSD.MINI.IP"),
+  /IG authentication failed: error\.security\.account-not-yet-activated/,
+);
+
+console.log("igPriceProvider error diagnostics test passed");
