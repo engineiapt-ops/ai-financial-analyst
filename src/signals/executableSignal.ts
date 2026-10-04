@@ -36,6 +36,7 @@ export interface BuildExecutableSignalInput {
   decision: DecisionResult;
   entryPrice: number;
   atr: number | null | undefined;
+  roundTripCostPct?: number;
 }
 
 export const ESTIMATED_ROUND_TRIP_COST_PCT =
@@ -60,7 +61,7 @@ function blocked(
     stop: null,
     targetPct: execution?.targetPct ?? null,
     stopPct: execution?.stopPct ?? null,
-    estimatedRoundTripCostPct: ESTIMATED_ROUND_TRIP_COST_PCT,
+    estimatedRoundTripCostPct: roundTripCostPct,
     execution,
   };
 }
@@ -69,6 +70,10 @@ export function buildExecutableSignal(
   input: BuildExecutableSignalInput,
 ): ExecutableSignalTicket {
   const { decision } = input;
+  const roundTripCostPct = input.roundTripCostPct ?? ESTIMATED_ROUND_TRIP_COST_PCT;
+  if (!Number.isFinite(roundTripCostPct) || roundTripCostPct < 0) {
+    return blocked(input, "cost_filter");
+  }
 
   if (decision.recomendacao === "WAIT") {
     return blocked(input, "wait_decision");
@@ -87,7 +92,7 @@ export function buildExecutableSignal(
     referencePrice: input.entryPrice,
   });
 
-  if (resolved.execution.targetPct <= ESTIMATED_ROUND_TRIP_COST_PCT) {
+  if (resolved.execution.targetPct <= roundTripCostPct) {
     return blocked(input, "cost_filter", resolved.execution);
   }
 
