@@ -83,6 +83,7 @@
     "test:price-provider": "tsx src/marketdata/providers/csvPriceProvider.test.ts",
     "test:price-provider-registry": "tsx src/marketdata/providers/priceProviderRegistry.test.ts",
     "test:market-data-normalization": "tsx src/marketdata/normalization.test.ts",
+    "test:market-data-service": "tsx src/marketdata/service.test.ts",
     "test:execution-model-v3": "tsx src/papertrading/executionModelV3.test.ts",
     "test:executable-signal": "tsx src/signals/executableSignal.test.ts",
     "test:profitability": "tsx src/evaluation/profitability.test.ts",
