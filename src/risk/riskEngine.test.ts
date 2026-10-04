@@ -6,6 +6,7 @@ import {
   applyRiskToDecision,
   RISK_POSITION_SIZE_PCT,
   DEFAULT_RISK_POLICY,
+  MAX_RISK_PER_TRADE_HARD_CAP_PCT,
 } from "./riskEngine.js";
 import type { RegimeSnapshot } from "./regime.js";
 
@@ -205,3 +206,23 @@ assert.equal(elevated.allowed, true);
 assert.equal(elevated.positionSizePct, FIXED_POSITION_PCT * 0.5);
 
 console.log("risk engine tests passed");
+
+
+assert.equal(MAX_RISK_PER_TRADE_HARD_CAP_PCT, 1);
+assert.throws(
+  () => evaluateRiskV2({
+    decision,
+    regime: baseRegime,
+    state: {
+      equity: 1000,
+      dailyLossPct: 0,
+      tradesToday: 0,
+      openPositions: 0,
+      grossExposurePct: 0,
+      consecutiveLosses: 0,
+    },
+    stopDistancePct: 1,
+    policy: { maxRiskPerTradePct: 1.01 },
+  }),
+  /Invalid risk policy/,
+);
