@@ -1,4 +1,4 @@
-import type { Kline, Timeframe } from "../types.js";
+import type { Kline, Timeframe } from "../../types.js";
 
 export interface PriceQuery {
   instrument: string;
