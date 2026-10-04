@@ -9,6 +9,7 @@ import { app as coreApiApp } from './src/api/server.js';
 import { isProtectedApiRequest, requireApiAuth } from './src/api/auth.js';
 import { getGeminiModel, getGeminiTtsModel } from './src/ai/geminiProvider.js';
 import { createRateLimitMiddleware, getRequestClientKey } from './src/api/rateLimit.js';
+import { isLegacyStockAnalystEnabled, isLegacyStockAnalystPath } from './src/legacy/stockAnalystGate.js';
 
 dotenv.config();
 
@@ -78,6 +79,18 @@ const extendedAiHeavyRateLimiter = createRateLimitMiddleware({
 });
 
 const rootApiAuthMiddleware = requireApiAuth();
+const legacyStockAnalystEnabled = isLegacyStockAnalystEnabled();
+
+app.use((req, res, next) => {
+  if (!legacyStockAnalystEnabled && isLegacyStockAnalystPath(req.path)) {
+    res.status(404).json({
+      error: "legacy stock analyst disabled",
+      code: "LEGACY_STOCK_ANALYST_DISABLED",
+    });
+    return;
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   if (isProtectedApiRequest(req)) {
