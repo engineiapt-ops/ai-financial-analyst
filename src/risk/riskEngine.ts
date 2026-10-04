@@ -6,43 +6,209 @@ export const RISK_ENGINE_VERSION = "risk-engine-v2";
 export const RISK_MAX_GROSS_EXPOSURE_PCT = 15;
 export const RISK_POSITION_SIZE_PCT = FIXED_POSITION_PCT;
 
+export interface RiskPolicy {
+  maxRiskPerTradePct: number;
+  maxDailyLossPct: number;
+  maxTradesPerDay: number;
+  maxOpenPositions: number;
+  maxGrossExposurePct: number;
+  maxConsecutiveLosses: number;
+  maxCorrelation: number;
+}
+
+export const DEFAULT_RISK_POLICY: Readonly<RiskPolicy> = {
+  maxRiskPerTradePct: 0.5,
+  maxDailyLossPct: 2,
+  maxTradesPerDay: 5,
+  maxOpenPositions: 3,
+  maxGrossExposurePct: RISK_MAX_GROSS_EXPOSURE_PCT,
+  maxConsecutiveLosses: 3,
+  maxCorrelation: 0.8,
+};
+
+export interface RiskState {
+  equity: number;
+  dailyLossPct: number;
+  tradesToday: number;
+  openPositions: number;
+  grossExposurePct: number;
+  consecutiveLosses: number;
+  correlationToOpenPositions?: number;
+  eventBlocked?: boolean;
+}
+
+export interface RiskV2Input {
+  decision: DecisionResult;
+  regime: RegimeSnapshot;
+  state: RiskState;
+  stopDistancePct: number;
+  policy?: Partial<RiskPolicy>;
+}
+
+export type RiskBlockReason =
+  | "wait_decision"
+  | "high_volatility"
+  | "invalid_risk_input"
+  | "daily_loss_limit"
+  | "trade_limit"
+  | "position_limit"
+  | "gross_exposure_limit"
+  | "correlation_limit"
+  | "consecutive_loss_limit"
+  | "event_block"
+  | "risk_ok";
+
 export interface RiskAssessment {
   version: string;
   allowed: boolean;
   positionSizePct: number;
   maxGrossExposurePct: number;
-  reason: "wait_decision" | "high_volatility" | "elevated_decision_risk" | "risk_ok";
+  riskPerTradePct: number;
+  riskAmount: number;
+  stopDistancePct: number;
+  reason: RiskBlockReason;
   regime: RegimeSnapshot;
 }
 
-export function evaluateRisk(decision: DecisionResult, regime: RegimeSnapshot): RiskAssessment {
-  if (decision.recomendacao === "WAIT") return {
-    version: RISK_ENGINE_VERSION, allowed: false, positionSizePct: 0,
-    maxGrossExposurePct: RISK_MAX_GROSS_EXPOSURE_PCT, reason: "wait_decision", regime,
-  };
-  if (regime.volatility === "HIGH") return {
-    version: RISK_ENGINE_VERSION, allowed: false, positionSizePct: 0,
-    maxGrossExposurePct: RISK_MAX_GROSS_EXPOSURE_PCT, reason: "high_volatility", regime,
-  };
+function mergedPolicy(policy?: Partial<RiskPolicy>): RiskPolicy {
+  const result = { ...DEFAULT_RISK_POLICY, ...policy };
+  if (
+    !Object.values(result).every((value) => Number.isFinite(value)) ||
+    result.maxRiskPerTradePct <= 0 ||
+    result.maxDailyLossPct <= 0 ||
+    result.maxTradesPerDay < 0 ||
+    result.maxOpenPositions < 0 ||
+    result.maxGrossExposurePct <= 0 ||
+    result.maxGrossExposurePct > 100 ||
+    result.maxConsecutiveLosses < 0 ||
+    result.maxCorrelation < 0 ||
+    result.maxCorrelation > 1
+  ) {
+    throw new Error("Invalid risk policy");
+  }
+  return result;
+}
 
-  const baseSize =
-    Number.isFinite(decision.tamanhoPosicaoPct) && decision.tamanhoPosicaoPct > 0
-      ? decision.tamanhoPosicaoPct
-      : FIXED_POSITION_PCT;
-  let positionSizePct = Math.min(baseSize, FIXED_POSITION_PCT);
-  if (decision.riscoElevado) {
-    positionSizePct = Math.round(positionSizePct * 0.5 * 100) / 100;
+function blocked(
+  reason: RiskBlockReason,
+  regime: RegimeSnapshot,
+  policy: RiskPolicy,
+  riskPerTradePct = 0,
+  riskAmount = 0,
+  stopDistancePct = 0,
+): RiskAssessment {
+  return {
+    version: RISK_ENGINE_VERSION,
+    allowed: false,
+    positionSizePct: 0,
+    maxGrossExposurePct: policy.maxGrossExposurePct,
+    riskPerTradePct,
+    riskAmount,
+    stopDistancePct,
+    reason,
+    regime,
+  };
+}
+
+export function evaluateRiskV2(input: RiskV2Input): RiskAssessment {
+  const policy = mergedPolicy(input.policy);
+  const { decision, regime, state, stopDistancePct } = input;
+
+  if (decision.recomendacao === "WAIT") return blocked("wait_decision", regime, policy);
+  if (regime.volatility === "HIGH") return blocked("high_volatility", regime, policy);
+  if (
+    !Number.isFinite(state.equity) ||
+    state.equity <= 0 ||
+    !Number.isFinite(stopDistancePct) ||
+    stopDistancePct <= 0 ||
+    !Number.isFinite(state.dailyLossPct) ||
+    !Number.isFinite(state.grossExposurePct) ||
+    !Number.isFinite(state.tradesToday) ||
+    !Number.isFinite(state.openPositions) ||
+    !Number.isFinite(state.consecutiveLosses)
+  ) {
+    return blocked("invalid_risk_input", regime, policy);
   }
 
-  if (positionSizePct <= 0) return {
-    version: RISK_ENGINE_VERSION, allowed: false, positionSizePct: 0,
-    maxGrossExposurePct: RISK_MAX_GROSS_EXPOSURE_PCT,
-    reason: "elevated_decision_risk", regime,
-  };
+  const riskAmount = state.equity * (policy.maxRiskPerTradePct / 100);
+  const riskPerTradePct = policy.maxRiskPerTradePct;
+  const requestedNotionalPct = (riskPerTradePct / stopDistancePct) * 100;
+  const remainingExposurePct = Math.max(0, policy.maxGrossExposurePct - state.grossExposurePct);
+  const positionSizePct = Math.min(requestedNotionalPct, remainingExposurePct);
+
+  if (state.dailyLossPct >= policy.maxDailyLossPct) {
+    return blocked("daily_loss_limit", regime, policy, riskPerTradePct, riskAmount, stopDistancePct);
+  }
+  if (state.tradesToday >= policy.maxTradesPerDay) {
+    return blocked("trade_limit", regime, policy, riskPerTradePct, riskAmount, stopDistancePct);
+  }
+  if (state.openPositions >= policy.maxOpenPositions) {
+    return blocked("position_limit", regime, policy, riskPerTradePct, riskAmount, stopDistancePct);
+  }
+  if (state.grossExposurePct >= policy.maxGrossExposurePct || positionSizePct <= 0) {
+    return blocked("gross_exposure_limit", regime, policy, riskPerTradePct, riskAmount, stopDistancePct);
+  }
+  if (
+    state.correlationToOpenPositions !== undefined &&
+    (!Number.isFinite(state.correlationToOpenPositions) ||
+      state.correlationToOpenPositions > policy.maxCorrelation)
+  ) {
+    return blocked("correlation_limit", regime, policy, riskPerTradePct, riskAmount, stopDistancePct);
+  }
+  if (state.consecutiveLosses >= policy.maxConsecutiveLosses) {
+    return blocked("consecutive_loss_limit", regime, policy, riskPerTradePct, riskAmount, stopDistancePct);
+  }
+  if (state.eventBlocked) {
+    return blocked("event_block", regime, policy, riskPerTradePct, riskAmount, stopDistancePct);
+  }
 
   return {
-    version: RISK_ENGINE_VERSION, allowed: true, positionSizePct,
-    maxGrossExposurePct: RISK_MAX_GROSS_EXPOSURE_PCT, reason: "risk_ok", regime,
+    version: RISK_ENGINE_VERSION,
+    allowed: true,
+    positionSizePct,
+    maxGrossExposurePct: policy.maxGrossExposurePct,
+    riskPerTradePct,
+    riskAmount,
+    stopDistancePct,
+    reason: "risk_ok",
+    regime,
+  };
+}
+
+export function evaluateRisk(decision: DecisionResult, regime: RegimeSnapshot): RiskAssessment {
+  const basePositionSizePct = Math.min(
+    decision.tamanhoPosicaoPct > 0 ? decision.tamanhoPosicaoPct : FIXED_POSITION_PCT,
+    FIXED_POSITION_PCT,
+  );
+
+  if (decision.recomendacao === "WAIT") {
+    return {
+      ...blocked("wait_decision", regime, DEFAULT_RISK_POLICY),
+      riskPerTradePct: basePositionSizePct,
+    };
+  }
+
+  if (regime.volatility === "HIGH") {
+    return {
+      ...blocked("high_volatility", regime, DEFAULT_RISK_POLICY),
+      riskPerTradePct: basePositionSizePct,
+    };
+  }
+
+  const positionSizePct = decision.riscoElevado
+    ? basePositionSizePct * 0.5
+    : basePositionSizePct;
+
+  return {
+    version: RISK_ENGINE_VERSION,
+    allowed: true,
+    positionSizePct,
+    maxGrossExposurePct: RISK_MAX_GROSS_EXPOSURE_PCT,
+    riskPerTradePct: basePositionSizePct,
+    riskAmount: 0,
+    stopDistancePct: 0,
+    reason: "risk_ok",
+    regime,
   };
 }
 

@@ -44,6 +44,9 @@ export function buildTestAnalyzeOutput(): AnalyzeOutput {
       allowed: true,
       positionSizePct: 2,
       maxGrossExposurePct: 20,
+      riskPerTradePct: 2,
+      riskAmount: 20,
+      stopDistancePct: 1,
       reason: "risk_ok",
       regime: {
         key: "normal",
