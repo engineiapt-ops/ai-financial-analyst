@@ -9,7 +9,7 @@ const sizing = calculatePositionSize({
 
 assert.equal(sizing.riskPerTradePct, MAX_RISK_PER_TRADE_PCT);
 assert.equal(sizing.riskAmount, 100);
-assert.equal(sizing.notionalPct, 10_000);
+assert.equal(sizing.notionalPct, 100);
 
 assert.throws(() => calculatePositionSize({
   equity: 10_000,
