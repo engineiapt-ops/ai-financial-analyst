@@ -24,7 +24,7 @@ export function calculatePositionSize(input: {
 
   const riskPerTradePct = Math.min(requestedRiskPct, MAX_RISK_PER_TRADE_PCT);
   const riskAmount = input.equity * riskPerTradePct / 100;
-  const notionalPct = riskPerTradePct / input.stopDistancePct * 100;
+  const notionalPct = (riskPerTradePct / 100) / input.stopDistancePct * 100;
 
   return {
     allowed: true,
