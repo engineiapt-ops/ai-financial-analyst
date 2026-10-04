@@ -9,6 +9,8 @@ import { calibrateRegimeThresholds, classifyRegime } from "../risk/regime.js";
 import { applyRiskToDecision, evaluateRisk } from "../risk/riskEngine.js";
 import { computeIndicatorsSeries } from "../features/indicators.js";
 import { assertMarketDataFresh, type MarketDataQuality } from "../marketdata/quality.js";
+import { getInstrument } from "../instruments/registry.js";
+import { buildExecutableSignal } from "../signals/executableSignal.js";
 import type { MarketState, Timeframe, DecisionResult } from "../types.js";
 
 export interface AnalyzeInput {
@@ -51,6 +53,22 @@ const DEFAULT_DEPENDENCIES: AnalyzeMarketDependencies = {
   saveMarketData,
 };
 
+function blockDecisionForExecution(
+  decision: DecisionResult,
+  reason: "invalid_price" | "cost_filter",
+): DecisionResult {
+  return {
+    ...decision,
+    recomendacao: "WAIT",
+    tamanhoPosicaoPct: 0,
+    riscoElevado: decision.recomendacao !== "WAIT" || Boolean(decision.riscoElevado),
+    observacao: [
+      decision.observacao,
+      `execution=blocked reason=${reason}`,
+    ].filter(Boolean).join(" "),
+  };
+}
+
 export async function analyzeMarket(
   input: AnalyzeInput,
   dependencies: Partial<AnalyzeMarketDependencies> = {},
@@ -58,6 +76,12 @@ export async function analyzeMarket(
   const deps = { ...DEFAULT_DEPENDENCIES, ...dependencies };
   const ativo = input.ativo.trim().toUpperCase();
   if (!ativo) throw new Error("ativo is required");
+
+  const instrument = getInstrument(ativo);
+  if (!instrument.enabled) {
+    throw new Error("Instrument is disabled");
+  }
+
   if (!Number.isFinite(input.valorInvestimento) || input.valorInvestimento <= 0) {
     throw new Error("valorInvestimento must be greater than zero");
   }
@@ -109,13 +133,28 @@ export async function analyzeMarket(
   const indicatorsSeries = computeIndicatorsSeries(klines);
   const regime = classifyRegime(last, indicatorsSeries[indicatorsSeries.length - 1], regimeThresholds);
   const risk = evaluateRisk(rawDecision, regime);
-  const decision = applyRiskToDecision(rawDecision, risk);
+  const riskAdjustedDecision = applyRiskToDecision(rawDecision, risk);
+  const execution = buildExecutableSignal({
+    ativo,
+    timeframe: input.timeframe,
+    dataAsOf,
+    decision: riskAdjustedDecision,
+    entryPrice: last.close,
+    atr: indicators.atr,
+  });
+  const decision = execution.status === "ready"
+    ? riskAdjustedDecision
+    : execution.reason === "wait_decision"
+      ? riskAdjustedDecision
+      : blockDecisionForExecution(riskAdjustedDecision, execution.reason);
 
   const valorExposto =
     input.valorInvestimento * (decision.tamanhoPosicaoPct / 100);
 
   const signalId = await deps.saveSignal(ativo, input.timeframe, decision, {
-    entrada: decision.recomendacao === "WAIT" ? null : last.close,
+    entrada: execution.status === "ready" ? execution.entrada : null,
+    alvo: execution.status === "ready" ? execution.alvo : null,
+    stop: execution.status === "ready" ? execution.stop : null,
   });
 
   const decisionLogId = await deps.saveDecisionLog({
