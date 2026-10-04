@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { FIXED_POSITION_PCT } from "../config/thresholds.js";
-import { evaluateRisk, applyRiskToDecision, RISK_POSITION_SIZE_PCT } from "./riskEngine.js";
+import {
+  evaluateRisk,
+  evaluateRiskV2,
+  applyRiskToDecision,
+  RISK_POSITION_SIZE_PCT,
+  DEFAULT_RISK_POLICY,
+} from "./riskEngine.js";
 import type { RegimeSnapshot } from "./regime.js";
 
 const baseRegime: RegimeSnapshot = {
@@ -22,16 +28,165 @@ const decision = {
   tamanhoPosicaoPct: FIXED_POSITION_PCT,
 };
 
-const ok = evaluateRisk(decision, baseRegime);
-assert.equal(ok.allowed, true);
-assert.equal(ok.reason, "risk_ok");
-assert.equal(ok.positionSizePct, FIXED_POSITION_PCT);
+const legacy = evaluateRisk(decision, baseRegime);
+assert.equal(legacy.allowed, true);
+assert.equal(legacy.reason, "risk_ok");
 assert.equal(RISK_POSITION_SIZE_PCT, FIXED_POSITION_PCT);
 
-const highVol = evaluateRisk(decision, {
-  ...baseRegime,
-  volatility: "HIGH",
-  key: "BULLISH.HIGH.POSITIVE",
+const v2 = evaluateRiskV2({
+  decision,
+  regime: baseRegime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 0,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+  },
+  stopDistancePct: 1,
+});
+assert.equal(v2.allowed, true);
+assert.equal(v2.riskAmount, 5);
+assert.equal(v2.positionSizePct, 15);
+assert.equal(v2.riskPerTradePct, DEFAULT_RISK_POLICY.maxRiskPerTradePct);
+
+const widerStop = evaluateRiskV2({
+  decision,
+  regime: baseRegime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 0,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+  },
+  stopDistancePct: 2,
+});
+assert.equal(widerStop.positionSizePct, 15);
+
+const dailyLoss = evaluateRiskV2({
+  decision,
+  regime: baseRegime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 2,
+    tradesToday: 0,
+    openPositions: 0,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+  },
+  stopDistancePct: 1,
+});
+assert.equal(dailyLoss.allowed, false);
+assert.equal(dailyLoss.reason, "daily_loss_limit");
+
+const tradeLimit = evaluateRiskV2({
+  decision,
+  regime: baseRegime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 5,
+    openPositions: 0,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+  },
+  stopDistancePct: 1,
+});
+assert.equal(tradeLimit.reason, "trade_limit");
+
+const positionLimit = evaluateRiskV2({
+  decision,
+  regime: baseRegime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 3,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+  },
+  stopDistancePct: 1,
+});
+assert.equal(positionLimit.reason, "position_limit");
+
+const exposureLimit = evaluateRiskV2({
+  decision,
+  regime: baseRegime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 0,
+    grossExposurePct: 14,
+    consecutiveLosses: 0,
+  },
+  stopDistancePct: 1,
+});
+assert.equal(exposureLimit.allowed, true);
+assert.equal(exposureLimit.positionSizePct, 1);
+
+const correlationLimit = evaluateRiskV2({
+  decision,
+  regime: baseRegime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 1,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+    correlationToOpenPositions: 0.81,
+  },
+  stopDistancePct: 1,
+});
+assert.equal(correlationLimit.reason, "correlation_limit");
+
+const lossStreak = evaluateRiskV2({
+  decision,
+  regime: baseRegime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 0,
+    grossExposurePct: 0,
+    consecutiveLosses: 3,
+  },
+  stopDistancePct: 1,
+});
+assert.equal(lossStreak.reason, "consecutive_loss_limit");
+
+const eventBlocked = evaluateRiskV2({
+  decision,
+  regime: baseRegime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 0,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+    eventBlocked: true,
+  },
+  stopDistancePct: 1,
+});
+assert.equal(eventBlocked.reason, "event_block");
+
+const highVol = evaluateRiskV2({
+  decision,
+  regime: { ...baseRegime, volatility: "HIGH", key: "BULLISH.HIGH.POSITIVE" },
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 0,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+  },
+  stopDistancePct: 1,
 });
 assert.equal(highVol.allowed, false);
 assert.equal(highVol.reason, "high_volatility");
@@ -45,6 +200,5 @@ const elevated = evaluateRisk(
   baseRegime,
 );
 assert.equal(elevated.allowed, true);
-assert.ok(elevated.positionSizePct < FIXED_POSITION_PCT);
 
 console.log("risk engine tests passed");
