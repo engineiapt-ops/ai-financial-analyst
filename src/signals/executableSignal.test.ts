@@ -75,12 +75,14 @@ const expensive = buildExecutableSignal({
     tamanhoPosicaoPct: 1.5,
   },
   entryPrice: 100,
-  atr: ESTIMATED_ROUND_TRIP_COST_PCT / 2 * 100,
+  atr: 1,
+  roundTripCostPct: 0.02,
 });
 
 assert.equal(expensive.status, "not_executable");
 assert.equal(expensive.reason, "cost_filter");
 assert.equal(expensive.side, null);
-assert.ok((expensive.targetPct ?? 0) <= ESTIMATED_ROUND_TRIP_COST_PCT);
+assert.equal(expensive.estimatedRoundTripCostPct, 0.02);
+assert.ok((expensive.targetPct ?? 0) <= 0.02);
 
 console.log("executable signal tests passed");
