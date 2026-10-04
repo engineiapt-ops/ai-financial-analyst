@@ -42,11 +42,17 @@ export class MarketDataPipeline {
         const normalizedProvider = provider.trim();
         if (!normalizedProvider || normalizedProvider === primary.provider) continue;
 
+        const comparisonRequest: MarketDataRequest = {
+          provider: normalizedProvider,
+          instrument: request.instrument,
+          timeframe: request.timeframe,
+          limit: request.limit,
+          startTime: request.startTime,
+          endTime: request.endTime,
+        };
+
         comparisonSnapshots.push(
-          await this.service.getSnapshot(
-            { ...request, provider: normalizedProvider, comparisonProviders: undefined },
-            checkedAt,
-          ),
+          await this.service.getSnapshot(comparisonRequest, checkedAt),
         );
       }
 
