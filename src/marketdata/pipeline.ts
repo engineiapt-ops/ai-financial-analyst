@@ -3,6 +3,7 @@ import {
   createMarketDataProvenance,
   type MarketDataProvenance,
 } from "./provenance.js";
+import { MarketDataObservability } from "./observability.js";
 import {
   MarketDataService,
   type MarketDataRequest,
@@ -22,50 +23,78 @@ export interface MarketDataPipelineResult {
 }
 
 export class MarketDataPipeline {
-  constructor(private readonly service: MarketDataService) {}
+  constructor(
+    private readonly service: MarketDataService,
+    private readonly observability?: MarketDataObservability,
+  ) {}
 
   async load(
     request: MarketDataPipelineRequest,
     checkedAt = new Date(),
   ): Promise<MarketDataPipelineResult> {
-    const primary = await this.service.getSnapshot(request, checkedAt);
-    const comparisonSnapshots: MarketDataSnapshot[] = [];
+    const startedAt = Date.now();
 
-    for (const provider of request.comparisonProviders ?? []) {
-      const normalizedProvider = provider.trim();
-      if (!normalizedProvider || normalizedProvider === primary.provider) continue;
+    try {
+      const primary = await this.service.getSnapshot(request, checkedAt);
+      const comparisonSnapshots: MarketDataSnapshot[] = [];
 
-      comparisonSnapshots.push(
-        await this.service.getSnapshot(
-          { ...request, provider: normalizedProvider, comparisonProviders: undefined },
-          checkedAt,
-        ),
+      for (const provider of request.comparisonProviders ?? []) {
+        const normalizedProvider = provider.trim();
+        if (!normalizedProvider || normalizedProvider === primary.provider) continue;
+
+        comparisonSnapshots.push(
+          await this.service.getSnapshot(
+            { ...request, provider: normalizedProvider, comparisonProviders: undefined },
+            checkedAt,
+          ),
+        );
+      }
+
+      const consistency = assertMarketDataConsistency(
+        [
+          { provider: primary.provider, candles: primary.candles },
+          ...comparisonSnapshots.map((snapshot) => ({
+            provider: snapshot.provider,
+            candles: snapshot.candles,
+          })),
+        ],
+        request.maxRelativeDeviationBps ?? 50,
       );
-    }
 
-    const consistency = assertMarketDataConsistency(
-      [
-        {
-          provider: primary.provider,
+      const result = {
+        primary,
+        provenance: createMarketDataProvenance({
+          metadata: primary.metadata,
           candles: primary.candles,
-        },
-        ...comparisonSnapshots.map((snapshot) => ({
-          provider: snapshot.provider,
-          candles: snapshot.candles,
-        })),
-      ],
-      request.maxRelativeDeviationBps ?? 50,
-    );
+          quality: primary.quality,
+        }),
+        consistency,
+        comparisonSnapshots,
+      };
 
-    return {
-      primary,
-      provenance: createMarketDataProvenance({
-        metadata: primary.metadata,
-        candles: primary.candles,
-        quality: primary.quality,
-      }),
-      consistency,
-      comparisonSnapshots,
-    };
+      this.observability?.record({
+        provider: primary.provider,
+        instrument: request.instrument,
+        timeframe: request.timeframe,
+        status: "success",
+        latencyMs: Date.now() - startedAt,
+        observedAt: checkedAt.toISOString(),
+      });
+
+      return result;
+    } catch (error) {
+      this.observability?.record({
+        provider: request.provider,
+        instrument: request.instrument,
+        timeframe: request.timeframe,
+        status: "failure",
+        latencyMs: Date.now() - startedAt,
+        observedAt: checkedAt.toISOString(),
+        errorCode: error instanceof Error && "code" in error
+          ? String((error as { code?: unknown }).code)
+          : undefined,
+      });
+      throw error;
+    }
   }
 }
