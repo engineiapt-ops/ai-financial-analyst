@@ -84,7 +84,8 @@
     "test:execution-model-v3": "tsx src/papertrading/executionModelV3.test.ts",
     "test:executable-signal": "tsx src/signals/executableSignal.test.ts",
     "test:profitability": "tsx src/evaluation/profitability.test.ts",
-    "test:promotion-gate": "tsx src/product/promotionGate.test.ts"
+    "test:promotion-gate": "tsx src/product/promotionGate.test.ts",
+    "test:ig-price-provider": "tsx src/marketdata/providers/igPriceProvider.test.ts"
   },
   "dependencies": {
     "express": "^5.2.1",
