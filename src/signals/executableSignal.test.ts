@@ -30,6 +30,7 @@ assert.ok((ready.stop ?? 0) < ready.entrada!);
 assert.ok((ready.targetPct ?? 0) > ESTIMATED_ROUND_TRIP_COST_PCT);
 assert.equal(ready.positionSizePct, 1.5);
 assert.equal(ready.execution?.source, "atr");
+assert.equal(ESTIMATED_ROUND_TRIP_COST_PCT, 0.003);
 
 const wait = buildExecutableSignal({
   ativo: "BTCUSDT",
