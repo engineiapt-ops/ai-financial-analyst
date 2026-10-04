@@ -9,6 +9,43 @@ export interface IgQuote {
   marketStatus?: string;
 }
 
+export interface IgMarketRule {
+  unit: string;
+  value: number;
+}
+
+export interface IgMarginDepositBand {
+  currency: string;
+  min: number;
+  max: number;
+  margin: number;
+  marginFactor: number;
+  marginFactorUnit: string;
+}
+
+export interface IgMarketDetails {
+  epic: string;
+  name: string;
+  symbol: string;
+  marketId: string;
+  type: string;
+  unit: string;
+  contractSize: string;
+  lotSize: number;
+  expiry: string;
+  currencies: string[];
+  dealingRules: {
+    minDealSize: IgMarketRule;
+    minStepDistance: IgMarketRule;
+    minNormalStopOrLimitDistance: IgMarketRule;
+    minControlledRiskStopDistance: IgMarketRule;
+    maxStopOrLimitDistance: IgMarketRule;
+  };
+  marginDepositBands: IgMarginDepositBand[];
+  openingHours: Array<{ openTime: string; closeTime: string }>;
+  snapshot: IgQuote;
+}
+
 interface IgSession {
   cst: string;
   securityToken: string;
@@ -39,10 +76,24 @@ function asFiniteNumber(value: unknown, field: string): number {
   return number;
 }
 
+function asNonNegativeNumber(value: unknown, field: string): number {
+  const number = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(number) || number < 0) throw new Error(`Invalid IG ${field}`);
+  return number;
+}
+
 function asTime(value: unknown): Date {
   const date = new Date(String(value));
   if (!Number.isFinite(date.getTime())) throw new Error("Invalid IG candle timestamp");
   return date;
+}
+
+function parseRule(value: unknown, field: string): IgMarketRule {
+  if (!value || typeof value !== "object") throw new Error(`Missing IG ${field}`);
+  const rule = value as { unit?: unknown; value?: unknown };
+  const unit = String(rule.unit ?? "");
+  if (!unit) throw new Error(`Invalid IG ${field} unit`);
+  return { unit, value: asFiniteNumber(rule.value, field) };
 }
 
 export class IgPriceProvider implements PriceProvider {
@@ -109,7 +160,7 @@ export class IgPriceProvider implements PriceProvider {
     if (!epic.trim()) throw new Error("IG epic is required");
     const response = await this.request(`/markets/${encodeURIComponent(epic)}`);
     const payload = await response.json() as {
-      snapshot?: { bid?: unknown; offer?: unknown; snapshotTime?: unknown; marketStatus?: string };
+      snapshot?: { bid?: unknown; offer?: unknown; snapshotTime?: unknown; updateTime?: unknown; marketStatus?: string };
     };
     const snapshot = payload.snapshot;
     if (!snapshot) throw new Error("IG market response missing snapshot");
@@ -117,8 +168,113 @@ export class IgPriceProvider implements PriceProvider {
       epic,
       bid: asFiniteNumber(snapshot.bid, "bid"),
       ask: asFiniteNumber(snapshot.offer, "ask"),
-      snapshotTime: String(snapshot.snapshotTime ?? ""),
+      snapshotTime: String(snapshot.snapshotTime ?? snapshot.updateTime ?? ""),
       marketStatus: snapshot.marketStatus,
+    };
+  }
+
+  async getMarketDetails(epic: string): Promise<IgMarketDetails> {
+    if (!epic.trim()) throw new Error("IG epic is required");
+
+    const response = await this.request(`/markets/${encodeURIComponent(epic)}`);
+    const payload = await response.json() as {
+      instrument?: {
+        epic?: unknown;
+        name?: unknown;
+        symbol?: unknown;
+        marketId?: unknown;
+        type?: unknown;
+        unit?: unknown;
+        contractSize?: unknown;
+        lotSize?: unknown;
+        expiry?: unknown;
+        currencies?: Array<{ symbol?: unknown }>;
+        marginDepositBands?: Array<{
+          currency?: unknown;
+          min?: unknown;
+          max?: unknown;
+          margin?: unknown;
+          marginFactor?: unknown;
+          marginFactorUnit?: unknown;
+        }>;
+        openingHours?: { marketTimes?: Array<{ openTime?: unknown; closeTime?: unknown }> };
+      };
+      dealingRules?: {
+        minDealSize?: unknown;
+        minStepDistance?: unknown;
+        minNormalStopOrLimitDistance?: unknown;
+        minControlledRiskStopDistance?: unknown;
+        maxStopOrLimitDistance?: unknown;
+      };
+      snapshot?: {
+        bid?: unknown;
+        offer?: unknown;
+        snapshotTime?: unknown;
+        updateTime?: unknown;
+        marketStatus?: unknown;
+      };
+    };
+
+    const instrument = payload.instrument;
+    if (!instrument) throw new Error("IG market response missing instrument");
+    if (String(instrument.epic ?? "") !== epic) throw new Error("IG market response epic mismatch");
+
+    const currencies = (instrument.currencies ?? [])
+      .map((currency) => String(currency.symbol ?? ""))
+      .filter(Boolean);
+
+    const marketTimes = instrument.openingHours?.marketTimes ?? [];
+    const openingHours = marketTimes
+      .map((window) => ({
+        openTime: String(window.openTime ?? ""),
+        closeTime: String(window.closeTime ?? ""),
+      }))
+      .filter((window) => window.openTime && window.closeTime);
+    if (!openingHours.length) throw new Error("IG market response missing opening hours");
+
+    const snapshot = payload.snapshot;
+    if (!snapshot) throw new Error("IG market response missing snapshot");
+
+    const marketSnapshot: IgQuote = {
+      epic,
+      bid: asFiniteNumber(snapshot.bid, "bid"),
+      ask: asFiniteNumber(snapshot.offer, "offer"),
+      snapshotTime: String(snapshot.snapshotTime ?? snapshot.updateTime ?? ""),
+      marketStatus: String(snapshot.marketStatus ?? ""),
+    };
+
+    const marginDepositBands = (instrument.marginDepositBands ?? [])
+      .map((band) => ({
+        currency: String(band.currency ?? ""),
+        min: asNonNegativeNumber(band.min, "margin min"),
+        max: asNonNegativeNumber(band.max, "margin max"),
+        margin: asFiniteNumber(band.margin, "margin"),
+        marginFactor: asFiniteNumber(band.marginFactor, "marginFactor"),
+        marginFactorUnit: String(band.marginFactorUnit ?? ""),
+      }))
+      .filter((band) => band.currency && band.marginFactorUnit);
+
+    return {
+      epic,
+      name: String(instrument.name ?? ""),
+      symbol: String(instrument.symbol ?? ""),
+      marketId: String(instrument.marketId ?? ""),
+      type: String(instrument.type ?? ""),
+      unit: String(instrument.unit ?? ""),
+      contractSize: String(instrument.contractSize ?? ""),
+      lotSize: asFiniteNumber(instrument.lotSize, "lotSize"),
+      expiry: String(instrument.expiry ?? ""),
+      currencies,
+      dealingRules: {
+        minDealSize: parseRule(payload.dealingRules?.minDealSize, "minDealSize"),
+        minStepDistance: parseRule(payload.dealingRules?.minStepDistance, "minStepDistance"),
+        minNormalStopOrLimitDistance: parseRule(payload.dealingRules?.minNormalStopOrLimitDistance, "minNormalStopOrLimitDistance"),
+        minControlledRiskStopDistance: parseRule(payload.dealingRules?.minControlledRiskStopDistance, "minControlledRiskStopDistance"),
+        maxStopOrLimitDistance: parseRule(payload.dealingRules?.maxStopOrLimitDistance, "maxStopOrLimitDistance"),
+      },
+      marginDepositBands,
+      openingHours,
+      snapshot: marketSnapshot,
     };
   }
 

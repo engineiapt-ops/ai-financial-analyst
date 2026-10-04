@@ -14,8 +14,38 @@ const fetchImpl: typeof fetch = async (input, init) => {
   if (String(input).endsWith("/session")) {
     return response({}, { CST: "cst-test", "X-SECURITY-TOKEN": "security-test" });
   }
-  if (String(input).includes("/markets/CS.D.EURUSD.MINI.IP")) {
+  if (String(input).includes("/markets/")) {
     return response({
+      instrument: {
+        epic: "CS.D.EURUSD.MINI.IP",
+        name: "EUR/USD",
+        symbol: "EURUSD",
+        marketId: "EURUSD",
+        type: "CURRENCIES",
+        unit: "AMOUNT",
+        contractSize: "1",
+        lotSize: 1,
+        expiry: "-",
+        currencies: [{ symbol: "USD" }],
+        marginDepositBands: [{
+          currency: "EUR",
+          min: 0,
+          max: 100000,
+          margin: 3.33,
+          marginFactor: 3.33,
+          marginFactorUnit: "PERCENTAGE",
+        }],
+        openingHours: {
+          marketTimes: [{ openTime: "00:00", closeTime: "22:00" }],
+        },
+      },
+      dealingRules: {
+        minDealSize: { unit: "AMOUNT", value: 1 },
+        minStepDistance: { unit: "POINTS", value: 0.1 },
+        minNormalStopOrLimitDistance: { unit: "POINTS", value: 0.5 },
+        minControlledRiskStopDistance: { unit: "POINTS", value: 1 },
+        maxStopOrLimitDistance: { unit: "POINTS", value: 10000 },
+      },
       snapshot: {
         bid: 1.082,
         offer: 1.083,
@@ -42,6 +72,16 @@ const provider = new IgPriceProvider({
   password: "demo-password",
   fetchImpl,
 });
+
+const market = await provider.getMarketDetails("CS.D.EURUSD.MINI.IP");
+assert.equal(market.epic, "CS.D.EURUSD.MINI.IP");
+assert.equal(market.symbol, "EURUSD");
+assert.equal(market.lotSize, 1);
+assert.equal(market.dealingRules.minDealSize.value, 1);
+assert.equal(market.dealingRules.minStepDistance.unit, "POINTS");
+assert.equal(market.marginDepositBands[0]?.currency, "EUR");
+assert.equal(market.openingHours[0]?.openTime, "00:00");
+assert.equal(market.snapshot.marketStatus, "TRADEABLE");
 
 const quote = await provider.getQuote("CS.D.EURUSD.MINI.IP");
 assert.equal(quote.bid, 1.082);

@@ -34,32 +34,82 @@ jobs:
           test -n "$IG_USERNAME"
           test -n "$IG_PASSWORD"
           test -n "$IG_EPIC"
-      - name: Authenticate, quote and candles
+
+      - name: Authenticate and validate market metadata
         shell: bash
         run: |
           set -euo pipefail
           h="$(mktemp)"
-          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30 \
-            -H "Accept: application/json; charset=UTF-8" -H "Content-Type: application/json" \
-            -H "X-IG-API-KEY: $IG_API_KEY" -H "Version: 2" -D "$h" -o /dev/null \
-            --request POST "$IG_API_BASE_URL/session" \
-            --data "$(jq -cn --arg id "$IG_USERNAME" --arg pw "$IG_PASSWORD" '{identifier:$id,password:$pw}')"
+          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30             -H "Accept: application/json; charset=UTF-8" -H "Content-Type: application/json"             -H "X-IG-API-KEY: $IG_API_KEY" -H "Version: 2" -D "$h" -o /dev/null             --request POST "$IG_API_BASE_URL/session"             --data "$(jq -cn --arg id "$IG_USERNAME" --arg pw "$IG_PASSWORD" '{identifier:$id,password:$pw}')"
           cst="$(awk 'BEGIN{IGNORECASE=1}/^CST:/{sub(/\r$/,"");sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$h")"
           token="$(awk 'BEGIN{IGNORECASE=1}/^X-SECURITY-TOKEN:/{sub(/\r$/,"");sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$h")"
           test -n "$cst" && test -n "$token"
           q="$(mktemp)"
-          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30 \
-            -H "Accept: application/json; charset=UTF-8" -H "X-IG-API-KEY: $IG_API_KEY" \
-            -H "CST: $cst" -H "X-SECURITY-TOKEN: $token" -H "Version: 3" \
-            -o "$q" "$IG_API_BASE_URL/markets/$IG_EPIC"
-          jq -e '.snapshot and ((.snapshot.bid|tonumber)>0) and ((.snapshot.offer|tonumber)>0) and ((.snapshot.offer|tonumber)>=(.snapshot.bid|tonumber)) and (.snapshot.snapshotTime!=null)' "$q" >/dev/null
+          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30             -H "Accept: application/json; charset=UTF-8" -H "X-IG-API-KEY: $IG_API_KEY"             -H "CST: $cst" -H "X-SECURITY-TOKEN: $token" -H "Version: 3"             -o "$q" "$IG_API_BASE_URL/markets/$IG_EPIC"
+          jq -e '
+            (.instrument | type == "object") and
+            (.instrument.epic == $ENV.IG_EPIC) and
+            ((.instrument.name // "") | length > 0) and
+            ((.instrument.symbol // "") | length > 0) and
+            ((.instrument.lotSize | tonumber) > 0) and
+            ((.instrument.unit // "") | length > 0) and
+            (.dealingRules | type == "object") and
+            (.dealingRules.minDealSize | type == "object") and
+            ((.dealingRules.minDealSize.value | tonumber) > 0) and
+            (.dealingRules.minStepDistance | type == "object") and
+            (.dealingRules.minNormalStopOrLimitDistance | type == "object") and
+            (.dealingRules.maxStopOrLimitDistance | type == "object") and
+            (.instrument.openingHours.marketTimes | type == "array") and
+            ((.instrument.openingHours.marketTimes | length) > 0) and
+            (.snapshot | type == "object") and
+            ((.snapshot.bid | tonumber) > 0) and
+            ((.snapshot.offer | tonumber) >= (.snapshot.bid | tonumber))
+          ' "$q" >/dev/null
+          echo "IG_MARKET_METADATA=PASS"
+          jq -c '{
+            epic: .instrument.epic,
+            name: .instrument.name,
+            symbol: .instrument.symbol,
+            type: .instrument.type,
+            unit: .instrument.unit,
+            lotSize: .instrument.lotSize,
+            expiry: .instrument.expiry,
+            currencies: [.instrument.currencies[]?.symbol],
+            minDealSize: .dealingRules.minDealSize,
+            minStepDistance: .dealingRules.minStepDistance,
+            minNormalStopOrLimitDistance: .dealingRules.minNormalStopOrLimitDistance,
+            minControlledRiskStopDistance: .dealingRules.minControlledRiskStopDistance,
+            maxStopOrLimitDistance: .dealingRules.maxStopOrLimitDistance,
+            marginDepositBands: [.instrument.marginDepositBands[]? | {
+              currency: .currency,
+              min: .min,
+              max: .max,
+              margin: .margin,
+              marginFactor: .marginFactor,
+              marginFactorUnit: .marginFactorUnit
+            }],
+            openingHours: [.instrument.openingHours.marketTimes[]? | {openTime: .openTime, closeTime: .closeTime}],
+            marketStatus: .snapshot.marketStatus,
+            bid: .snapshot.bid,
+            offer: .snapshot.offer
+          }' "$q"
+
+      - name: Validate quote and historical candles
+        shell: bash
+        run: |
+          set -euo pipefail
+          h="$(mktemp)"
+          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30             -H "Accept: application/json; charset=UTF-8" -H "Content-Type: application/json"             -H "X-IG-API-KEY: $IG_API_KEY" -H "Version: 2" -D "$h" -o /dev/null             --request POST "$IG_API_BASE_URL/session"             --data "$(jq -cn --arg id "$IG_USERNAME" --arg pw "$IG_PASSWORD" '{identifier:$id,password:$pw}')"
+          cst="$(awk 'BEGIN{IGNORECASE=1}/^CST:/{sub(/\r$/,"");sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$h")"
+          token="$(awk 'BEGIN{IGNORECASE=1}/^X-SECURITY-TOKEN:/{sub(/\r$/,"");sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$h")"
+          test -n "$cst" && test -n "$token"
+          q="$(mktemp)"
+          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30             -H "Accept: application/json; charset=UTF-8" -H "X-IG-API-KEY: $IG_API_KEY"             -H "CST: $cst" -H "X-SECURITY-TOKEN: $token" -H "Version: 3"             -o "$q" "$IG_API_BASE_URL/markets/$IG_EPIC"
+          jq -e '.snapshot and ((.snapshot.bid|tonumber)>0) and ((.snapshot.offer|tonumber)>0) and ((.snapshot.offer|tonumber)>=(.snapshot.bid|tonumber)) and (.snapshot.snapshotTime!=null or .snapshot.updateTime!=null)' "$q" >/dev/null
           resolution=HOUR
           case "$IG_TIMEFRAME" in 4h) resolution=HOUR_4;; 1d) resolution=DAY;; esac
           p="$(mktemp)"
-          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30 \
-            -H "Accept: application/json; charset=UTF-8" -H "X-IG-API-KEY: $IG_API_KEY" \
-            -H "CST: $cst" -H "X-SECURITY-TOKEN: $token" -H "Version: 3" \
-            -o "$p" "$IG_API_BASE_URL/prices/$IG_EPIC?resolution=$resolution&max=5"
+          curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30             -H "Accept: application/json; charset=UTF-8" -H "X-IG-API-KEY: $IG_API_KEY"             -H "CST: $cst" -H "X-SECURITY-TOKEN: $token" -H "Version: 3"             -o "$p" "$IG_API_BASE_URL/prices/$IG_EPIC?resolution=$resolution&max=5"
           jq -e '(.prices|type=="array") and (.prices|length>0) and all(.prices[]?; (.snapshotTimeUTC!=null or .snapshotTime!=null) and ((.openPrice.bid|tonumber)>0) and ((.highPrice.bid|tonumber)>0) and ((.lowPrice.bid|tonumber)>0) and ((.closePrice.bid|tonumber)>0))' "$p" >/dev/null
           echo "IG_DEMO_VALIDATION=PASS"
           echo "EPIC=$IG_EPIC"
