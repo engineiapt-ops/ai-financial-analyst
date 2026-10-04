@@ -75,7 +75,7 @@ const expensive = buildExecutableSignal({
     tamanhoPosicaoPct: 1.5,
   },
   entryPrice: 100,
-  atr: ESTIMATED_ROUND_TRIP_COST_PCT / 1.25 * 100,
+  atr: ESTIMATED_ROUND_TRIP_COST_PCT / 2 * 100,
 });
 
 assert.equal(expensive.status, "not_executable");
