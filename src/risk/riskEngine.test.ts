@@ -31,6 +31,8 @@ const decision = {
 const legacy = evaluateRisk(decision, baseRegime);
 assert.equal(legacy.allowed, true);
 assert.equal(legacy.reason, "risk_ok");
+assert.equal(legacy.positionSizePct, FIXED_POSITION_PCT);
+assert.equal(legacy.maxGrossExposurePct, 15);
 assert.equal(RISK_POSITION_SIZE_PCT, FIXED_POSITION_PCT);
 
 const v2 = evaluateRiskV2({
@@ -200,5 +202,6 @@ const elevated = evaluateRisk(
   baseRegime,
 );
 assert.equal(elevated.allowed, true);
+assert.equal(elevated.positionSizePct, FIXED_POSITION_PCT * 0.5);
 
 console.log("risk engine tests passed");
