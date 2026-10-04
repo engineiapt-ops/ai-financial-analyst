@@ -6,14 +6,15 @@ import { MarketDataService } from "./service.js";
 import { MarketDataPipeline } from "./pipeline.js";
 
 function candle(close: number): Kline {
+  const closeTime = new Date(Date.now() - 60_000);
   return {
-    openTime: new Date("2026-10-04T11:00:00.000Z"),
+    openTime: new Date(closeTime.getTime() - 60 * 60 * 1000 + 1),
     open: close - 1,
     high: close + 1,
     low: close - 2,
     close,
     volume: 10,
-    closeTime: new Date("2026-10-04T12:00:00.000Z"),
+    closeTime,
   };
 }
 
