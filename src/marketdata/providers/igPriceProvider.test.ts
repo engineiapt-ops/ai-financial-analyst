@@ -27,6 +27,17 @@ const fetchImpl: typeof fetch = async (input, init) => {
         lotSize: 1,
         expiry: "-",
         currencies: [{ symbol: "USD" }],
+        marginDepositBands: [{
+          currency: "EUR",
+          min: 0,
+          max: 100000,
+          margin: 3.33,
+          marginFactor: 3.33,
+          marginFactorUnit: "PERCENTAGE",
+        }],
+        openingHours: {
+          marketTimes: [{ openTime: "00:00", closeTime: "22:00" }],
+        },
       },
       dealingRules: {
         minDealSize: { unit: "AMOUNT", value: 1 },
@@ -34,17 +45,6 @@ const fetchImpl: typeof fetch = async (input, init) => {
         minNormalStopOrLimitDistance: { unit: "POINTS", value: 0.5 },
         minControlledRiskStopDistance: { unit: "POINTS", value: 1 },
         maxStopOrLimitDistance: { unit: "POINTS", value: 10000 },
-      },
-      marginDepositBands: [{
-        currency: "EUR",
-        min: 0,
-        max: 100000,
-        margin: 3.33,
-        marginFactor: 3.33,
-        marginFactorUnit: "PERCENTAGE",
-      }],
-      openingHours: {
-        marketTimes: [{ openTime: "00:00", closeTime: "22:00" }],
       },
       snapshot: {
         bid: 1.082,
