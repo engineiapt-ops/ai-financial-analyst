@@ -4,7 +4,6 @@ import type { RegimeSnapshot } from "./regime.js";
 
 export const RISK_ENGINE_VERSION = "risk-engine-v2";
 export const RISK_MAX_GROSS_EXPOSURE_PCT = 15;
-export const RISK_MAX_GROSS_EXPOSURE_PCT = 15;
 export const RISK_POSITION_SIZE_PCT = FIXED_POSITION_PCT;
 export const MAX_RISK_PER_TRADE_HARD_CAP_PCT = 1;
 
