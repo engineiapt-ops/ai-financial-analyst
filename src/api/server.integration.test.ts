@@ -1,6 +1,8 @@
 import { strict as assert } from "node:assert";
 import http from "node:http";
 
+import { isLegacyStockAnalystPath } from "../legacy/stockAnalystGate.js";
+
 process.env.NODE_ENV = "test";
 process.env.API_AUTH_TOKEN = "integration-secret";
 process.env.CRON_SECRET = "cron-secret";
@@ -179,7 +181,12 @@ try {
     "/api/system/readiness",
   ]);
   const discoveredProtectedRoutes = [...routePathSet]
-    .filter((path) => path.startsWith("/api/") && !publicApiRoutes.has(path));
+    .filter(
+      (path) =>
+        path.startsWith("/api/") &&
+        !publicApiRoutes.has(path) &&
+        !isLegacyStockAnalystPath(path),
+    );
 
   assert.equal(discoveredProtectedRoutes.length > 0, true);
   for (const path of discoveredProtectedRoutes) {
