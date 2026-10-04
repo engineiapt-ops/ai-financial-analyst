@@ -57,6 +57,12 @@ interface IgProviderConfig {
   password?: string;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
+  /**
+   * Minimum spacing between outbound IG requests.
+   * Production default is 2s, deliberately conservative for account-level REST usage.
+   * Tests may set this to 0.
+   */
+  minRequestIntervalMs?: number;
 }
 
 const RESOLUTION_BY_TIMEFRAME: Record<Timeframe, string> = {
@@ -68,6 +74,29 @@ const RESOLUTION_BY_TIMEFRAME: Record<Timeframe, string> = {
 function requireEnv(name: string, value: string | undefined): string {
   if (!value) throw new Error(`Missing IG configuration: ${name}`);
   return value;
+}
+
+async function waitForRateLimit(lastRequestAt: number, minRequestIntervalMs: number): Promise<number> {
+  const now = Date.now();
+  const waitMs = Math.max(0, lastRequestAt + minRequestIntervalMs - now);
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+  return Date.now();
+}
+
+async function readIgError(response: Response, operation: string): Promise<Error> {
+  let errorCode = `HTTP_${response.status}`;
+  try {
+    const body = await response.text();
+    if (body) {
+      const parsed = JSON.parse(body) as { errorCode?: unknown };
+      if (typeof parsed.errorCode === "string" && parsed.errorCode.trim()) {
+        errorCode = parsed.errorCode.trim();
+      }
+    }
+  } catch {
+    // Keep the safe HTTP-only fallback when the broker returns non-JSON.
+  }
+  return new Error(`IG ${operation} failed: ${errorCode}`);
 }
 
 function asFiniteNumber(value: unknown, field: string): number {
@@ -103,6 +132,8 @@ export class IgPriceProvider implements PriceProvider {
   private readonly password: string;
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly minRequestIntervalMs: number;
+  private lastRequestAt = 0;
   private session: IgSession | null = null;
 
   constructor(config: IgProviderConfig = {}) {
@@ -111,9 +142,11 @@ export class IgPriceProvider implements PriceProvider {
     this.password = requireEnv("IG_PASSWORD", config.password ?? process.env.IG_PASSWORD);
     this.baseUrl = (config.baseUrl ?? process.env.IG_API_BASE_URL ?? "https://demo-api.ig.com/gateway/deal").replace(/\/$/, "");
     this.fetchImpl = config.fetchImpl ?? fetch;
+    this.minRequestIntervalMs = Math.max(0, config.minRequestIntervalMs ?? 2000);
   }
 
   private async authenticate(): Promise<IgSession> {
+    this.lastRequestAt = await waitForRateLimit(this.lastRequestAt, this.minRequestIntervalMs);
     const response = await this.fetchImpl(`${this.baseUrl}/session`, {
       method: "POST",
       headers: {
@@ -128,7 +161,7 @@ export class IgPriceProvider implements PriceProvider {
       }),
     });
 
-    if (!response.ok) throw new Error(`IG authentication failed: HTTP ${response.status}`);
+    if (!response.ok) throw await readIgError(response, "authentication");
     const cst = response.headers.get("CST");
     const securityToken = response.headers.get("X-SECURITY-TOKEN");
     if (!cst || !securityToken) throw new Error("IG authentication failed: missing session tokens");
@@ -147,12 +180,13 @@ export class IgPriceProvider implements PriceProvider {
     headers.set("X-SECURITY-TOKEN", session.securityToken);
     headers.set("Version", "3");
 
+    this.lastRequestAt = await waitForRateLimit(this.lastRequestAt, this.minRequestIntervalMs);
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, { ...options, headers });
     if (response.status === 401 && retry) {
       this.session = null;
       return this.request(path, options, false);
     }
-    if (!response.ok) throw new Error(`IG API request failed: HTTP ${response.status}`);
+    if (!response.ok) throw await readIgError(response, `request ${path}`);
     return response;
   }
 
