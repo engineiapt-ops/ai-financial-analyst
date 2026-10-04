@@ -59,8 +59,8 @@ jobs:
             (.dealingRules.minStepDistance | type == "object") and
             (.dealingRules.minNormalStopOrLimitDistance | type == "object") and
             (.dealingRules.maxStopOrLimitDistance | type == "object") and
-            (.openingHours.marketTimes | type == "array") and
-            ((.openingHours.marketTimes | length) > 0) and
+            (.instrument.openingHours.marketTimes | type == "array") and
+            ((.instrument.openingHours.marketTimes | length) > 0) and
             (.snapshot | type == "object") and
             ((.snapshot.bid | tonumber) > 0) and
             ((.snapshot.offer | tonumber) >= (.snapshot.bid | tonumber))
@@ -80,7 +80,7 @@ jobs:
             minNormalStopOrLimitDistance: .dealingRules.minNormalStopOrLimitDistance,
             minControlledRiskStopDistance: .dealingRules.minControlledRiskStopDistance,
             maxStopOrLimitDistance: .dealingRules.maxStopOrLimitDistance,
-            marginDepositBands: [.marginDepositBands[]? | {
+            marginDepositBands: [.instrument.marginDepositBands[]? | {
               currency: .currency,
               min: .min,
               max: .max,
@@ -88,7 +88,7 @@ jobs:
               marginFactor: .marginFactor,
               marginFactorUnit: .marginFactorUnit
             }],
-            openingHours: [.openingHours.marketTimes[]? | {openTime: .openTime, closeTime: .closeTime}],
+            openingHours: [.instrument.openingHours.marketTimes[]? | {openTime: .openTime, closeTime: .closeTime}],
             marketStatus: .snapshot.marketStatus,
             bid: .snapshot.bid,
             offer: .snapshot.offer
@@ -98,12 +98,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          q="$(mktemp)"
           h="$(mktemp)"
           curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30             -H "Accept: application/json; charset=UTF-8" -H "Content-Type: application/json"             -H "X-IG-API-KEY: $IG_API_KEY" -H "Version: 2" -D "$h" -o /dev/null             --request POST "$IG_API_BASE_URL/session"             --data "$(jq -cn --arg id "$IG_USERNAME" --arg pw "$IG_PASSWORD" '{identifier:$id,password:$pw}')"
           cst="$(awk 'BEGIN{IGNORECASE=1}/^CST:/{sub(/\r$/,"");sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$h")"
           token="$(awk 'BEGIN{IGNORECASE=1}/^X-SECURITY-TOKEN:/{sub(/\r$/,"");sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$h")"
           test -n "$cst" && test -n "$token"
+          q="$(mktemp)"
           curl --fail-with-body --silent --show-error --location --connect-timeout 15 --max-time 30             -H "Accept: application/json; charset=UTF-8" -H "X-IG-API-KEY: $IG_API_KEY"             -H "CST: $cst" -H "X-SECURITY-TOKEN: $token" -H "Version: 3"             -o "$q" "$IG_API_BASE_URL/markets/$IG_EPIC"
           jq -e '.snapshot and ((.snapshot.bid|tonumber)>0) and ((.snapshot.offer|tonumber)>0) and ((.snapshot.offer|tonumber)>=(.snapshot.bid|tonumber)) and (.snapshot.snapshotTime!=null or .snapshot.updateTime!=null)' "$q" >/dev/null
           resolution=HOUR
