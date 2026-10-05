@@ -129,7 +129,7 @@ const closedSnapshot = await closedCandleService.getSnapshot({
   instrument: "BTCUSDT",
   timeframe: "1h",
   limit: 2,
-}, new Date("2026-10-04T12:30:00.000Z"));
+}, new Date("2026-10-04T12:29:59.999Z"));
 
 assert.equal(closedSnapshot.candles.length, 1);
 assert.equal(closedSnapshot.candles[0].close, 100);
