@@ -178,7 +178,7 @@ export function runPaperTradingCycle(input: {
         dataAsOf: candidateSignal.dataAsOf,
         decision: riskAdjustedDecision,
         entryPrice: candidateSignal.entrada ?? input.signalCandle.close,
-        atr,
+        atr: input.atr,
       },
       confluence,
     });
