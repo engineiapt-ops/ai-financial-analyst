@@ -13,6 +13,7 @@ export interface DynamicKnockOutInput {
 export interface BarrierOptionContract {
   symbol: string;
   type: BarrierOptionType;
+  direction: BarrierDirection;
   strike: number;
   expiry: Date;
   premium: number;
@@ -216,12 +217,6 @@ function resolvesKnockOutLevel(
   );
 }
 
-declare module "./barrierOptions.js" {
-  interface BarrierOptionContract {
-    direction: BarrierDirection;
-  }
-}
-
 /**
  * Evaluates a long barrier-option candidate without sending orders.
  *
@@ -271,14 +266,7 @@ export function evaluateBarrierOptionRisk(
     rejectionReasons.push("expired");
   }
 
-  const candidateWithDirection = contract as BarrierOptionContract & {
-    direction: BarrierDirection;
-  };
-
-  if (
-    candidateWithDirection.direction !== "UP_AND_OUT" &&
-    candidateWithDirection.direction !== "DOWN_AND_OUT"
-  ) {
+  if (contract.direction !== "UP_AND_OUT" && contract.direction !== "DOWN_AND_OUT") {
     throw new Error(
       "barrier direction must be UP_AND_OUT or DOWN_AND_OUT",
     );
@@ -294,14 +282,14 @@ export function evaluateBarrierOptionRisk(
   );
 
   if (
-    candidateWithDirection.direction === "UP_AND_OUT" &&
+    contract.direction === "UP_AND_OUT" &&
     knockOutLevel <= spot
   ) {
     rejectionReasons.push("knockout_not_above_spot");
   }
 
   if (
-    candidateWithDirection.direction === "DOWN_AND_OUT" &&
+    contract.direction === "DOWN_AND_OUT" &&
     knockOutLevel >= spot
   ) {
     rejectionReasons.push("knockout_not_below_spot");
@@ -321,9 +309,9 @@ export function evaluateBarrierOptionRisk(
   }
 
   if (
-    (candidateWithDirection.direction === "UP_AND_OUT" &&
+    (contract.direction === "UP_AND_OUT" &&
       config.targetUnderlyingPrice >= knockOutLevel) ||
-    (candidateWithDirection.direction === "DOWN_AND_OUT" &&
+    (contract.direction === "DOWN_AND_OUT" &&
       config.targetUnderlyingPrice <= knockOutLevel)
   ) {
     rejectionReasons.push("target_breaches_knockout");
