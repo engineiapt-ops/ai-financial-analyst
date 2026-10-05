@@ -55,4 +55,26 @@ assert.equal(result.provenance.provider, "saxo-sim");
 assert.equal(result.consistency.status, "consistent");
 assert.equal(result.comparisonSnapshots.length, 1);
 
+// Canonical EURUSD resolution must translate to Saxo's provider-native identifier.
+const canonicalResult = await new MarketDataPipeline(service).load({
+  provider: "saxo-sim",
+  instrument: "ignored-provider-native-value",
+  canonicalInstrument: "EURUSD",
+  timeframe: "1h",
+});
+
+assert.equal(canonicalResult.primary.metadata.instrument, "FxSpot:21");
+assert.equal(canonicalResult.provenance.instrument, "FxSpot:21");
+
+await assert.rejects(
+  () =>
+    new MarketDataPipeline(service).load({
+      provider: "ig-demo",
+      instrument: "ignored-provider-native-value",
+      canonicalInstrument: "EURUSD",
+      timeframe: "1h",
+    }),
+  /mapping is not verified/i,
+);
+
 console.log("market data pipeline tests passed");
