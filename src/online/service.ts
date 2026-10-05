@@ -2,7 +2,8 @@ import { buildOnlineAnalysisPacket, type OnlineAnalysisPacket } from "./provenan
 import { analyzeMarket, type AnalyzeInput, type AnalyzeOutput } from "../api/analyze.js";
 import { generateAnalystReport, type AnalystResearchResult } from "../research/report.js";
 import { buildResearchSnapshot, type ResearchSnapshot } from "../research/snapshot.js";
-import { saveResearchSnapshot } from "../db/repository.js";
+import type { ResearchSnapshotRepository } from "../db/ports/researchSnapshotRepository.js";
+import { getDefaultResearchSnapshotRepository } from "../db/repositories/researchSnapshotRepository.js";
 import type { AiProviderResult, AiProviderDescriptor } from "../ai/provider.js";
 import { getGeminiProvider } from "../ai/geminiProvider.js";
 
@@ -20,7 +21,7 @@ export interface OnlineAnalysisDependencies {
   analyzeMarket: typeof analyzeMarket;
   generateAnalystReport: typeof generateAnalystReport;
   buildResearchSnapshot: typeof buildResearchSnapshot;
-  saveResearchSnapshot: typeof saveResearchSnapshot;
+  saveResearchSnapshot: ResearchSnapshotRepository["saveResearchSnapshot"];
   buildOnlineAnalysisPacket: typeof buildOnlineAnalysisPacket;
   getGeminiProvider: typeof getGeminiProvider;
 }
@@ -29,7 +30,7 @@ const DEFAULT_DEPENDENCIES: OnlineAnalysisDependencies = {
   analyzeMarket,
   generateAnalystReport,
   buildResearchSnapshot,
-  saveResearchSnapshot,
+  saveResearchSnapshot: getDefaultResearchSnapshotRepository().saveResearchSnapshot,
   buildOnlineAnalysisPacket,
   getGeminiProvider,
 };
