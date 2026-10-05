@@ -99,4 +99,41 @@ await assert.rejects(
   /Market data snapshot failed.*OHLC relationship/,
 );
 
+
+const openCandle: Kline = {
+  openTime: new Date("2026-10-04T11:00:00.000Z"),
+  closeTime: new Date("2026-10-04T12:59:59.999Z"),
+  open: 100,
+  high: 102,
+  low: 99,
+  close: 101,
+  volume: 10,
+};
+
+const closedCandle: Kline = {
+  openTime: new Date("2026-10-04T10:00:00.000Z"),
+  closeTime: new Date("2026-10-04T10:59:59.999Z"),
+  open: 99,
+  high: 101,
+  low: 98,
+  close: 100,
+  volume: 10,
+};
+
+const closedCandleService = new MarketDataService(new PriceProviderRegistry([
+  provider("binance", [closedCandle, openCandle]),
+]));
+
+const closedSnapshot = await closedCandleService.getSnapshot({
+  provider: "binance",
+  instrument: "BTCUSDT",
+  timeframe: "1h",
+  limit: 2,
+}, new Date("2026-10-04T12:30:00.000Z"));
+
+assert.equal(closedSnapshot.candles.length, 1);
+assert.equal(closedSnapshot.candles[0].close, 100);
+assert.equal(closedSnapshot.quality.dataAsOf, "2026-10-04T10:59:59.999Z");
+
+
 console.log("MarketDataService tests passed");
