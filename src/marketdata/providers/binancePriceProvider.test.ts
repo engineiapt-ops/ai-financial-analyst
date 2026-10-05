@@ -41,7 +41,7 @@ assert.equal(receivedTimeframe, "1h");
 assert.deepEqual(receivedOptions, {
   limit: 5,
   startTime: candle.openTime.getTime(),
-  endTime: candle.closeTime.getTime(),
+  endTime: candleCloseTime.getTime(),
 });
 
 const metadata = provider.getMetadata({
