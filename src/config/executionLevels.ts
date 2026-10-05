@@ -17,9 +17,9 @@ export interface AtrMultipliers {
 }
 
 export const ATR_MULTIPLIERS: Record<Timeframe, AtrMultipliers> = {
-  "1h": { targetMult: 1.25, stopMult: 1.0, maxTargetPct: 0.025, minStopPct: 0.003, maxStopPct: 0.015 },
-  "4h": { targetMult: 1.5, stopMult: 1.1, maxTargetPct: 0.04, minStopPct: 0.005, maxStopPct: 0.025 },
-  "1d": { targetMult: 1.75, stopMult: 1.25, maxTargetPct: 0.06, minStopPct: 0.008, maxStopPct: 0.04 },
+  "1h": { targetMult: 2.0, stopMult: 1.0, maxTargetPct: 0.025, minStopPct: 0.003, maxStopPct: 0.015 },
+  "4h": { targetMult: 2.2, stopMult: 1.1, maxTargetPct: 0.04, minStopPct: 0.005, maxStopPct: 0.025 },
+  "1d": { targetMult: 2.5, stopMult: 1.25, maxTargetPct: 0.06, minStopPct: 0.008, maxStopPct: 0.04 },
 };
 
 export interface ExecutionLevels {
