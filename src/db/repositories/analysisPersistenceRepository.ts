@@ -20,9 +20,21 @@ export function createAnalysisPersistenceRepository(
 
 let defaultRepository: AnalysisPersistenceRepository | null = null;
 
-export function getDefaultAnalysisPersistenceRepository(): AnalysisPersistenceRepository {
+function resolveDefaultRepository(): AnalysisPersistenceRepository {
   if (!defaultRepository) {
     defaultRepository = createAnalysisPersistenceRepository(getPool());
   }
   return defaultRepository;
+}
+
+export const defaultAnalysisPersistenceRepository: AnalysisPersistenceRepository = {
+  saveSignal: (ativo, timeframe, decision, levels) =>
+    resolveDefaultRepository().saveSignal(ativo, timeframe, decision, levels),
+  saveDecisionLog: (input) => resolveDefaultRepository().saveDecisionLog(input),
+  saveMarketData: (ativo, timeframe, klines) =>
+    resolveDefaultRepository().saveMarketData(ativo, timeframe, klines),
+};
+
+export function getDefaultAnalysisPersistenceRepository(): AnalysisPersistenceRepository {
+  return defaultAnalysisPersistenceRepository;
 }
