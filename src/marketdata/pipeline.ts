@@ -46,13 +46,16 @@ export class MarketDataPipeline {
         ? resolveProviderInstrument(request.canonicalInstrument, request.provider)
         : request.instrument;
 
-      const primary = await this.service.getSnapshot(
-        {
-          ...request,
-          instrument: primaryInstrument,
-        },
-        checkedAt,
-      );
+      const primaryRequest: MarketDataRequest = {
+        provider: request.provider,
+        instrument: primaryInstrument,
+        timeframe: request.timeframe,
+        limit: request.limit,
+        startTime: request.startTime,
+        endTime: request.endTime,
+      };
+
+      const primary = await this.service.getSnapshot(primaryRequest, checkedAt);
       const comparisonSnapshots: MarketDataSnapshot[] = [];
 
       for (const provider of request.comparisonProviders ?? []) {
