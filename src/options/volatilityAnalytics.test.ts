@@ -66,7 +66,8 @@ assert.equal(lookback.observations, 3);
 
 const premium = compareImpliedVsHistoricalVolatility(0.30, 0.20, 0.10);
 assert.equal(premium.state, "iv_premium");
-assert.equal(premium.spreadAbsolute, 0.10);
+// Floating-point arithmetic can represent 0.30 - 0.20 slightly below 0.10.
+assert.ok(Math.abs(premium.spreadAbsolute - 0.10) < 1e-12);
 assert.equal(premium.spreadPercentagePoints, 10);
 assert.equal(premium.ratio, 1.5);
 
