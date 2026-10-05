@@ -253,9 +253,44 @@ export function rankVanillaOptionCandidates(
       }
 
       const timeToExpiryYears = daysToExpiry / YEAR_DAYS;
+
+      // Reject expired contracts before valuation so the option pricer never
+      // receives a non-positive time-to-expiry.
+      if (daysToExpiry <= 0) {
+        const multiplier = normalizedMultiplier(quote);
+        const maxLossPerContract = quote.ask * multiplier;
+        const maxLossPctOfEquity =
+          (maxLossPerContract / normalized.accountEquity) * 100;
+
+        candidates.push({
+          quote,
+          mid,
+          spreadPct,
+          daysToExpiry: 0,
+          timeToExpiryYears: 0,
+          impliedVolatility: 0,
+          theoreticalPrice: 0,
+          theoreticalEdgePct: 0,
+          delta: 0,
+          gamma: 0,
+          vegaPerOnePctVol: 0,
+          thetaPerDay: 0,
+          rhoPerOneBp: 0,
+          breakEvenPrice: breakEven(quote.type, quote.strike, quote.ask),
+          maxLossPerContract,
+          maxLossPctOfEquity,
+          conservativeRewardPerContract: 0,
+          riskReward: 0,
+          score: Number.NEGATIVE_INFINITY,
+          eligible: false,
+          rejectionReasons,
+        });
+        continue;
+      }
+
       positive("timeToExpiryYears", timeToExpiryYears);
 
-      if (rejectionReasons.includes("expired")) {
+
         candidates.push({
           quote,
           mid,
