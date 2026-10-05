@@ -3,7 +3,7 @@ import { analyzeMarket, type AnalyzeInput, type AnalyzeOutput } from "../api/ana
 import { generateAnalystReport, type AnalystResearchResult } from "../research/report.js";
 import { buildResearchSnapshot, type ResearchSnapshot } from "../research/snapshot.js";
 import type { ResearchSnapshotRepository } from "../db/ports/researchSnapshotRepository.js";
-import { getDefaultResearchSnapshotRepository } from "../db/repositories/researchSnapshotRepository.js";
+import { saveResearchSnapshot } from "../db/repositories/researchSnapshotRepository.js";
 import type { AiProviderResult, AiProviderDescriptor } from "../ai/provider.js";
 import { getGeminiProvider } from "../ai/geminiProvider.js";
 
@@ -30,7 +30,7 @@ const DEFAULT_DEPENDENCIES: OnlineAnalysisDependencies = {
   analyzeMarket,
   generateAnalystReport,
   buildResearchSnapshot,
-  saveResearchSnapshot: getDefaultResearchSnapshotRepository().saveResearchSnapshot,
+  saveResearchSnapshot,
   buildOnlineAnalysisPacket,
   getGeminiProvider,
 };
