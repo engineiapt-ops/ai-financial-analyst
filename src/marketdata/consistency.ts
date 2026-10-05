@@ -52,8 +52,11 @@ function latestAlignedClose(
     const candle = input.candles.find(
       (candidate) => candleTimestamp(candidate) === timestamp,
     );
-    const close = candle?.close;
+    if (!candle) {
+      return null;
+    }
 
+    const close = candle.close;
     if (!Number.isFinite(close) || close <= 0) {
       return null;
     }
