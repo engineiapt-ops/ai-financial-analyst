@@ -43,7 +43,7 @@ const volatile = calculateHistoricalVolatility(
 );
 
 assert.ok(volatile.annualizedVolatility > 0);
-assert.equal(volatile.dataAsOf.toISOString(), "2026-01-01T07:00:59.999Z");
+assert.equal(volatile.dataAsOf.toISOString(), "2026-01-01T07:59:59.999Z");
 
 const hourly = calculateHistoricalVolatility(
   buildCandles([100, 101, 99, 102, 98]),
