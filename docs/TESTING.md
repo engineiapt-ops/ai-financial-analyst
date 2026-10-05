@@ -59,7 +59,7 @@ npm test
 
 Specific suites are invoked with their `test:<name>` scripts in `package.json`.
 
-The aggregate suite must remain a superset of all release-relevant test scripts.
+The aggregate suite must remain a superset of all release-relevant test scripts. The `verify:test-manifest` guard fails when a `test:*` script is declared but omitted from `npm test`.
 
 ## Release validation
 
