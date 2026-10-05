@@ -5,10 +5,11 @@ import type { PriceProvider, PriceQuery, PriceProviderMetadata } from "./provide
 import { MarketDataService } from "./service.js";
 import { MarketDataPipeline } from "./pipeline.js";
 
-function candle(close: number): Kline {
-  const closeTime = new Date(Date.now() - 60_000);
+function candle(close: number, openTime = "2026-10-05T12:00:00.000Z"): Kline {
+  const open = new Date(openTime);
+  const closeTime = new Date(open.getTime() + 60 * 60 * 1000 - 1);
   return {
-    openTime: new Date(closeTime.getTime() - 60 * 60 * 1000 + 1),
+    openTime: open,
     open: close - 1,
     high: close + 1,
     low: close - 2,
