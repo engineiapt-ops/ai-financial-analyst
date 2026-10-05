@@ -75,6 +75,9 @@ if (premium.spreadPercentagePoints === null) {
   throw new Error("Expected spreadPercentagePoints to be available for IV premium");
 }
 assert.ok(Math.abs(premium.spreadPercentagePoints - 10) < 1e-12);
+if (premium.ratio === null) {
+  throw new Error("Expected ratio to be available for IV premium");
+}
 assert.ok(Math.abs(premium.ratio - 1.5) < 1e-12);
 
 const near = compareImpliedVsHistoricalVolatility(0.205, 0.20, 0.10);
