@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import type { CfdQuoteCandle } from "./executionModelV3.js";
 import { runPaperTradingCycle, PAPER_TRADING_CYCLE_VERSION } from "./paperTradingCycle.js";
 import type { MultiTimeframeContext } from "../signals/confluence.js";
-import type { DecisionResult, Timeframe } from "../types.js";
+import type { DecisionResult } from "../types.js";
 
 function decision(recomendacao: "BUY" | "SELL" | "WAIT"): DecisionResult {
   return {
