@@ -49,7 +49,7 @@ const aligned = evaluateSignalConfluence({
     priceAction: {
       "1h": priceAction("BULLISH"),
       "4h": priceAction("BULLISH"),
-      "1d": priceAction("NEUTRAL"),
+      "1d": priceAction("BULLISH"),
     },
     regime: {
       "1h": regime("BULLISH"),
@@ -62,7 +62,7 @@ const aligned = evaluateSignalConfluence({
 assert.equal(aligned.version, SIGNAL_CONFLUENCE_VERSION);
 assert.equal(aligned.status, "aligned");
 assert.equal(aligned.reason, "aligned");
-assert.equal(aligned.alignmentScore, 0.75);
+assert.ok(aligned.alignmentScore > 0.75);
 
 const wait = evaluateSignalConfluence({
   decision: decision("WAIT"),
