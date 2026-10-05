@@ -198,10 +198,7 @@ export function runPaperTradingCycle(input: {
     }
 
     const paper = validatePaperSignal({
-      signal: {
-        ...finalSignal,
-        version: finalSignal.version,
-      } as never,
+      signal: finalSignal,
       signalCandle: input.signalCandle,
       futureCandles: input.futureCandles,
       executionConfig: input.executionConfig,
