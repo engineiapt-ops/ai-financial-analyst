@@ -1,9 +1,16 @@
 import type { CfdQuoteCandle, ExecutionModelV3Config, ExecutionModelV3Trade } from "./executionModelV3.js";
 import { simulateCfdTradeV3 } from "./executionModelV3.js";
-import type { ExecutableSignalTicket } from "../signals/executableSignal.js";
 
 export const PAPER_VALIDATION_VERSION = "paper-validation.v1";
 export const MAX_RISK_PER_TRADE_PCT = 1;
+
+export interface PaperValidationSignal {
+  status: "ready" | "not_executable";
+  side: "BUY" | "SELL" | null;
+  positionSizePct: number;
+  targetPct: number | null;
+  stopPct: number | null;
+}
 
 export interface PaperValidationResult {
   version: typeof PAPER_VALIDATION_VERSION;
@@ -57,7 +64,7 @@ function blocked(
  * This function never creates or routes an order.
  */
 export function validatePaperSignal(input: {
-  signal: ExecutableSignalTicket;
+  signal: PaperValidationSignal;
   signalCandle: CfdQuoteCandle;
   futureCandles: CfdQuoteCandle[];
   executionConfig: ExecutionModelV3Config;
