@@ -14,3 +14,14 @@ export type {
   VanillaOptionGreeks,
   VanillaOptionValuation,
 } from "./optionPricing.js";
+
+export {
+  VANILLA_OPTION_SELECTOR_VERSION,
+  rankVanillaOptionCandidates,
+} from "./optionCandidateSelector.js";
+export type {
+  VanillaOptionQuote,
+  VanillaOptionSelectorConfig,
+  VanillaOptionCandidate,
+  VanillaOptionSelectionResult,
+} from "./optionCandidateSelector.js";
