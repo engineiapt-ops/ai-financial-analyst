@@ -162,7 +162,7 @@ function makeOnlineDependencies(
 
   const analyzeWithMocks: OnlineAnalysisDependencies["analyzeMarket"] = async (input) =>
     analyzeMarket(input, {
-      fetchKlines: async () => candles,
+      getMarketData: async () => candles,
       decideWithJev: async (market, mode) => decideWithJev(market, mode, callJevImpl),
       saveSignal: persistence.saveSignal,
       saveDecisionLog: persistence.saveDecisionLog,
