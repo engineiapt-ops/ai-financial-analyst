@@ -10,7 +10,7 @@ import { computeIndicatorsSeries } from "../features/indicators.js";
 import { assertMarketDataFresh, type MarketDataQuality } from "../marketdata/quality.js";
 import { getInstrument } from "../instruments/registry.js";
 import { buildExecutableSignal } from "../signals/executableSignal.js";
-import type { MarketState, Timeframe, DecisionResult } from "../types.js";
+import type { Kline, MarketState, Timeframe, DecisionResult } from "../types.js";
 
 export interface AnalyzeInput {
   ativo: string;
@@ -33,7 +33,7 @@ export interface AnalyzeOutput {
 }
 
 export interface AnalyzeMarketDependencies {
-  getMarketData: (ativo: string, timeframe: Timeframe, limit: number, checkedAt: Date) => Promise<ReturnType<typeof createDefaultMarketDataService> extends infer _T ? import("../types.js").Kline[] : never>;
+  getMarketData: (ativo: string, timeframe: Timeframe, limit: number, checkedAt: Date) => Promise<Kline[]>;
   getSentiment: typeof getSentiment;
   evaluateBaseline: typeof evaluateBaseline;
   decideWithJev: typeof decideWithJev;
