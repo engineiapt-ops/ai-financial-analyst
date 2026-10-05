@@ -290,34 +290,6 @@ export function rankVanillaOptionCandidates(
 
       positive("timeToExpiryYears", timeToExpiryYears);
 
-
-        candidates.push({
-          quote,
-          mid,
-          spreadPct,
-          daysToExpiry: roundedDays,
-          timeToExpiryYears: 0,
-          impliedVolatility: 0,
-          theoreticalPrice: 0,
-          theoreticalEdgePct: 0,
-          delta: 0,
-          gamma: 0,
-          vegaPerOnePctVol: 0,
-          thetaPerDay: 0,
-          rhoPerOneBp: 0,
-          breakEvenPrice: breakEven(quote.type, quote.strike, quote.ask),
-          maxLossPerContract: quote.ask * normalizedMultiplier(quote),
-          maxLossPctOfEquity:
-            (quote.ask * normalizedMultiplier(quote) / normalized.accountEquity) * 100,
-          conservativeRewardPerContract: 0,
-          riskReward: 0,
-          score: Number.NEGATIVE_INFINITY,
-          eligible: false,
-          rejectionReasons,
-        });
-        continue;
-      }
-
       const iv = impliedVolatility(quote.type, {
         spot,
         strike: quote.strike,
