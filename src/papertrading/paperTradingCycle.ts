@@ -16,7 +16,7 @@ import {
   type RiskPolicy,
   type RiskState,
 } from "../risk/riskEngine.js";
-import type { DecisionResult } from "../types.js";
+import type { DecisionResult, Timeframe } from "../types.js";
 
 export const PAPER_TRADING_CYCLE_VERSION = "paper-trading-cycle.v1";
 
@@ -59,7 +59,10 @@ export function runPaperTradingCycle(input: {
   executionConfig: ExecutionModelV3Config;
   riskState: RiskState;
   riskPolicy?: Partial<RiskPolicy>;
-  requiredTimeframes?: MultiTimeframeContext extends never ? never : readonly ("1h" | "4h" | "1d")[];
+  signalTimeframe: Timeframe;
+  instrument: string;
+  atr: number;
+  requiredTimeframes?: readonly Timeframe[];
 }): PaperTradingCycleResult {
   const requiredTimeframes = input.requiredTimeframes;
   if (requiredTimeframes && requiredTimeframes.length === 0) {
@@ -68,6 +71,14 @@ export function runPaperTradingCycle(input: {
 
   if (!Number.isFinite(input.signalCandle.close) || input.signalCandle.close <= 0) {
     throw new Error("signalCandle.close must be a positive finite number");
+  }
+
+  if (!Number.isFinite(input.atr) || input.atr <= 0) {
+    throw new Error("atr must be a positive finite number");
+  }
+
+  if (!input.instrument.trim()) {
+    throw new Error("instrument is required");
   }
 
   if (!Array.isArray(input.futureCandles)) {
@@ -95,23 +106,14 @@ export function runPaperTradingCycle(input: {
       };
     }
 
-    const atr =
-      input.signalCandle.close > 0
-        ? Math.abs(input.signalCandle.high - input.signalCandle.low) / 2
-        : null;
-
-    if (atr === null || !Number.isFinite(atr) || atr <= 0) {
-      throw new Error("Unable to derive a valid execution ATR from signal candle");
-    }
-
     const candidateSignal = buildConfluentExecutableSignal({
       signal: {
-        ativo: "paper-cycle",
-        timeframe: input.requiredTimeframes?.[0] ?? "1h",
+        ativo: input.instrument,
+        timeframe: input.signalTimeframe,
         dataAsOf: input.signalCandle.closeTime ?? input.signalCandle.openTime,
         decision: input.decision,
         entryPrice: input.signalCandle.close,
-        atr,
+        atr: input.atr,
       },
       confluence,
     });
@@ -171,8 +173,8 @@ export function runPaperTradingCycle(input: {
     const riskAdjustedDecision = applyRiskToDecision(input.decision, risk);
     const finalSignal = buildConfluentExecutableSignal({
       signal: {
-        ativo: candidateSignal.ativo,
-        timeframe: candidateSignal.timeframe,
+        ativo: input.instrument,
+        timeframe: input.signalTimeframe,
         dataAsOf: candidateSignal.dataAsOf,
         decision: riskAdjustedDecision,
         entryPrice: candidateSignal.entrada ?? input.signalCandle.close,
