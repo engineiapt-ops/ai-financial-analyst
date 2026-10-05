@@ -27,6 +27,17 @@ export function createResearchSnapshotRepository(
  *
  * The underlying pool remains lazy, matching the current repository behavior.
  */
+let defaultRepository: ResearchSnapshotRepository | null = null;
+
 export function getDefaultResearchSnapshotRepository(): ResearchSnapshotRepository {
-  return createResearchSnapshotRepository(getPool());
+  if (!defaultRepository) {
+    defaultRepository = createResearchSnapshotRepository(getPool());
+  }
+  return defaultRepository;
+}
+
+export async function saveResearchSnapshot(
+  input: Parameters<ResearchSnapshotRepository["saveResearchSnapshot"]>[0],
+): ReturnType<ResearchSnapshotRepository["saveResearchSnapshot"]> {
+  return getDefaultResearchSnapshotRepository().saveResearchSnapshot(input);
 }
