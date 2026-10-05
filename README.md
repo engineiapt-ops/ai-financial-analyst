@@ -243,3 +243,14 @@ The history is operational/audit evidence only. It does not rank strategies, cha
 ## Supabase database access
 
 The application uses the PostgreSQL connection configured in `DATABASE_URL` through the `pg` driver. It does not use the Supabase Data API or Supabase Auth roles from the application client. Migration `019_revoke_public_data_api_grants.sql` removes direct table, sequence and function privileges from the `anon` and `authenticated` roles and removes those grants from the PostgreSQL default privileges for future objects. This keeps database access server-side and avoids exposing application tables through Supabase's public Data API surface.\n
+
+## Engineering documentation
+
+The maintenance and architecture contracts are documented in:
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Testing](docs/TESTING.md)
+- [Deployment](docs/DEPLOYMENT.md)
+
+These documents describe the current boundaries, reproducibility requirements, validation order and broker-promotion sequence. Structural refactors should preserve behavior unless a pull request explicitly declares a behavior change.
