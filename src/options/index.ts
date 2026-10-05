@@ -25,3 +25,15 @@ export type {
   VanillaOptionCandidate,
   VanillaOptionSelectionResult,
 } from "./optionCandidateSelector.js";
+
+export {
+  VOLATILITY_ANALYTICS_VERSION,
+  calculateHistoricalVolatility,
+  historicalVolatilityPeriodsPerYear,
+  compareImpliedVsHistoricalVolatility,
+} from "./volatilityAnalytics.js";
+export type {
+  VolatilityRelativeState,
+  HistoricalVolatilityResult,
+  ImpliedHistoricalVolatilityComparison,
+} from "./volatilityAnalytics.js";
