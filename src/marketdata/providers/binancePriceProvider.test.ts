@@ -15,6 +15,8 @@ const candle: Kline = {
 let receivedSymbol = "";
 let receivedTimeframe = "";
 let receivedOptions: unknown;
+const candleCloseTime = candle.closeTime;
+if (!candleCloseTime) throw new Error("Test candle must have closeTime");
 
 const provider = new BinancePriceProvider({
   fetchCandles: async (symbol, timeframe, options) => {
@@ -30,7 +32,7 @@ const candles = await provider.getCandles({
   timeframe: "1h",
   limit: 5,
   startTime: candle.openTime.getTime(),
-  endTime: candle.closeTime.getTime(),
+  endTime: candleCloseTime.getTime(),
 });
 
 assert.deepEqual(candles, [candle]);
