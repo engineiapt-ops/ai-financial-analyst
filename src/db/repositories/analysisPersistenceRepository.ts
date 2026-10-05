@@ -11,7 +11,8 @@ export function createAnalysisPersistenceRepository(
   const repository = createRepository(db);
 
   return {
-    saveSignal: repository.saveSignal,
+    saveSignal: (ativo, timeframe, decision, levels) =>
+      repository.saveSignal({ ativo, timeframe, decision, ...levels }),
     saveDecisionLog: repository.saveDecisionLog,
     saveMarketData: repository.saveMarketData,
   };
