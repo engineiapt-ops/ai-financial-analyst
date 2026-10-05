@@ -73,6 +73,7 @@ const result = rankVanillaOptionCandidates(
     targetUnderlyingPrice: 130,
     accountEquity: 10_000,
     referenceVolatility: 0.25,
+    historicalVolatility: 0.10,
     maxSpreadPct: 10,
     minDaysToExpiry: 7,
     maxDaysToExpiry: 180,
@@ -91,6 +92,15 @@ assert.ok((result.selected?.riskReward ?? 0) >= 2);
 assert.ok((result.selected?.theoreticalEdgePct ?? 0) > 0);
 assert.ok((result.selected?.spreadPct ?? 999) < 10);
 assert.ok((result.selected?.delta ?? 0) > 0);
+assert.equal(result.selected?.historicalVolatility, 0.10);
+assert.ok(
+  Math.abs((result.selected?.volatilitySpreadAbsolute ?? 0) - 0.10) < 1e-6,
+);
+assert.ok(
+  Math.abs((result.selected?.volatilitySpreadPercentagePoints ?? 0) - 10) < 1e-6,
+);
+assert.equal(result.selected?.volatilityState, "iv_premium");
+assert.ok(Math.abs((result.selected?.volatilityRatio ?? 0) - 2) < 1e-6);
 
 const badSpread = result.candidates.find(
   (candidate) => candidate.quote.symbol === "TEST-BAD-SPREAD",
@@ -125,6 +135,27 @@ const noEligible = rankVanillaOptionCandidates(
 );
 assert.equal(noEligible.status, "no_eligible_candidates");
 assert.equal(noEligible.selected, null);
+
+const withoutHistoricalContext = rankVanillaOptionCandidates(
+  100,
+  [quotes[0]],
+  {
+    evaluationAt,
+    targetUnderlyingPrice: 130,
+    accountEquity: 10_000,
+    referenceVolatility: 0.25,
+    maxOneContractRiskPct: 1,
+  },
+  0.02,
+  0,
+);
+assert.equal(withoutHistoricalContext.status, "selected");
+assert.equal(
+  withoutHistoricalContext.selected?.volatilityState,
+  "insufficient_data",
+);
+assert.equal(withoutHistoricalContext.selected?.historicalVolatility, null);
+assert.equal(withoutHistoricalContext.selected?.volatilityRatio, null);
 
 // The IV solver still returns the expected market IV from the same quote.
 const recoveredIv = impliedVolatility("CALL", {

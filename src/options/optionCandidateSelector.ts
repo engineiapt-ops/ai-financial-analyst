@@ -3,8 +3,12 @@ import {
   valueVanillaOption,
   type VanillaOptionType,
 } from "./optionPricing.js";
+import {
+  compareImpliedVsHistoricalVolatility,
+  type VolatilityRelativeState,
+} from "./volatilityAnalytics.js";
 
-export const VANILLA_OPTION_SELECTOR_VERSION = "vanilla-option-selector-v1";
+export const VANILLA_OPTION_SELECTOR_VERSION = "vanilla-option-selector-v2";
 
 export interface VanillaOptionQuote {
   symbol: string;
@@ -23,6 +27,12 @@ export interface VanillaOptionSelectorConfig {
   targetUnderlyingPrice: number;
   accountEquity: number;
   referenceVolatility: number;
+  /**
+   * Optional annualized historical volatility supplied by the Phase 11
+   * analytics layer. It is diagnostic only and never changes eligibility,
+   * ranking, R/R, sizing or execution.
+   */
+  historicalVolatility?: number;
   maxSpreadPct?: number;
   minDaysToExpiry?: number;
   maxDaysToExpiry?: number;
@@ -38,6 +48,11 @@ export interface VanillaOptionCandidate {
   daysToExpiry: number;
   timeToExpiryYears: number;
   impliedVolatility: number;
+  historicalVolatility: number | null;
+  volatilitySpreadAbsolute: number | null;
+  volatilitySpreadPercentagePoints: number | null;
+  volatilityRatio: number | null;
+  volatilityState: VolatilityRelativeState;
   theoreticalPrice: number;
   theoreticalEdgePct: number;
   delta: number;
@@ -71,6 +86,11 @@ const DEFAULT_TARGET_DELTA = 0.5;
 const DEFAULT_MAX_ONE_CONTRACT_RISK_PCT = 1;
 const DEFAULT_MAX_CANDIDATES = 10;
 
+type NormalizedVanillaOptionSelectorConfig =
+  Omit<Required<VanillaOptionSelectorConfig>, "historicalVolatility"> & {
+    historicalVolatility: number | null;
+  };
+
 function finite(name: string, value: number): void {
   if (!Number.isFinite(value)) throw new Error(`${name} must be finite`);
 }
@@ -85,12 +105,15 @@ function nonNegative(name: string, value: number): void {
   if (value < 0) throw new Error(`${name} must be non-negative`);
 }
 
-function validateConfig(config: VanillaOptionSelectorConfig): Required<VanillaOptionSelectorConfig> {
+function validateConfig(
+  config: VanillaOptionSelectorConfig,
+): NormalizedVanillaOptionSelectorConfig {
   const normalized = {
     evaluationAt: config.evaluationAt,
     targetUnderlyingPrice: config.targetUnderlyingPrice,
     accountEquity: config.accountEquity,
     referenceVolatility: config.referenceVolatility,
+    historicalVolatility: config.historicalVolatility ?? null,
     maxSpreadPct: config.maxSpreadPct ?? DEFAULT_MAX_SPREAD_PCT,
     minDaysToExpiry: config.minDaysToExpiry ?? DEFAULT_MIN_DTE,
     maxDaysToExpiry: config.maxDaysToExpiry ?? DEFAULT_MAX_DTE,
@@ -106,6 +129,9 @@ function validateConfig(config: VanillaOptionSelectorConfig): Required<VanillaOp
   positive("targetUnderlyingPrice", normalized.targetUnderlyingPrice);
   positive("accountEquity", normalized.accountEquity);
   positive("referenceVolatility", normalized.referenceVolatility);
+  if (normalized.historicalVolatility !== null) {
+    positive("historicalVolatility", normalized.historicalVolatility);
+  }
   nonNegative("maxSpreadPct", normalized.maxSpreadPct);
   if (!Number.isInteger(normalized.minDaysToExpiry) || normalized.minDaysToExpiry < 0) {
     throw new Error("minDaysToExpiry must be an integer >= 0");
@@ -269,6 +295,11 @@ export function rankVanillaOptionCandidates(
           daysToExpiry: 0,
           timeToExpiryYears: 0,
           impliedVolatility: 0,
+          historicalVolatility: normalized.historicalVolatility,
+          volatilitySpreadAbsolute: null,
+          volatilitySpreadPercentagePoints: null,
+          volatilityRatio: null,
+          volatilityState: "insufficient_data",
           theoreticalPrice: 0,
           theoreticalEdgePct: 0,
           delta: 0,
@@ -307,6 +338,11 @@ export function rankVanillaOptionCandidates(
         volatility: normalized.referenceVolatility,
         dividendYield,
       });
+
+      const volatilityComparison = compareImpliedVsHistoricalVolatility(
+        iv,
+        normalized.historicalVolatility,
+      );
 
       const theoreticalEdgePct = ((valuation.price - quote.ask) / quote.ask) * 100;
       if (theoreticalEdgePct <= 0) {
@@ -356,6 +392,12 @@ export function rankVanillaOptionCandidates(
         daysToExpiry: roundedDays,
         timeToExpiryYears,
         impliedVolatility: iv,
+        historicalVolatility: volatilityComparison.historicalVolatility,
+        volatilitySpreadAbsolute: volatilityComparison.spreadAbsolute,
+        volatilitySpreadPercentagePoints:
+          volatilityComparison.spreadPercentagePoints,
+        volatilityRatio: volatilityComparison.ratio,
+        volatilityState: volatilityComparison.state,
         theoreticalPrice: valuation.price,
         theoreticalEdgePct,
         delta,
@@ -382,6 +424,11 @@ export function rankVanillaOptionCandidates(
         daysToExpiry: 0,
         timeToExpiryYears: 0,
         impliedVolatility: 0,
+        historicalVolatility: normalized.historicalVolatility,
+        volatilitySpreadAbsolute: null,
+        volatilitySpreadPercentagePoints: null,
+        volatilityRatio: null,
+        volatilityState: "insufficient_data",
         theoreticalPrice: 0,
         theoreticalEdgePct: 0,
         delta: 0,
