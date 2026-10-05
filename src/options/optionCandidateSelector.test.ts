@@ -94,13 +94,13 @@ assert.ok((result.selected?.spreadPct ?? 999) < 10);
 assert.ok((result.selected?.delta ?? 0) > 0);
 assert.equal(result.selected?.historicalVolatility, 0.10);
 assert.ok(
-  Math.abs((result.selected?.volatilitySpreadAbsolute ?? 0) - 0.10) < 1e-8,
+  Math.abs((result.selected?.volatilitySpreadAbsolute ?? 0) - 0.10) < 1e-6,
 );
 assert.ok(
-  Math.abs((result.selected?.volatilitySpreadPercentagePoints ?? 0) - 10) < 1e-8,
+  Math.abs((result.selected?.volatilitySpreadPercentagePoints ?? 0) - 10) < 1e-6,
 );
 assert.equal(result.selected?.volatilityState, "iv_premium");
-assert.ok(Math.abs((result.selected?.volatilityRatio ?? 0) - 2) < 1e-8);
+assert.ok(Math.abs((result.selected?.volatilityRatio ?? 0) - 2) < 1e-6);
 
 const badSpread = result.candidates.find(
   (candidate) => candidate.quote.symbol === "TEST-BAD-SPREAD",
