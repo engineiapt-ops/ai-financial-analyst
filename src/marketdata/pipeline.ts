@@ -99,7 +99,7 @@ export class MarketDataPipeline {
 
       this.observability?.record({
         provider: primary.provider,
-        instrument: request.instrument,
+        instrument: primaryInstrument,
         timeframe: request.timeframe,
         status: "success",
         latencyMs: Date.now() - startedAt,
