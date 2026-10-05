@@ -274,7 +274,7 @@ export function evaluateBarrierOptionRisk(
 
   const knockOutLevel = resolvesKnockOutLevel(
     spot,
-    candidateWithDirection,
+    contract,
     {
       ...config,
       defaultKnockoutAtrMultiple: defaultKnockoutMultiple,
