@@ -71,6 +71,9 @@ if (premium.spreadAbsolute === null) {
 }
 // Floating-point arithmetic can represent 0.30 - 0.20 slightly below 0.10.
 assert.ok(Math.abs(premium.spreadAbsolute - 0.10) < 1e-12);
+if (premium.spreadPercentagePoints === null) {
+  throw new Error("Expected spreadPercentagePoints to be available for IV premium");
+}
 assert.ok(Math.abs(premium.spreadPercentagePoints - 10) < 1e-12);
 assert.equal(premium.ratio, 1.5);
 
