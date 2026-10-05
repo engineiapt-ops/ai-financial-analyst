@@ -1,4 +1,5 @@
 import { assertMarketDataConsistency, type MarketDataConsistency } from "./consistency.js";
+import { resolveProviderInstrument } from "../instruments/providerMapping.js";
 import {
   createMarketDataProvenance,
   type MarketDataProvenance,
@@ -11,6 +12,12 @@ import {
 } from "./service.js";
 
 export interface MarketDataPipelineRequest extends MarketDataRequest {
+  /**
+   * Optional canonical instrument symbol.
+   * When supplied, provider-native identifiers are resolved fail-closed.
+   * Without it, the existing provider-native request contract is preserved.
+   */
+  canonicalInstrument?: string;
   comparisonProviders?: readonly string[];
   maxRelativeDeviationBps?: number;
 }
@@ -35,7 +42,17 @@ export class MarketDataPipeline {
     const startedAt = Date.now();
 
     try {
-      const primary = await this.service.getSnapshot(request, checkedAt);
+      const primaryInstrument = request.canonicalInstrument
+        ? resolveProviderInstrument(request.canonicalInstrument, request.provider)
+        : request.instrument;
+
+      const primary = await this.service.getSnapshot(
+        {
+          ...request,
+          instrument: primaryInstrument,
+        },
+        checkedAt,
+      );
       const comparisonSnapshots: MarketDataSnapshot[] = [];
 
       for (const provider of request.comparisonProviders ?? []) {
@@ -44,7 +61,9 @@ export class MarketDataPipeline {
 
         const comparisonRequest: MarketDataRequest = {
           provider: normalizedProvider,
-          instrument: request.instrument,
+          instrument: request.canonicalInstrument
+            ? resolveProviderInstrument(request.canonicalInstrument, normalizedProvider)
+            : request.instrument,
           timeframe: request.timeframe,
           limit: request.limit,
           startTime: request.startTime,
