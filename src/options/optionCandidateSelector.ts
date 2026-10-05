@@ -86,6 +86,11 @@ const DEFAULT_TARGET_DELTA = 0.5;
 const DEFAULT_MAX_ONE_CONTRACT_RISK_PCT = 1;
 const DEFAULT_MAX_CANDIDATES = 10;
 
+type NormalizedVanillaOptionSelectorConfig =
+  Omit<Required<VanillaOptionSelectorConfig>, "historicalVolatility"> & {
+    historicalVolatility: number | null;
+  };
+
 function finite(name: string, value: number): void {
   if (!Number.isFinite(value)) throw new Error(`${name} must be finite`);
 }
@@ -100,7 +105,9 @@ function nonNegative(name: string, value: number): void {
   if (value < 0) throw new Error(`${name} must be non-negative`);
 }
 
-function validateConfig(config: VanillaOptionSelectorConfig): Required<VanillaOptionSelectorConfig> {
+function validateConfig(
+  config: VanillaOptionSelectorConfig,
+): NormalizedVanillaOptionSelectorConfig {
   const normalized = {
     evaluationAt: config.evaluationAt,
     targetUnderlyingPrice: config.targetUnderlyingPrice,
