@@ -37,3 +37,19 @@ export type {
   HistoricalVolatilityResult,
   ImpliedHistoricalVolatilityComparison,
 } from "./volatilityAnalytics.js";
+
+export {
+  BARRIER_OPTIONS_RISK_VERSION,
+  deriveDynamicKnockOutLevel,
+  knockOutBreachedByCandle,
+  evaluateBarrierOptionRisk,
+} from "./barrierOptions.js";
+export type {
+  BarrierDirection,
+  BarrierOptionType,
+  DynamicKnockOutInput,
+  BarrierOptionContract,
+  BarrierOptionRiskConfig,
+  BarrierOptionRiskResult,
+  BarrierMonitoringCandle,
+} from "./barrierOptions.js";
