@@ -5,6 +5,7 @@ import type { PriceProvider, PriceQuery, PriceProviderMetadata } from "./provide
 import { MarketDataService } from "./service.js";
 import { MarketDataPipeline } from "./pipeline.js";
 
+// Shared deterministic timestamp keeps both provider fixtures on the same candle boundary.
 function candle(close: number, openTime = "2026-10-05T12:00:00.000Z"): Kline {
   const open = new Date(openTime);
   const closeTime = new Date(open.getTime() + 60 * 60 * 1000 - 1);
