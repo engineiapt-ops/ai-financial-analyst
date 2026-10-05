@@ -4,7 +4,7 @@ import { GdeltSource, getSentiment } from "../features/sentimentPipeline.js";
 import { evaluateBaseline } from "../decision/baselineEngine.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
 import type { AnalysisPersistenceRepository } from "../db/ports/analysisPersistenceRepository.js";
-import { getDefaultAnalysisPersistenceRepository } from "../db/repositories/analysisPersistenceRepository.js";
+import { defaultAnalysisPersistenceRepository } from "../db/repositories/analysisPersistenceRepository.js";
 import { calibrateRegimeThresholds, classifyRegime } from "../risk/regime.js";
 import { applyRiskToDecision, evaluateRisk } from "../risk/riskEngine.js";
 import { computeIndicatorsSeries } from "../features/indicators.js";
@@ -44,7 +44,6 @@ export interface AnalyzeMarketDependencies {
 }
 
 const defaultMarketDataService = createDefaultMarketDataService();
-const defaultAnalysisPersistenceRepository = getDefaultAnalysisPersistenceRepository();
 
 const DEFAULT_DEPENDENCIES: AnalyzeMarketDependencies = {
   getMarketData: async (ativo, timeframe, limit, checkedAt) =>
