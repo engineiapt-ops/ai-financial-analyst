@@ -44,7 +44,7 @@ assert.equal(
 
 const valid = evaluateBarrierOptionRisk(100, validContract, {
   evaluationAt,
-  targetUnderlyingPrice: 120,
+  targetUnderlyingPrice: 115,
   accountEquity: 10_000,
   maxOneContractRiskPct: 1,
   minKnockOutDistanceAtr: 1,
