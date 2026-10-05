@@ -43,7 +43,7 @@ const volatile = calculateHistoricalVolatility(
 );
 
 assert.ok(volatile.annualizedVolatility > 0);
-assert.equal(volatile.dataAsOf.toISOString(), "2026-01-01T07:00:59.999Z");
+assert.equal(volatile.dataAsOf.toISOString(), "2026-01-01T07:59:59.999Z");
 
 const hourly = calculateHistoricalVolatility(
   buildCandles([100, 101, 99, 102, 98]),
@@ -66,9 +66,19 @@ assert.equal(lookback.observations, 3);
 
 const premium = compareImpliedVsHistoricalVolatility(0.30, 0.20, 0.10);
 assert.equal(premium.state, "iv_premium");
-assert.equal(premium.spreadAbsolute, 0.10);
-assert.equal(premium.spreadPercentagePoints, 10);
-assert.equal(premium.ratio, 1.5);
+if (premium.spreadAbsolute === null) {
+  throw new Error("Expected spreadAbsolute to be available for IV premium");
+}
+// Floating-point arithmetic can represent 0.30 - 0.20 slightly below 0.10.
+assert.ok(Math.abs(premium.spreadAbsolute - 0.10) < 1e-12);
+if (premium.spreadPercentagePoints === null) {
+  throw new Error("Expected spreadPercentagePoints to be available for IV premium");
+}
+assert.ok(Math.abs(premium.spreadPercentagePoints - 10) < 1e-12);
+if (premium.ratio === null) {
+  throw new Error("Expected ratio to be available for IV premium");
+}
+assert.ok(Math.abs(premium.ratio - 1.5) < 1e-12);
 
 const near = compareImpliedVsHistoricalVolatility(0.205, 0.20, 0.10);
 assert.equal(near.state, "near_historical");
