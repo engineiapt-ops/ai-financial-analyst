@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
+import type { DecisionLogInput } from "../db/repository.js";
 import type {
-  DecisionLogInput,
   ResearchSnapshotRecord,
   SaveResearchSnapshotInput,
 } from "../db/repository.js";
