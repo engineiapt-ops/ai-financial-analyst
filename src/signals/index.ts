@@ -18,3 +18,12 @@ export type {
   MultiTimeframeContext,
   SignalConfluenceResult,
 } from "./confluence.js";
+
+export {
+  buildConfluentExecutableSignal,
+  CONFLUENT_EXECUTABLE_SIGNAL_VERSION,
+} from "./executableSignalV2.js";
+export type {
+  ConfluentExecutableSignalReason,
+  ConfluentExecutableSignalTicket,
+} from "./executableSignalV2.js";
