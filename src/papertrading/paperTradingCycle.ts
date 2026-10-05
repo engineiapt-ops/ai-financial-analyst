@@ -18,7 +18,7 @@ import {
 } from "../risk/riskEngine.js";
 import type { DecisionResult, Timeframe } from "../types.js";
 
-export const PAPER_TRADING_CYCLE_VERSION = "paper-trading-cycle.v1";
+export const PAPER_TRADING_CYCLE_VERSION = "paper-trading-cycle.v1"; // paper-only orchestration; no broker order path
 
 export type PaperTradingCycleStage =
   | "confluence"
