@@ -3,7 +3,8 @@ import { computeIndicators } from "../features/indicators.js";
 import { GdeltSource, getSentiment } from "../features/sentimentPipeline.js";
 import { evaluateBaseline } from "../decision/baselineEngine.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
-import { saveDecisionLog, saveMarketData, saveSignal } from "../db/repository.js";
+import type { AnalysisPersistenceRepository } from "../db/ports/analysisPersistenceRepository.js";
+import { getDefaultAnalysisPersistenceRepository } from "../db/repositories/analysisPersistenceRepository.js";
 import { calibrateRegimeThresholds, classifyRegime } from "../risk/regime.js";
 import { applyRiskToDecision, evaluateRisk } from "../risk/riskEngine.js";
 import { computeIndicatorsSeries } from "../features/indicators.js";
@@ -37,12 +38,13 @@ export interface AnalyzeMarketDependencies {
   getSentiment: typeof getSentiment;
   evaluateBaseline: typeof evaluateBaseline;
   decideWithJev: typeof decideWithJev;
-  saveSignal: typeof saveSignal;
-  saveDecisionLog: typeof saveDecisionLog;
-  saveMarketData: typeof saveMarketData;
+  saveSignal: AnalysisPersistenceRepository["saveSignal"];
+  saveDecisionLog: AnalysisPersistenceRepository["saveDecisionLog"];
+  saveMarketData: AnalysisPersistenceRepository["saveMarketData"];
 }
 
 const defaultMarketDataService = createDefaultMarketDataService();
+const defaultAnalysisPersistenceRepository = getDefaultAnalysisPersistenceRepository();
 
 const DEFAULT_DEPENDENCIES: AnalyzeMarketDependencies = {
   getMarketData: async (ativo, timeframe, limit, checkedAt) =>
@@ -56,9 +58,9 @@ const DEFAULT_DEPENDENCIES: AnalyzeMarketDependencies = {
   getSentiment,
   evaluateBaseline,
   decideWithJev,
-  saveSignal,
-  saveDecisionLog,
-  saveMarketData,
+  saveSignal: defaultAnalysisPersistenceRepository.saveSignal,
+  saveDecisionLog: defaultAnalysisPersistenceRepository.saveDecisionLog,
+  saveMarketData: defaultAnalysisPersistenceRepository.saveMarketData,
 };
 
 function blockDecisionForExecution(
