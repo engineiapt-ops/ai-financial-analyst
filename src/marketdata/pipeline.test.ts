@@ -5,10 +5,14 @@ import type { PriceProvider, PriceQuery, PriceProviderMetadata } from "./provide
 import { MarketDataService } from "./service.js";
 import { MarketDataPipeline } from "./pipeline.js";
 
-function candle(close: number): Kline {
-  const closeTime = new Date(Date.now() - 60_000);
+// Shared timestamp keeps both provider fixtures aligned and recent enough for freshness validation.
+const TEST_OPEN_TIME = new Date(Date.now() - 60 * 60 * 1000 + 1);
+
+function candle(close: number, openTime = TEST_OPEN_TIME): Kline {
+  const open = new Date(openTime);
+  const closeTime = new Date(open.getTime() + 60 * 60 * 1000 - 1);
   return {
-    openTime: new Date(closeTime.getTime() - 60 * 60 * 1000 + 1),
+    openTime: open,
     open: close - 1,
     high: close + 1,
     low: close - 2,
