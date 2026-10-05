@@ -1,4 +1,5 @@
 import { assertMarketDataConsistency, type MarketDataConsistency } from "./consistency.js";
+import { resolveProviderInstrument } from "../instruments/providerMapping.js";
 import {
   createMarketDataProvenance,
   type MarketDataProvenance,
@@ -11,6 +12,12 @@ import {
 } from "./service.js";
 
 export interface MarketDataPipelineRequest extends MarketDataRequest {
+  /**
+   * Optional canonical instrument symbol.
+   * When supplied, provider-native identifiers are resolved fail-closed.
+   * Without it, the existing provider-native request contract is preserved.
+   */
+  canonicalInstrument?: string;
   comparisonProviders?: readonly string[];
   maxRelativeDeviationBps?: number;
 }
@@ -35,7 +42,20 @@ export class MarketDataPipeline {
     const startedAt = Date.now();
 
     try {
-      const primary = await this.service.getSnapshot(request, checkedAt);
+      const primaryInstrument = request.canonicalInstrument
+        ? resolveProviderInstrument(request.canonicalInstrument, request.provider)
+        : request.instrument;
+
+      const primaryRequest: MarketDataRequest = {
+        provider: request.provider,
+        instrument: primaryInstrument,
+        timeframe: request.timeframe,
+        limit: request.limit,
+        startTime: request.startTime,
+        endTime: request.endTime,
+      };
+
+      const primary = await this.service.getSnapshot(primaryRequest, checkedAt);
       const comparisonSnapshots: MarketDataSnapshot[] = [];
 
       for (const provider of request.comparisonProviders ?? []) {
@@ -44,7 +64,9 @@ export class MarketDataPipeline {
 
         const comparisonRequest: MarketDataRequest = {
           provider: normalizedProvider,
-          instrument: request.instrument,
+          instrument: request.canonicalInstrument
+            ? resolveProviderInstrument(request.canonicalInstrument, normalizedProvider)
+            : request.instrument,
           timeframe: request.timeframe,
           limit: request.limit,
           startTime: request.startTime,
@@ -80,7 +102,7 @@ export class MarketDataPipeline {
 
       this.observability?.record({
         provider: primary.provider,
-        instrument: request.instrument,
+        instrument: primaryInstrument,
         timeframe: request.timeframe,
         status: "success",
         latencyMs: Date.now() - startedAt,
