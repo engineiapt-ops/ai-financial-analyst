@@ -43,7 +43,12 @@ export class MarketDataService {
 
     try {
       const rawCandles = await provider.getCandles(query);
-      const candles = normalizeMarketData(rawCandles);
+      const normalizedCandles = normalizeMarketData(rawCandles);
+      const candles = normalizedCandles.filter(
+        (candle) =>
+          candle.closeTime === undefined ||
+          candle.closeTime.getTime() <= checkedAt.getTime(),
+      );
       const quality = assertMarketDataFresh({
         timeframe: request.timeframe,
         candles,

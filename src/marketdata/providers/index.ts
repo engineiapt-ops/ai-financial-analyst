@@ -7,3 +7,4 @@ export type {
 export { PriceProviderRegistry } from "./priceProviderRegistry.js";
 export { IgPriceProvider } from "./igPriceProvider.js";
 export { SaxoPriceProvider } from "./saxoPriceProvider.js";
+export { BinancePriceProvider } from "./binancePriceProvider.js";

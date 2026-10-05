@@ -1,17 +1,16 @@
-import { fetchKlines } from "../marketdata/binanceClient.js";
+import { createDefaultMarketDataService } from "../marketdata/defaultService.js";
 import { computeIndicators } from "../features/indicators.js";
 import { GdeltSource, getSentiment } from "../features/sentimentPipeline.js";
 import { evaluateBaseline } from "../decision/baselineEngine.js";
 import { decideWithJev } from "../decision/decisionEngine.js";
 import { saveDecisionLog, saveMarketData, saveSignal } from "../db/repository.js";
-import { filterKlinesByAsOf } from "../marketdata/pointInTime.js";
 import { calibrateRegimeThresholds, classifyRegime } from "../risk/regime.js";
 import { applyRiskToDecision, evaluateRisk } from "../risk/riskEngine.js";
 import { computeIndicatorsSeries } from "../features/indicators.js";
 import { assertMarketDataFresh, type MarketDataQuality } from "../marketdata/quality.js";
 import { getInstrument } from "../instruments/registry.js";
 import { buildExecutableSignal } from "../signals/executableSignal.js";
-import type { MarketState, Timeframe, DecisionResult } from "../types.js";
+import type { Kline, MarketState, Timeframe, DecisionResult } from "../types.js";
 
 export interface AnalyzeInput {
   ativo: string;
@@ -34,7 +33,7 @@ export interface AnalyzeOutput {
 }
 
 export interface AnalyzeMarketDependencies {
-  fetchKlines: typeof fetchKlines;
+  getMarketData: (ativo: string, timeframe: Timeframe, limit: number, checkedAt: Date) => Promise<Kline[]>;
   getSentiment: typeof getSentiment;
   evaluateBaseline: typeof evaluateBaseline;
   decideWithJev: typeof decideWithJev;
@@ -43,8 +42,17 @@ export interface AnalyzeMarketDependencies {
   saveMarketData: typeof saveMarketData;
 }
 
+const defaultMarketDataService = createDefaultMarketDataService();
+
 const DEFAULT_DEPENDENCIES: AnalyzeMarketDependencies = {
-  fetchKlines,
+  getMarketData: async (ativo, timeframe, limit, checkedAt) =>
+    (await defaultMarketDataService.getSnapshot({
+      provider: "binance",
+      instrument: ativo,
+      timeframe,
+      limit,
+      endTime: checkedAt.getTime(),
+    }, checkedAt)).candles,
   getSentiment,
   evaluateBaseline,
   decideWithJev,
@@ -87,10 +95,7 @@ export async function analyzeMarket(
   }
 
   const now = new Date();
-  const klines = filterKlinesByAsOf(
-    await deps.fetchKlines(ativo, input.timeframe, 100),
-    now,
-  );
+  const klines = await deps.getMarketData(ativo, input.timeframe, 100, now);
   if (klines.length < 21) {
     throw new Error("Insufficient closed market candles for EMA21");
   }

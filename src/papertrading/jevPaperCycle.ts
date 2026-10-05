@@ -1,4 +1,4 @@
-import { fetchKlines } from "../marketdata/binanceClient.js";
+import { createDefaultMarketDataService } from "../marketdata/defaultService.js";
 import { filterKlinesByAsOf } from "../marketdata/pointInTime.js";
 import {
   findDecisionLogByAsOf,
@@ -52,9 +52,18 @@ export interface JevPaperCycleDependencies {
   }) => Promise<AnalyzeOutput>;
 }
 
+const defaultMarketDataService = createDefaultMarketDataService();
+
 const defaultDependencies: JevPaperCycleDependencies = {
   now: () => new Date(),
-  fetchCandles: fetchKlines,
+  fetchCandles: async (ativo, timeframe, limit) =>
+    (await defaultMarketDataService.getSnapshot({
+      provider: "binance",
+      instrument: ativo,
+      timeframe,
+      limit,
+      endTime: Date.now(),
+    }, new Date())).candles,
   findExisting: findDecisionLogByAsOf,
   analyze: analyzeMarket,
 };

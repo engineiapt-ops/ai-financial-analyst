@@ -9,3 +9,4 @@ export type { MarketDataProvenance } from "./provenance.js";
 export { MarketDataObservability } from "./observability.js";
 export type { MarketDataObservation, MarketDataObservabilitySnapshot } from "./observability.js";
 export { createMarketDataPipeline, loadMarketData, assertSupportedTimeframe } from "./integration.js";
+export { createDefaultMarketDataService } from "./defaultService.js";
