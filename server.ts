@@ -1,8 +1,37 @@
 import { app, startServer } from './src/app/createApp.js';
 import { closePool } from './src/db/pool.js';
+import { healthDatabase } from './src/db/repository.js';
 
 export { app };
 export default app;
+
+const SERVICE_VERSION = process.env.APP_VERSION?.trim() || "unknown";
+const SERVICE_COMMIT =
+  process.env.RENDER_GIT_COMMIT?.trim() ||
+  process.env.GIT_COMMIT?.trim() ||
+  "unknown";
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "ai-financial-analyst-api",
+  });
+});
+
+app.get("/health/ready", async (_req, res) => {
+  const database = await healthDatabase()
+    .then(() => "ok" as const)
+    .catch(() => "error" as const);
+
+  const ready = database === "ok";
+
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ok" : "error",
+    db: database,
+    version: SERVICE_VERSION,
+    commit: SERVICE_COMMIT,
+  });
+});
 
 const SHUTDOWN_TIMEOUT_MS = Number(process.env.SHUTDOWN_TIMEOUT_MS ?? 25_000);
 
