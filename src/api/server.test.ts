@@ -80,6 +80,31 @@ assert(
   "importing src/api/server.ts must never bind a network port",
 );
 
+assert(
+  coreApiServerSource.includes('app.get("/health"'),
+  "liveness endpoint must remain available",
+);
+assert(
+  coreApiServerSource.includes('app.get("/health/ready"'),
+  "readiness endpoint must be available",
+);
+assert(
+  coreApiServerSource.includes("healthDatabase()"),
+  "readiness must verify database availability",
+);
+assert(
+  coreApiServerSource.includes("pingBinance()"),
+  "readiness must verify market-data availability",
+);
+assert(
+  coreApiServerSource.includes("res.status(ready ? 200 : 503)"),
+  "readiness must return 503 when critical dependencies are unavailable",
+);
+assert(
+  coreApiServerSource.includes("uptimeSeconds"),
+  "liveness must expose process uptime for operational diagnostics",
+);
+
 for (const forbiddenMiddleware of [
   "requestContextMiddleware",
   "requestObservabilityMiddleware",
