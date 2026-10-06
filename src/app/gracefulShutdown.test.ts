@@ -60,3 +60,11 @@ assert(
   createAppSource.includes("server.headersTimeout = 75_000"),
   "HTTP headers timeout must exceed keep-alive timeout",
 );
+assert(
+  createAppSource.includes("server.once('error'"),
+  "HTTP server bind errors must be handled explicitly",
+);
+assert(
+  createAppSource.includes("process.exitCode = 1"),
+  "HTTP server bind failures must set a non-zero exit code",
+);
