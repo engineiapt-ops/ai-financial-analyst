@@ -30,6 +30,10 @@ assert(
   "shutdown must have a bounded timeout",
 );
 assert(
+  source.includes("25_000"),
+  "graceful shutdown deadline must default to 25 seconds",
+);
+assert(
   source.includes("forceExit.unref()"),
   "shutdown timeout must not keep the process alive",
 );
