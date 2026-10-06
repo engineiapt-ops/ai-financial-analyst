@@ -79,7 +79,7 @@ assert.throws(
 );
 
 assert.throws(
-  () => resolveSaxoEnvironment({ environment: "invalid" as "sim" }),
+  () => resolveSaxoEnvironment({ environment: "invalid" as unknown as "sim" }),
   /Invalid SAXO_ENVIRONMENT/,
 );
 
