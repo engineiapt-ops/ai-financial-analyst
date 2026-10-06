@@ -918,30 +918,36 @@ async function startServer() {
         next(e);
       }
     });
-  } else if (process.env.SERVE_STATIC === 'true') {
-    // Static hosting is opt-in. Production normally serves the frontend from Cloudflare.
-    const distPath = path.join(__dirname, '../../dist');
-    app.use(express.static(distPath));
-    app.use((_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  } else {
-    // With the frontend hosted separately, non-API routes must not accidentally
-    // return an HTML SPA fallback from the backend.
+
     app.use((req, res, next) => {
       if (req.path.startsWith('/api/') || req.path === '/health') {
-        return next();
+        return coreApiApp(req, res, next);
       }
-      res.status(404).json({ status: 'error', error: 'not found' });
+      next();
     });
-  }
+  } else {
+    // The API must be mounted before any static fallback so /api/* never receives index.html.
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path === '/health') {
+        return coreApiApp(req, res, next);
+      }
+      next();
+    });
 
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path === '/health') {
-      return coreApiApp(req, res, next);
+    if (process.env.SERVE_STATIC === 'true') {
+      // Static serving is opt-in. Production normally serves the frontend from Cloudflare.
+      const distPath = path.join(__dirname, '../../dist');
+      app.use(express.static(distPath));
+      app.use((_req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      // With the frontend hosted separately, non-API routes return JSON 404s.
+      app.use((req, res) => {
+        res.status(404).json({ status: 'error', error: 'not found' });
+      });
     }
-    next();
-  });
+  }
 
   app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 AI Financial Analyst Server running on http://0.0.0.0:${PORT}`);
