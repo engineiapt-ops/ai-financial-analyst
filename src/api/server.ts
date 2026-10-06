@@ -1,8 +1,5 @@
 import "dotenv/config";
 import express from "express";
-import { createRateLimitMiddleware, getRequestClientKey, isHeavyApiRequest } from "./rateLimit.js";
-import { requestContextMiddleware } from "./requestContext.js";
-import { requestObservabilityMiddleware, requestErrorHandler } from "./observability.js";
 import { z } from "zod";
 import {
   fetchKlines,
@@ -43,7 +40,7 @@ import { buildOperationalQualityOverview } from "../product/operationalQuality.j
 import { comparePipelineAudits } from "../product/pipelineAudit.js";
 import { buildPipelineAuditForRun } from "../product/pipelineAuditService.js";
 import { listAiProviders } from "../ai/providers.js";
-import { hasValidCronSecret, isProtectedApiRequest, requireApiAuth } from "./auth.js";
+import { hasValidCronSecret } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
 import { buildGovernanceDashboardForScope } from "../product/governanceDashboardService.js";
 import { buildContinuousGovernanceForRun } from "../product/continuousGovernanceService.js";
@@ -69,52 +66,7 @@ function clientSafeApiError(status: number): string {
 }
 
 export const app = express();
-app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
-
-app.use(requestContextMiddleware);
-app.use(requestObservabilityMiddleware);
-app.use(express.json());
-
-const apiRateLimitWindowMs = 60_000;
-const apiRateLimitMax = Number(process.env.RATE_LIMIT_MAX ?? 120);
-const heavyRateLimitMax = Number(process.env.RATE_LIMIT_HEAVY_MAX ?? 20);
-
-const apiRateLimiter = createRateLimitMiddleware({
-  windowMs: apiRateLimitWindowMs,
-  max: apiRateLimitMax,
-  key: (req) => `api:${getRequestClientKey(req)}`,
-});
-
-const heavyRateLimiter = createRateLimitMiddleware({
-  windowMs: apiRateLimitWindowMs,
-  max: heavyRateLimitMax,
-  key: (req) => `heavy:${getRequestClientKey(req)}`,
-});
-
-app.use((req, res, next) => {
-  if (req.path.startsWith("/api/")) {
-    apiRateLimiter(req, res, next);
-    return;
-  }
-  next();
-});
-
-app.use((req, res, next) => {
-  if (isHeavyApiRequest(req)) {
-    heavyRateLimiter(req, res, next);
-    return;
-  }
-  next();
-});
-
-const apiAuthMiddleware = requireApiAuth();
-app.use((req, res, next) => {
-  if (isProtectedApiRequest(req)) {
-    apiAuthMiddleware(req, res, next);
-    return;
-  }
-  next();
-});
+// Shared middleware (CORS, body parsing, rate limiting and auth) is composed by createApp.ts.
 
 const HTML_DASHBOARD = `<!DOCTYPE html>
 <html lang="en">
@@ -2134,8 +2086,6 @@ app.get("/api/cron/paper-jev-cycle", async (req, res) => {
     res.status(500).json({ status: "error", error: "internal server error" });
   }
 });
-
-app.use(requestErrorHandler);
 
 // The root server.ts -> createApp.startServer() is the single production entrypoint.
 // This module is imported by createApp.ts and must never bind a port as a side effect.
