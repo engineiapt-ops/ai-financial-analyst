@@ -570,14 +570,6 @@ export interface MetricsByOrigem {
   avg_candles_held: number;
 }
 
-function requireDatabaseUrl(): string {
-  const value = process.env.DATABASE_URL?.trim();
-  if (!value) {
-    throw new Error("DATABASE_URL is required for repository operations");
-  }
-  return value;
-}
-
 function getDefaultPool() {
   // Keep the repository API lazy while sharing one centrally configured pool.
   return getSharedDefaultPool();
