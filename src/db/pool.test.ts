@@ -19,8 +19,8 @@ try {
   process.env.DATABASE_SSL_CA = "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----";
   assert.deepEqual(resolveSsl(), { ca: process.env.DATABASE_SSL_CA });
 
-  delete process.env.DATABASE_SSL_CA;
   process.env.DATABASE_SSL = "require";
+  delete process.env.DATABASE_SSL_CA;
   assert.deepEqual(resolveSsl(), { rejectUnauthorized: false });
 
   delete process.env.DATABASE_SSL;
