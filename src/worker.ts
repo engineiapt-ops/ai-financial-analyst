@@ -1,6 +1,7 @@
 const BACKEND_ORIGIN = "https://ai-financial-analyst-api-kmvj.onrender.com";
 
 interface WorkerEnv {
+  BACKEND_ORIGIN: string;
   ASSETS: {
     fetch(request: Request): Promise<Response>;
   };
@@ -15,7 +16,7 @@ async function proxyApiRequest(request: Request, env: WorkerEnv): Promise<Respon
   const incomingUrl = new URL(request.url);
   const backendUrl = new URL(
     incomingUrl.pathname + incomingUrl.search,
-    BACKEND_ORIGIN,
+    env.BACKEND_ORIGIN || BACKEND_ORIGIN,
   );
 
   const headers = new Headers(request.headers);
