@@ -15,6 +15,7 @@ try {
   delete process.env.DATABASE_SSL_CA;
   assert.deepEqual(resolveSsl(), false);
 
+  delete process.env.DATABASE_SSL;
   process.env.DATABASE_SSL_CA = "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----";
   assert.deepEqual(resolveSsl(), { ca: process.env.DATABASE_SSL_CA });
 
