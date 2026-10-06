@@ -11,14 +11,14 @@ import {
   findRegimeAtOrBefore,
   type RegimeSnapshot,
 } from "./regime.js";
-import { evaluateRisk } from "./riskEngine.js";
+import { evaluateRiskV2 } from "./riskEngine.js";
 
 export interface RiskRegimeAnalysisDependencies {
   getBacktestRun: typeof getBacktestRun;
   getMarketDataRange: typeof getMarketDataRange;
   getPortfolioPositions: typeof getPortfolioPositions;
   assertDatasetMatchesMetadata: typeof assertDatasetMatchesMetadata;
-  evaluateRisk: typeof evaluateRisk;
+  evaluateRiskV2: typeof evaluateRiskV2;
 }
 
 const DEFAULT_DEPENDENCIES: RiskRegimeAnalysisDependencies = {
@@ -26,7 +26,7 @@ const DEFAULT_DEPENDENCIES: RiskRegimeAnalysisDependencies = {
   getMarketDataRange,
   getPortfolioPositions,
   assertDatasetMatchesMetadata,
-  evaluateRisk,
+  evaluateRiskV2,
 };
 
 interface RegimeMetrics {
@@ -130,7 +130,19 @@ export async function runRiskRegimeAnalysis(
       tamanhoPosicaoPct: 2,
     };
     const wouldRiskBlock =
-      deps.evaluateRisk(syntheticDecision, regime).reason === "high_volatility";
+      !deps.evaluateRiskV2({
+        decision: syntheticDecision,
+        regime,
+        state: {
+          equity: 1000,
+          dailyLossPct: 0,
+          tradesToday: 0,
+          openPositions: 0,
+          grossExposurePct: 0,
+          consecutiveLosses: 0,
+        },
+        stopDistancePct: sourceRun.stopPct * 100,
+      }).allowed;
     if (wouldRiskBlock) metric.highVolatilityBlocksWouldOccur += 1;
 
     if (position.status === "rejected") {
@@ -177,7 +189,7 @@ export async function runRiskRegimeAnalysis(
     notes: [
       "Regime thresholds are calibrated only on the pre-OOS window and then frozen.",
       "P&L by regime is diagnostic; it is not an account-level return metric.",
-      "High-volatility blocks are hypothetical for the existing portfolio run because the risk gate was not present in that historical execution.",
+      "Risk blocks are hypothetical for the existing portfolio run because the risk gate was not present in that historical execution.",
     ],
   };
 }
