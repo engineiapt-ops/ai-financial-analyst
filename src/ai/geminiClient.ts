@@ -36,9 +36,15 @@ export class GeminiClientError extends Error {
  */
 export class GeminiClient {
   private readonly client: GeminiSdkClient;
+  readonly models: GeminiSdkClient["models"];
 
   constructor(client: GeminiSdkClient) {
     this.client = client;
+    // Preserve the SDK-shaped surface used by existing application code while
+    // keeping the vendor implementation behind this adapter.
+    this.models = {
+      generateContent: (request) => this.client.models.generateContent(request),
+    };
   }
 
   generateContent(
