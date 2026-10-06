@@ -133,3 +133,13 @@ Preferred refactoring sequence:
 6. deploy and compare behavior.
 
 This order keeps changes reversible and limits regression scope.
+
+## Broker boundary
+
+Broker connectivity is separate from market-data transport.
+
+The Saxo broker adapter is intentionally read-only. Its contract exposes account discovery and account detail only; order placement, modification and cancellation are not part of the contract.
+
+Saxo environments are explicit: SIM and LIVE. Construction of a LIVE read-only client fails closed unless `SAXO_ENABLE_LIVE_READ_ONLY=true` is explicitly configured.
+
+No credentials or access tokens are logged. Market-data providers remain separate from broker account access, and instrument resolution remains under `src/instruments`.
