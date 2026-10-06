@@ -950,5 +950,7 @@ async function startServer() {
   });
 }
 
+app.use(requestErrorHandler);
+
 export { app, startServer };
 export default app;
