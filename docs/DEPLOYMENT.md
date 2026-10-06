@@ -36,6 +36,21 @@ Vercel production deployment
 post-deploy health/readiness validation
 ```
 
+## Reproducibility baseline
+
+The repository pins the Node.js toolchain to **22.23.3** across the local runtime declaration, GitHub Actions and Docker.
+
+Docker base images are pinned by immutable OCI manifest digest:
+
+- Node.js 22.23.3 Alpine for application build/runtime;
+- PostgreSQL 16 Alpine for the local Compose database.
+
+The dependency graph is resolved exclusively through `package-lock.json` with `npm ci`.
+
+GitHub Actions uses the fixed Ubuntu 24.04 runner image and immutable commit references for the checkout/setup-node actions used by the validation workflow.
+
+When updating any pinned runtime, action or container image, record the new version/digest in the same change and keep the CI, Docker and local Node references aligned.
+
 ## Required release checks
 
 A release should show:
