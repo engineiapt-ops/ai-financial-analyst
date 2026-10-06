@@ -43,11 +43,13 @@ export const App: React.FC = () => {
       oilWTI: '$71.45/bbl',
       gold: '$2,658.20/oz'
     },
-    featuredTickers: ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'BRK.B']
+    featuredTickers: ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'BRK.B'],
+    source: 'static-demo',
+    asOf: new Date().toISOString()
   });
 
   useEffect(() => {
-    // Fetch live market data on initial load
+    // Fetch the market overview snapshot on initial load; the backend labels its provenance.
     apiFetch('/api/market/overview')
       .then(res => res.json())
       .then(data => {
