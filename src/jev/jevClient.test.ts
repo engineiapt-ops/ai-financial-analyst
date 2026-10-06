@@ -41,6 +41,21 @@ function validBody(modelVersion?: string): unknown {
 }
 
 process.env.JEV_MODEL_VERSION = "jev-2026-09";
+process.env.JEV_BASE_URL = "https://jev.example.test";
+
+
+let missingBaseUrlRejected = false;
+try {
+  await callJev(market, {
+    credential: "test-secret",
+    baseUrl: "",
+    fetchImpl: async () => response(validBody("jev-2026-09")),
+  });
+} catch (error) {
+  missingBaseUrlRejected =
+    error instanceof Error && error.message.includes("JEV_BASE_URL não configurada");
+}
+assert.equal(missingBaseUrlRejected, true);
 
 const success = await callJev(market, {
   credential: "test-secret",
@@ -165,6 +180,7 @@ try {
 assert.equal(unreportedRejected, true);
 
 delete process.env.JEV_MODEL_VERSION;
+process.env.JEV_BASE_URL = "https://jev.example.test";
 const unpinned = await callJev(market, {
   credential: "test-secret",
   fetchImpl: async () => response(validBody()),
