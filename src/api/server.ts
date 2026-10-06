@@ -1288,7 +1288,8 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/health/ready", async (_req, res) => {
-  const database = await healthDatabase()
+  const database = await Promise.resolve()
+    .then(() => healthDatabase())
     .then(() => "ok" as const)
     .catch(() => "error" as const);
 
