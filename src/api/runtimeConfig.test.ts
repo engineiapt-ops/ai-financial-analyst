@@ -53,6 +53,8 @@ const deterministic = inspectRuntimeConfig({
   API_AUTH_TOKEN: "secret",
   CRON_SECRET: "cron-secret",
   PAPER_JEV_AUTORUN: "false",
+  CORS_ORIGINS: "https://example.pages.dev",
+  SERVE_STATIC: "false",
 });
 assert.equal(deterministic.state, "degraded");
 assert.equal(deterministic.warnings.some((warning) => warning.includes("GEMINI_API_KEY")), true);
