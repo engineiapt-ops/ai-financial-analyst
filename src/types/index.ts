@@ -180,6 +180,8 @@ export interface MarketOverviewData {
   indices: MarketIndex[];
   macro: MacroIndicator;
   featuredTickers: string[];
+  source: "static-demo" | string;
+  asOf: string;
 }
 
 export interface ChatMessage {
