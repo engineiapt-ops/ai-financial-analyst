@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { fetchKlinesHistory } from "./binanceClient.js";
+import { createDefaultMarketDataService } from "./defaultService.js";
 import { saveMarketData } from "../db/repository.js";
 import { computeDatasetHash } from "./dataset.js";
 import type { Timeframe } from "../types.js";
@@ -18,6 +18,8 @@ function getPositiveInt(name: string, fallback: number): number {
   return value;
 }
 
+const marketDataService = createDefaultMarketDataService();
+
 async function main() {
   const symbol = String(getArg("--symbol", "BTCUSDT")).toUpperCase();
   const timeframe = String(getArg("--timeframe", "1h")) as Timeframe;
@@ -27,7 +29,10 @@ async function main() {
     throw new Error("timeframe must be 1h, 4h or 1d");
   }
 
-  const klines = await fetchKlinesHistory(symbol, timeframe, {
+  const klines = await marketDataService.getHistory({
+    provider: "binance",
+    instrument: symbol,
+    timeframe,
     totalCandles: candles,
     chunkSize: 1000,
     delayMs: 150,

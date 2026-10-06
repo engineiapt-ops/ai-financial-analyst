@@ -1,4 +1,4 @@
-import type { Kline, Timeframe } from "../../types.js";
+import type { Kline, Timeframe } from "../../domain/trading.js";
 
 export interface PriceQuery {
   instrument: string;
@@ -6,6 +6,15 @@ export interface PriceQuery {
   limit?: number;
   startTime?: number;
   endTime?: number;
+}
+
+export interface HistoricalPriceQuery {
+  instrument: string;
+  timeframe: Timeframe;
+  totalCandles: number;
+  endTime?: number;
+  chunkSize?: number;
+  delayMs?: number;
 }
 
 export interface PriceProviderMetadata {
@@ -20,4 +29,5 @@ export interface PriceProvider {
   readonly id: string;
   getCandles(query: PriceQuery): Promise<Kline[]>;
   getMetadata(query: PriceQuery): PriceProviderMetadata;
+  getHistory?(query: HistoricalPriceQuery): Promise<Kline[]>;
 }

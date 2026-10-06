@@ -1,5 +1,5 @@
 import { SUPPORTED_TIMEFRAMES } from "./binanceClient.js";
-import { BinancePriceProvider } from "./providers/binancePriceProvider.js";
+import { createDefaultMarketDataService } from "./defaultService.js";
 import { saveMarketData } from "../db/repository.js";
 import type { Kline, Timeframe } from "../types.js";
 
@@ -16,7 +16,7 @@ export function isClosedCandle(candle: Kline, nowMs: number): boolean {
   return candle.closeTime !== undefined && candle.closeTime.getTime() <= nowMs;
 }
 
-const binanceProvider = new BinancePriceProvider();
+const marketDataService = createDefaultMarketDataService();
 
 export async function collectLatestMarketData(
   symbol = "BTCUSDT",
@@ -38,15 +38,16 @@ export async function collectLatestMarketData(
   let saved = 0;
 
   for (const timeframe of uniqueTimeframes) {
-    const batch = await binanceProvider.getCandles({
+    const batch = await marketDataService.getSnapshot({
+      provider: "binance",
       instrument: cleanSymbol,
       timeframe,
       limit: 2,
       endTime: nowMs,
-    });
-    fetched += batch.length;
+    }, new Date(nowMs));
+    fetched += batch.candles.length;
 
-    const closed = batch.filter((candle) => isClosedCandle(candle, nowMs));
+    const closed = batch.candles.filter((candle) => isClosedCandle(candle, nowMs));
     candlesByTimeframe[timeframe] = closed.length;
 
     if (closed.length > 0) {

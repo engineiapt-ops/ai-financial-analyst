@@ -137,3 +137,58 @@ assert.equal(closedSnapshot.quality.dataAsOf, "2026-10-04T10:59:59.999Z");
 
 
 console.log("MarketDataService tests passed");
+
+
+const historyCandles: Kline[] = [
+  candle("2026-10-04T08:00:00.000Z", 98),
+  {
+    ...candle("2026-10-04T10:00:00.000Z", 100),
+    closeTime: new Date("2026-10-04T12:59:59.999Z"),
+  },
+  candle("2026-10-04T09:00:00.000Z", 99),
+];
+const historyProvider: PriceProvider = {
+  ...provider("history", historyCandles),
+  async getHistory(query) {
+    assert.equal(query.instrument, "BTCUSDT");
+    assert.equal(query.timeframe, "1h");
+    assert.equal(query.totalCandles, 3);
+    return historyCandles;
+  },
+};
+
+const historyService = new MarketDataService(
+  new PriceProviderRegistry([historyProvider]),
+);
+const history = await historyService.getHistory({
+  provider: "history",
+  instrument: "BTCUSDT",
+  timeframe: "1h",
+  totalCandles: 3,
+  endTime: new Date("2026-10-04T12:00:00.000Z").getTime(),
+});
+assert.equal(history.length, 2);
+assert.deepEqual(history.map((item) => item.close), [98, 99]);
+
+await assert.rejects(
+  () => historyService.getHistory({
+    provider: "history",
+    instrument: "BTCUSDT",
+    timeframe: "1h",
+    totalCandles: 0,
+  }),
+  /totalCandles must be a positive integer/,
+);
+
+const noHistoryService = new MarketDataService(
+  new PriceProviderRegistry([provider("no-history", [candle("2026-10-04T10:00:00.000Z", 100)])]),
+);
+await assert.rejects(
+  () => noHistoryService.getHistory({
+    provider: "no-history",
+    instrument: "BTCUSDT",
+    timeframe: "1h",
+    totalCandles: 2,
+  }),
+  /Historical market data is not supported by provider: no-history/,
+);
