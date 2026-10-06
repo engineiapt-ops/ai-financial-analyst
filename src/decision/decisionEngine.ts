@@ -4,7 +4,7 @@ import {
   thresholds,
 } from "../config/thresholds.js";
 import { callJev, JevModelVersionMismatchError, JevUnavailableError, type JevResponse } from "../jev/jevClient.js";
-import type { DecisionResult, MarketState, Recomendacao } from "../types.js";
+import type { DecisionResult, MarketState, Recomendacao } from "../domain/trading.js";
 
 const CHOICE_TO_RECOMENDACAO: Record<"ALTA" | "BAIXA" | "AGUARDAR", Recomendacao> = {
   ALTA: "BUY",
