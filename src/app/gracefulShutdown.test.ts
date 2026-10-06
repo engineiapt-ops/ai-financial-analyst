@@ -43,3 +43,16 @@ assert(
 );
 
 console.log("graceful shutdown tests: OK");
+
+const createAppSource = readFileSync(
+  new URL("./createApp.ts", import.meta.url),
+  "utf8",
+);
+assert(
+  createAppSource.includes("server.keepAliveTimeout = 70_000"),
+  "HTTP keep-alive timeout must exceed 65 seconds",
+);
+assert(
+  createAppSource.includes("server.headersTimeout = 75_000"),
+  "HTTP headers timeout must exceed keep-alive timeout",
+);
