@@ -28,7 +28,7 @@ const snapshot: MarketDataSnapshot = {
     quoteMode: "bid_ask",
   },
   candles,
-  quality: { status: "fresh", timeframe: "1h", checkedAt: "2026-10-01T12:00:00.000Z", dataAsOf: "2026-10-01T11:59:59.000Z", ageMs: 1, maxAgeMs: 5400000 },
+  quality: { version: "market-data-quality.v1", status: "fresh", timeframe: "1h", checkedAt: "2026-10-01T12:00:00.000Z", dataAsOf: "2026-10-01T11:59:59.000Z", ageMs: 1, maxAgeMs: 5400000 },
 };
 
 let receivedMarket: unknown;
