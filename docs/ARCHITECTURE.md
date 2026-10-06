@@ -133,3 +133,36 @@ Preferred refactoring sequence:
 6. deploy and compare behavior.
 
 This order keeps changes reversible and limits regression scope.
+
+## Broker boundary
+
+Broker connectivity is separate from market-data transport.
+
+The current Saxo broker adapter is intentionally **read-only**. Its contract exposes account discovery/details but no order placement, order modification or cancellation methods.
+
+Saxo environments are explicit:
+
+- `sim` → Saxo Simulation;
+- `live` → Saxo LIVE.
+
+Construction of a LIVE Saxo read-only client fails closed unless `SAXO_ENABLE_LIVE_READ_ONLY=true` is explicitly configured. Credentials/tokens are never logged.
+
+The broker layer owns provider environment semantics and account access. Market-data normalization continues to use the existing `PriceProvider` boundary. Instrument resolution remains the responsibility of `src/instruments`.
+
+The progression remains:
+
+```
+Saxo read-only
+      ↓
+real-data paper/shadow
+      ↓
+Saxo SIM execution
+      ↓
+reconciliation
+      ↓
+explicit LIVE safety gate
+      ↓
+controlled real test
+```
+
+No order endpoint is introduced by the broker boundary.
