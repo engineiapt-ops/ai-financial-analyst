@@ -47,7 +47,7 @@ try {
   });
 
   const readiness = await fetch(baseUrl + "/health/ready");
-  assert.equal([200, 503].includes(readiness.status), true);
+  assert.equal([200, 503].includes(readiness.status), true, `unexpected readiness status: ${readiness.status}`);
   const readinessBody = await readiness.json();
   assert.equal(["ok", "error"].includes(readinessBody.status), true);
   assert.equal(["ok", "error"].includes(readinessBody.db), true);
