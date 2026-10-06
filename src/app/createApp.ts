@@ -7,8 +7,10 @@ import { fileURLToPath } from 'url';
 import { createGeminiClient, type GeminiClient } from '../ai/geminiClient.js';
 import { app as coreApiApp } from '../api/server.js';
 import { isProtectedApiRequest, requireApiAuth } from '../api/auth.js';
+import { requestContextMiddleware } from '../api/requestContext.js';
+import { requestObservabilityMiddleware, requestErrorHandler } from '../api/observability.js';
 import { getGeminiModel, getGeminiTtsModel } from '../ai/geminiProvider.js';
-import { createRateLimitMiddleware, getRequestClientKey } from '../api/rateLimit.js';
+import { createRateLimitMiddleware, getRequestClientKey, isHeavyApiRequest } from '../api/rateLimit.js';
 import { isLegacyStockAnalystEnabled, isLegacyStockAnalystPath } from '../legacy/stockAnalystGate.js';
 
 dotenv.config();
@@ -21,6 +23,10 @@ const PORT = process.env.PORT || 3000;
 
 const GEMINI_MODEL = getGeminiModel();
 const GEMINI_TTS_MODEL = getGeminiTtsModel();
+
+app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
+app.use(requestContextMiddleware);
+app.use(requestObservabilityMiddleware);
 
 const corsOrigins = (process.env.CORS_ORIGINS ?? "")
   .split(",")
@@ -42,6 +48,7 @@ const corsOptions = corsOrigins.length > 0
     };
 
 app.use(cors(corsOptions));
+
 app.use((req, res, next) => {
   if (req.path === "/api/analyze/ledger") {
     express.json({ limit: "5mb" })(req, res, next);
@@ -49,6 +56,7 @@ app.use((req, res, next) => {
   }
   express.json({ limit: "1mb" })(req, res, next);
 });
+
 app.use((req, res, next) => {
   if (req.path === "/api/analyze/ledger") {
     express.urlencoded({ extended: true, limit: "5mb" })(req, res, next);
@@ -57,40 +65,36 @@ app.use((req, res, next) => {
   express.urlencoded({ extended: true, limit: "1mb" })(req, res, next);
 });
 
-const extendedAiApiPaths = new Set([
-  '/api/analyze/ticker',
-  '/api/analyze/ledger',
-  '/api/valuation/dcf',
-  '/api/research/memo',
-  '/api/briefing/tts',
-  '/api/copilot/chat',
-]);
-
-const extendedAiRateLimiter = createRateLimitMiddleware({
+const apiRateLimiter = createRateLimitMiddleware({
   windowMs: 60_000,
   max: Number(process.env.RATE_LIMIT_MAX ?? 120),
-  key: (req) => `extended-api:${getRequestClientKey(req)}`,
+  key: (req) => `api:${getRequestClientKey(req)}`,
 });
 
-const extendedAiHeavyRateLimiter = createRateLimitMiddleware({
+const heavyRateLimiter = createRateLimitMiddleware({
   windowMs: 60_000,
   max: Number(process.env.RATE_LIMIT_HEAVY_MAX ?? 20),
-  key: (req) => `extended-heavy:${getRequestClientKey(req)}`,
+  key: (req) => `heavy:${getRequestClientKey(req)}`,
 });
 
-const rootApiAuthMiddleware = requireApiAuth();
-const legacyStockAnalystEnabled = isLegacyStockAnalystEnabled();
-
 app.use((req, res, next) => {
-  if (!legacyStockAnalystEnabled && isLegacyStockAnalystPath(req.path)) {
-    res.status(404).json({
-      error: "legacy stock analyst disabled",
-      code: "LEGACY_STOCK_ANALYST_DISABLED",
-    });
+  if (req.path.startsWith("/api/")) {
+    apiRateLimiter(req, res, next);
     return;
   }
   next();
 });
+
+app.use((req, res, next) => {
+  if (isHeavyApiRequest(req)) {
+    heavyRateLimiter(req, res, next);
+    return;
+  }
+  next();
+});
+
+const rootApiAuthMiddleware = requireApiAuth();
+const legacyStockAnalystEnabled = isLegacyStockAnalystEnabled();
 
 app.use((req, res, next) => {
   if (isProtectedApiRequest(req)) {
@@ -101,17 +105,14 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  if (!extendedAiApiPaths.has(req.path) || req.method !== 'POST') {
-    return next();
+  if (!legacyStockAnalystEnabled && isLegacyStockAnalystPath(req.path)) {
+    res.status(404).json({
+      error: "legacy stock analyst disabled",
+      code: "LEGACY_STOCK_ANALYST_DISABLED",
+    });
+    return;
   }
-  extendedAiRateLimiter(req, res, next);
-});
-
-app.use((req, res, next) => {
-  if (!extendedAiApiPaths.has(req.path) || req.method !== 'POST') {
-    return next();
-  }
-  extendedAiHeavyRateLimiter(req, res, next);
+  next();
 });
 
 // Helper to safely get initialized GoogleGenAI or null
