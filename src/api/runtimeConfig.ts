@@ -46,7 +46,7 @@ function validCorsOrigins(value: string | undefined): boolean {
 export function inspectRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): RuntimeConfigCheck {
-  const productionMode = env.NODE_ENV === "production" || env.VERCEL === "1" || env.VERCEL === "true";
+  const productionMode = env.NODE_ENV === "production" || Boolean(trimValue(env.VERCEL)) || Boolean(trimValue(env.RENDER));
   const configured: string[] = [];
   const missing: string[] = [];
   const invalid: string[] = [];
@@ -67,7 +67,6 @@ export function inspectRuntimeConfig(
     "JEV_MODEL_VERSION",
     "PAPER_JEV_AUTORUN",
     "JEV_BASE_URL",
-    "JEV_API_KEY",
     "AI_GATEWAY_API_KEY",
     "CORS_ORIGINS",
     "GEMINI_API_BASE",
@@ -86,7 +85,22 @@ export function inspectRuntimeConfig(
   if (!validBoolean(env.TRUST_PROXY)) invalid.push("TRUST_PROXY");
   if (!validBoolean(env.OBSERVABILITY_LOGS)) invalid.push("OBSERVABILITY_LOGS");
   if (!validBoolean(env.PAPER_JEV_AUTORUN)) invalid.push("PAPER_JEV_AUTORUN");
+  if (!validBoolean(env.SERVE_STATIC)) invalid.push("SERVE_STATIC");
   if (!validCorsOrigins(env.CORS_ORIGINS)) invalid.push("CORS_ORIGINS");
+
+  const databaseSsl = trimValue(env.DATABASE_SSL);
+  if (databaseSsl && !["disable", "require"].includes(databaseSsl)) {
+    invalid.push("DATABASE_SSL");
+  }
+
+  const poolMax = parseEnvNumber(env.DB_POOL_MAX, { min: 1, max: 100 });
+  if (trimValue(env.DB_POOL_MAX) && (!poolMax || !Number.isInteger(poolMax))) {
+    invalid.push("DB_POOL_MAX");
+  }
+
+  if (!validUrl(env.DATABASE_MIGRATE_URL, ["postgres:", "postgresql:"])) {
+    if (trimValue(env.DATABASE_MIGRATE_URL)) invalid.push("DATABASE_MIGRATE_URL");
+  }
 
   if (!validUrl(env.BINANCE_REST_BASE?.trim(), ["http:", "https:"])) {
     invalid.push("BINANCE_REST_BASE");
@@ -110,14 +124,20 @@ export function inspectRuntimeConfig(
     warnings.push("PAPER_JEV_AUTORUN is not true; the paper JEV cycle is disabled");
   }
 
-  if (productionMode && env.PAPER_JEV_AUTORUN === "true") {
+  if (productionMode && env.PAPER_JEV_AUTORUN === "true" && !trimValue(env.VERCEL)) {
+    if (!trimValue(env.AI_GATEWAY_API_KEY)) missing.push("AI_GATEWAY_API_KEY");
     if (!trimValue(env.JEV_BASE_URL)) missing.push("JEV_BASE_URL");
-    if (!trimValue(env.JEV_API_KEY) && !trimValue(env.AI_GATEWAY_API_KEY)) {
-      missing.push("JEV_API_KEY");
+  }
+
+  if (productionMode && !trimValue(env.JEV_MODEL_VERSION)) {
+    warnings.push("JEV_MODEL_VERSION is not configured; JEV model version pinning is disabled");
+  }
+
+  if (productionMode && !trimValue(env.CORS_ORIGINS)) {
+    warnings.push("CORS_ORIGINS is empty in production");
+    if (env.SERVE_STATIC !== "true") {
+      missing.push("CORS_ORIGINS");
     }
-    if (!trimValue(env.JEV_MODEL_VERSION)) missing.push("JEV_MODEL_VERSION");
-  } else if (productionMode && !trimValue(env.JEV_MODEL_VERSION)) {
-    warnings.push("JEV_MODEL_VERSION is not configured; JEV model version pinning is disabled while paper JEV is disabled");
   }
 
   if (missing.length > 0 || invalid.length > 0) {
