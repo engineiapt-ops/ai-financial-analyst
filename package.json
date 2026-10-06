@@ -136,7 +136,8 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "recharts": "^3.10.1",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "@vercel/oidc": "^3.8.8"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
