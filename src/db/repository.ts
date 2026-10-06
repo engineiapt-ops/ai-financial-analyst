@@ -3340,8 +3340,19 @@ export function createRepository(db: RepositoryPool) {
     },
 
     async health(): Promise<boolean> {
-      await db.query("SELECT 1");
-      return true;
+      const client = await db.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SET LOCAL statement_timeout = '3000ms'");
+        await client.query("SELECT 1");
+        await client.query("COMMIT");
+        return true;
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
     },
   };
 }
