@@ -107,10 +107,14 @@ export function inspectRuntimeConfig(
     warnings.push("PAPER_JEV_AUTORUN is not true; the paper JEV cycle is disabled");
   }
 
-  if (productionMode && env.PAPER_JEV_AUTORUN === "true" && !trimValue(env.JEV_MODEL_VERSION)) {
-    missing.push("JEV_MODEL_VERSION");
+  if (productionMode && env.PAPER_JEV_AUTORUN === "true") {
+    if (!trimValue(env.JEV_BASE_URL)) missing.push("JEV_BASE_URL");
+    if (!trimValue(env.JEV_API_KEY) && !trimValue(env.AI_GATEWAY_API_KEY)) {
+      missing.push("JEV_API_KEY");
+    }
+    if (!trimValue(env.JEV_MODEL_VERSION)) missing.push("JEV_MODEL_VERSION");
   } else if (productionMode && !trimValue(env.JEV_MODEL_VERSION)) {
-    warnings.push("JEV_MODEL_VERSION is not configured; gateway-reported JEV version will be recorded for observability only");
+    warnings.push("JEV_MODEL_VERSION is not configured; JEV model version pinning is disabled while paper JEV is disabled");
   }
 
   if (missing.length > 0 || invalid.length > 0) {
