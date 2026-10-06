@@ -80,6 +80,18 @@ assert(
   "importing src/api/server.ts must never bind a network port",
 );
 
+for (const forbiddenMiddleware of [
+  "requestContextMiddleware",
+  "requestObservabilityMiddleware",
+  "createRateLimitMiddleware",
+  "requireApiAuth()",
+]) {
+  assert(
+    !coreApiServerSource.includes(forbiddenMiddleware),
+    `core API routes must not compose shared middleware: ${forbiddenMiddleware}`,
+  );
+}
+
 assert(
   coreApiServerSource.includes("RISK_POSITION_SIZE_PCT"),
   "portfolio API should use the shared position-size risk constant",
