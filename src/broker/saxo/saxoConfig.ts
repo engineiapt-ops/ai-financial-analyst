@@ -44,7 +44,7 @@ function parseBoolean(value: string | undefined): boolean {
 export function resolveSaxoEnvironment(
   config: SaxoRuntimeConfig = {},
 ): SaxoEnvironmentConfig {
-  const environment = config.environment ?? normalizeEnvironment(process.env.SAXO_ENVIRONMENT);
+  const environment = normalizeEnvironment(config.environment ?? process.env.SAXO_ENVIRONMENT);
   if (environment === "live") {
     const enabled = config.enableLiveReadOnly ?? parseBoolean(process.env.SAXO_ENABLE_LIVE_READ_ONLY);
     if (!enabled) {
