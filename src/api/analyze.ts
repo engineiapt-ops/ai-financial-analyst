@@ -6,7 +6,11 @@ import { decideWithJev } from "../decision/decisionEngine.js";
 import type { AnalysisPersistenceRepository } from "../db/ports/analysisPersistenceRepository.js";
 import { defaultAnalysisPersistenceRepository } from "../db/repositories/analysisPersistenceRepository.js";
 import { calibrateRegimeThresholds, classifyRegime } from "../risk/regime.js";
-import { applyRiskToDecision, evaluateRisk } from "../risk/riskEngine.js";
+import {
+  applyRiskToDecision,
+  evaluateRiskV2,
+  type RiskState,
+} from "../risk/riskEngine.js";
 import { computeIndicatorsSeries } from "../features/indicators.js";
 import { assertMarketDataFresh, type MarketDataQuality } from "../marketdata/quality.js";
 import { getInstrument } from "../instruments/registry.js";
@@ -30,7 +34,7 @@ export interface AnalyzeOutput {
   valorExposto: number;
   candlesAnalisados: number;
   marketDataQuality: MarketDataQuality;
-  risk: ReturnType<typeof evaluateRisk>;
+  risk: ReturnType<typeof evaluateRiskV2>;
 }
 
 export interface AnalyzeMarketDependencies {
@@ -41,6 +45,7 @@ export interface AnalyzeMarketDependencies {
   saveSignal: AnalysisPersistenceRepository["saveSignal"];
   saveDecisionLog: AnalysisPersistenceRepository["saveDecisionLog"];
   saveMarketData: AnalysisPersistenceRepository["saveMarketData"];
+  createRiskState: (equity: number) => RiskState;
 }
 
 const defaultMarketDataService = createDefaultMarketDataService();
@@ -60,11 +65,19 @@ const DEFAULT_DEPENDENCIES: AnalyzeMarketDependencies = {
   saveSignal: defaultAnalysisPersistenceRepository.saveSignal,
   saveDecisionLog: defaultAnalysisPersistenceRepository.saveDecisionLog,
   saveMarketData: defaultAnalysisPersistenceRepository.saveMarketData,
+  createRiskState: (equity) => ({
+    equity,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 0,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+  }),
 };
 
 function blockDecisionForExecution(
   decision: DecisionResult,
-  reason: "invalid_price" | "cost_filter",
+  reason: "invalid_price" | "cost_filter" | "risk_reward_filter",
 ): DecisionResult {
   return {
     ...decision,
@@ -138,7 +151,24 @@ export async function analyzeMarket(
   );
   const indicatorsSeries = computeIndicatorsSeries(klines);
   const regime = classifyRegime(last, indicatorsSeries[indicatorsSeries.length - 1], regimeThresholds);
-  const risk = evaluateRisk(rawDecision, regime);
+
+  // Execution levels establish the concrete stop distance required by Risk V2.
+  const candidateExecution = buildExecutableSignal({
+    ativo,
+    timeframe: input.timeframe,
+    dataAsOf,
+    decision: rawDecision,
+    entryPrice: last.close,
+    atr: indicators.atr,
+  });
+
+  const risk = evaluateRiskV2({
+    decision: rawDecision,
+    regime,
+    state: deps.createRiskState(input.valorInvestimento),
+    stopDistancePct: (candidateExecution.stopPct ?? 0) * 100,
+  });
+
   const riskAdjustedDecision = applyRiskToDecision(rawDecision, risk);
   const execution = buildExecutableSignal({
     ativo,
@@ -151,8 +181,15 @@ export async function analyzeMarket(
 
   let decision = riskAdjustedDecision;
   if (execution.status === "not_executable") {
-    if (execution.reason === "cost_filter" || execution.reason === "invalid_price") {
-      decision = blockDecisionForExecution(riskAdjustedDecision, execution.reason);
+    if (
+      execution.reason === "cost_filter" ||
+      execution.reason === "invalid_price" ||
+      execution.reason === "risk_reward_filter"
+    ) {
+      decision = blockDecisionForExecution(
+        riskAdjustedDecision,
+        execution.reason,
+      );
     }
   }
 
