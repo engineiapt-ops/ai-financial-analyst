@@ -1,19 +1,28 @@
 import "dotenv/config";
 import fs from "node:fs/promises";
 import path from "node:path";
-import pg from "pg";
+import { createPool } from "./pool.js";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.resolve(__dirname, "../../db/migrations");
 
 async function main(): Promise<void> {
-  const connectionString = process.env.DATABASE_URL?.trim();
+  const connectionString =
+    process.env.DATABASE_MIGRATE_URL?.trim() ||
+    process.env.DATABASE_URL?.trim();
+
   if (!connectionString) {
-    throw new Error("DATABASE_URL is required to run migrations");
+    throw new Error("DATABASE_MIGRATE_URL or DATABASE_URL is required to run migrations");
   }
 
-  const pool = new pg.Pool({ connectionString });
+  if (connectionString.includes(":6543")) {
+    console.warn(
+      "DATABASE_MIGRATE_URL appears to use Supabase transaction pooler port 6543. Use the direct/session connection for migrations.",
+    );
+  }
+
+  const pool = createPool(connectionString);
   const client = await pool.connect();
 
   try {
