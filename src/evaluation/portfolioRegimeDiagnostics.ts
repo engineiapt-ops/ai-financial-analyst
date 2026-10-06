@@ -257,7 +257,7 @@ export async function buildPortfolioRegimeDiagnostics(
           grossExposurePct: 0,
           consecutiveLosses: 0,
         },
-        stopDistancePct: sourceRun.stopPct * 100,
+        stopDistancePct: (sourceRun.stopPct ?? 0.005) * 100,
       });
       const blocked = !risk.allowed && risk.reason === "high_volatility";
 
