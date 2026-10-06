@@ -44,7 +44,7 @@ const gateway = createSaxoDecisionGateway(
       });
       return snapshot;
     },
-  } as never,
+  },
   (market) => {
     receivedMarket = market;
     return {
