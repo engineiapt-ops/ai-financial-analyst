@@ -1,6 +1,6 @@
 export type InstrumentAssetClass = "crypto_spot" | "cfd";
 
-export type InstrumentVenue = "binance_spot" | "ig" | "xtb";
+export type InstrumentVenue = "binance_spot" | "saxo" | "ig" | "xtb";
 
 export interface InstrumentDefinition {
   symbol: string;
@@ -48,13 +48,13 @@ export const INSTRUMENT_REGISTRY: readonly InstrumentDefinition[] = [
     symbol: "EURUSD",
     displayName: "Euro / US Dollar CFD",
     assetClass: "cfd",
-    venue: "ig",
+    venue: "saxo",
     baseCurrency: "EUR",
     quoteCurrency: "USD",
     enabled: false,
-    dataProvider: "TODO_CONFIRMAR_NA_CORRETORA",
+    dataProvider: "saxo-sim",
     metadataStatus: "pending_broker_confirmation",
-    metadataSource: "TODO_CONFIRMAR_NA_CORRETORA",
+    metadataSource: "Saxo OpenAPI Reference Data; account-specific validation required",
     minOrderSize: null,
     maxOrderSize: null,
     leverage: null,
