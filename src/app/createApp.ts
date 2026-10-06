@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
+import { createGeminiClient, type GeminiClient } from '../ai/geminiClient.js';
 import { app as coreApiApp } from '../api/server.js';
 import { isProtectedApiRequest, requireApiAuth } from '../api/auth.js';
 import { getGeminiModel, getGeminiTtsModel } from '../ai/geminiProvider.js';
@@ -115,20 +115,14 @@ app.use((req, res, next) => {
 });
 
 // Helper to safely get initialized GoogleGenAI or null
-function getAIClient(): GoogleGenAI | null {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!key) return null;
+function getAIClient(): GeminiClient | null {
   try {
-    return new GoogleGenAI({
-      apiKey: key,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-  } catch (err) {
-    console.error('Failed to initialize GoogleGenAI client:', err);
+    return createGeminiClient();
+  } catch (error) {
+    console.error(
+      'Failed to initialize Gemini client:',
+      error instanceof Error ? error.message : String(error),
+    );
     return null;
   }
 }
