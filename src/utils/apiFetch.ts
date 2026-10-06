@@ -1,5 +1,27 @@
 const API_KEY_STORAGE_KEY = "ai-financial-analyst-api-key";
 
+type ImportMetaEnvLike = {
+  VITE_API_BASE_URL?: string;
+};
+
+function readApiBaseUrl(): string {
+  const value = (import.meta as ImportMeta & { env?: ImportMetaEnvLike }).env?.VITE_API_BASE_URL?.trim();
+  return value ? value.replace(/\/$/, "") : "";
+}
+
+/**
+ * Resolves relative frontend API paths against the optional backend origin.
+ *
+ * Empty VITE_API_BASE_URL preserves the previous same-origin behavior.
+ */
+export function resolveApiUrl(input: RequestInfo | URL, apiBaseUrl = readApiBaseUrl()): RequestInfo | URL {
+  if (!apiBaseUrl || typeof input !== "string" || !input.startsWith("/")) {
+    return input;
+  }
+
+  return apiBaseUrl + input;
+}
+
 let apiKeyInMemory: string | undefined;
 
 function readSessionApiKey(): string | undefined {
@@ -60,7 +82,7 @@ export async function apiFetch(
     headers.set("X-API-Key", apiKey);
   }
 
-  const response = await fetch(input, {
+  const response = await fetch(resolveApiUrl(input), {
     ...init,
     headers,
   });
