@@ -22,7 +22,7 @@ import { computeDatasetHash } from "../marketdata/dataset.js";
 import { assertKlinesAvailableAsOf } from "../marketdata/pointInTime.js";
 import { freezeThresholds, thresholds } from "../config/thresholds.js";
 import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
-import { evaluateRisk, RISK_MAX_GROSS_EXPOSURE_PCT, RISK_POSITION_SIZE_PCT } from "../risk/riskEngine.js";
+import { evaluateRiskV2, RISK_MAX_GROSS_EXPOSURE_PCT, RISK_POSITION_SIZE_PCT } from "../risk/riskEngine.js";
 import {
   simulateWalkForwardPortfolio,
   WALK_FORWARD_PORTFOLIO_MODEL_VERSION,
@@ -368,7 +368,19 @@ export async function runWalkForward(options = getOptions()) {
       });
 
       const regime = regimeSeries[candidate.index];
-      const risk = evaluateRisk(decision, regime);
+      const risk = evaluateRiskV2({
+        decision,
+        regime,
+        state: {
+          equity: baselineRiskPortfolioCapital,
+          dailyLossPct: 0,
+          tradesToday: 0,
+          openPositions: 0,
+          grossExposurePct: 0,
+          consecutiveLosses: 0,
+        },
+        stopDistancePct: STOP_PCT * 100,
+      });
       if (!risk.allowed) {
         riskGateBlocks += 1;
         continue;
