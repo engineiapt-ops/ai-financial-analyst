@@ -25,6 +25,10 @@ MVP pessoal de análise financeira assistida por IA.
 11. API
 12. Backtest Jev x Baseline
 
+## Frontend / Backend
+
+O frontend pode apontar para um backend independente com `VITE_API_BASE_URL`. Em desenvolvimento local, deixe vazio para manter o comportamento same-origin. Em produção, o frontend pode apontar para o serviço Render do backend sem expor qualquer segredo no build.
+
 ## Desenvolvimento
 cp .env.example .env
 npm ci
