@@ -11,7 +11,7 @@ import {
   classifyRegime,
   type RegimeSnapshot,
 } from "../risk/regime.js";
-import { evaluateRisk } from "../risk/riskEngine.js";
+import { evaluateRiskV2 } from "../risk/riskEngine.js";
 import {
   simulateTrade,
   type TradeOutcome,
@@ -246,7 +246,19 @@ export async function buildPortfolioRegimeDiagnostics(
         sourceRun.stopPct,
       );
 
-      const risk = evaluateRisk(decision, regime);
+      const risk = evaluateRiskV2({
+        decision,
+        regime,
+        state: {
+          equity: 1000,
+          dailyLossPct: 0,
+          tradesToday: 0,
+          openPositions: 0,
+          grossExposurePct: 0,
+          consecutiveLosses: 0,
+        },
+        stopDistancePct: (sourceRun.stopPct ?? 0.005) * 100,
+      });
       const blocked = !risk.allowed && risk.reason === "high_volatility";
 
       const combined = bucketFor(byCombined, regime);

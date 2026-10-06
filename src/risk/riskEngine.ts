@@ -177,43 +177,6 @@ export function evaluateRiskV2(input: RiskV2Input): RiskAssessment {
   };
 }
 
-export function evaluateRisk(decision: DecisionResult, regime: RegimeSnapshot): RiskAssessment {
-  const basePositionSizePct = Math.min(
-    decision.tamanhoPosicaoPct > 0 ? decision.tamanhoPosicaoPct : FIXED_POSITION_PCT,
-    FIXED_POSITION_PCT,
-  );
-
-  if (decision.recomendacao === "WAIT") {
-    return {
-      ...blocked("wait_decision", regime, DEFAULT_RISK_POLICY),
-      riskPerTradePct: basePositionSizePct,
-    };
-  }
-
-  if (regime.volatility === "HIGH") {
-    return {
-      ...blocked("high_volatility", regime, DEFAULT_RISK_POLICY),
-      riskPerTradePct: basePositionSizePct,
-    };
-  }
-
-  const positionSizePct = decision.riscoElevado
-    ? basePositionSizePct * 0.5
-    : basePositionSizePct;
-
-  return {
-    version: RISK_ENGINE_VERSION,
-    allowed: true,
-    positionSizePct,
-    maxGrossExposurePct: RISK_MAX_GROSS_EXPOSURE_PCT,
-    riskPerTradePct: basePositionSizePct,
-    riskAmount: 0,
-    stopDistancePct: 0,
-    reason: "risk_ok",
-    regime,
-  };
-}
-
 export function applyRiskToDecision(decision: DecisionResult, risk: RiskAssessment): DecisionResult {
   if (risk.allowed) {
     return {

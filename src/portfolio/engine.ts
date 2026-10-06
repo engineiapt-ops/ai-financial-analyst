@@ -15,7 +15,11 @@ import { assertDatasetMatchesMetadata } from "../marketdata/dataset.js";
 import { FEE_PCT, SLIPPAGE_PCT } from "../papertrading/simulator.js";
 import type { Kline, Timeframe } from "../types.js";
 import { calibrateRegimeThresholds, buildRegimeSeries } from "../risk/regime.js";
-import { evaluateRisk, RISK_MAX_GROSS_EXPOSURE_PCT, RISK_POSITION_SIZE_PCT } from "../risk/riskEngine.js";
+import {
+  evaluateRiskV2,
+  RISK_MAX_GROSS_EXPOSURE_PCT,
+  RISK_POSITION_SIZE_PCT,
+} from "../risk/riskEngine.js";
 
 export const PORTFOLIO_MODEL_VERSION = "portfolio-v1";
 export const RISK_AWARE_PORTFOLIO_MODEL_VERSION = "portfolio-v1-risk-regime-v1";
@@ -161,7 +165,7 @@ export interface PortfolioEngineDependencies {
   assertDatasetMatchesMetadata: typeof assertDatasetMatchesMetadata;
   calibrateRegimeThresholds: typeof calibrateRegimeThresholds;
   buildRegimeSeries: typeof buildRegimeSeries;
-  evaluateRisk: typeof evaluateRisk;
+  evaluateRiskV2: typeof evaluateRiskV2;
 }
 
 const DEFAULT_DEPENDENCIES: PortfolioEngineDependencies = {
@@ -175,7 +179,7 @@ const DEFAULT_DEPENDENCIES: PortfolioEngineDependencies = {
   assertDatasetMatchesMetadata,
   calibrateRegimeThresholds,
   buildRegimeSeries,
-  evaluateRisk,
+  evaluateRiskV2,
 };
 
 export async function runPortfolioEngine(
@@ -321,14 +325,23 @@ export async function runPortfolioEngine(
         if (!regime) {
           throw new Error(`Missing frozen regime for entry timestamp ${asOf.toISOString()}`);
         }
-        const risk = deps.evaluateRisk(
-          {
+        const risk = deps.evaluateRiskV2({
+          decision: {
             origem: "baseline",
             recomendacao: trade.side,
             tamanhoPosicaoPct: positionSizePct,
           },
           regime,
-        );
+          state: {
+            equity,
+            dailyLossPct: 0,
+            tradesToday: 0,
+            openPositions: active.size,
+            grossExposurePct: equity > 0 ? (grossExposure / equity) * 100 : 0,
+            consecutiveLosses: 0,
+          },
+          stopDistancePct: (sourceRun.stopPct ?? 0.005) * 100,
+        });
         if (!risk.allowed) {
           riskGateBlocks += 1;
           rejectedTrades += 1;

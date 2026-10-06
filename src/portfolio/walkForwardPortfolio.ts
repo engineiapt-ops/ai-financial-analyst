@@ -11,7 +11,7 @@ import { computeIndicatorsSeries } from "../features/indicators.js";
 import { assertDatasetMatchesMetadata } from "../marketdata/dataset.js";
 import { simulateTrade, FEE_PCT, SLIPPAGE_PCT, type TradeOutcome } from "../papertrading/simulator.js";
 import { calibrateRegimeThresholds, classifyRegime, type RegimeSnapshot } from "../risk/regime.js";
-import { evaluateRisk } from "../risk/riskEngine.js";
+import { evaluateRiskV2 } from "../risk/riskEngine.js";
 import type { Kline, MarketState } from "../types.js";
 
 export const WALK_FORWARD_PORTFOLIO_MODEL_VERSION = "walk-forward-portfolio-v1.1";
@@ -347,14 +347,23 @@ function simulatePortfolio(
           if (!regime) {
             throw new Error(`Missing regime for signal index ${candidate.signalIndex}`);
           }
-          const risk = evaluateRisk(
-            {
+          const risk = evaluateRiskV2({
+            decision: {
               origem: "baseline",
               recomendacao: candidate.side,
               tamanhoPosicaoPct: positionSizePct,
             },
             regime,
-          );
+            state: {
+              equity,
+              dailyLossPct: 0,
+              tradesToday: 0,
+              openPositions: active.size,
+              grossExposurePct: equity > 0 ? (grossExposure / equity) * 100 : 0,
+              consecutiveLosses: 0,
+            },
+            stopDistancePct: 0.5,
+          });
           if (!risk.allowed) {
             rejectedTrades += 1;
             rejects += 1;
