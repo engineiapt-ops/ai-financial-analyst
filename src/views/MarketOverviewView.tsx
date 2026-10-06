@@ -32,16 +32,23 @@ export const MarketOverviewView: React.FC<MarketOverviewViewProps> = ({
           <div>
             <h1 className="text-xl font-bold text-white flex items-center gap-2">
               Macroeconomic Pulse & Cross-Asset Market Dashboard
-              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">
-                Global Feed
+              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                Dados ilustrativos
               </span>
             </h1>
             <p className="text-xs text-slate-400">
-              Real-time benchmark index performance, sovereign yields, inflation print, and key liquidity indicators.
+              Snapshot ilustrativo de índices, yields e indicadores macro. Não representa cotações em tempo real.
             </p>
           </div>
         </div>
       </div>
+
+      {marketData.source === 'static-demo' && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+          <strong>Dados ilustrativos.</strong> Esta tela usa um snapshot estático identificado como <code>static-demo</code>.
+          O timestamp da resposta é {new Date(marketData.asOf).toLocaleString()}.
+        </div>
+      )}
 
       {/* Macro Indicators */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">

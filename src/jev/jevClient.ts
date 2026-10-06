@@ -1,5 +1,4 @@
 import type { MarketState } from "../types.js";
-import { getVercelOidcToken } from "@vercel/oidc";
 
 const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/typesafe";
 const REQUEST_TIMEOUT_MS = 12_000;
@@ -11,7 +10,12 @@ const JEV_MODEL = "typesafe-ai/jev";
 async function getGatewayCredential(): Promise<string> {
   if (STATIC_API_KEY) return STATIC_API_KEY;
   if (process.env.VERCEL_OIDC_TOKEN) return process.env.VERCEL_OIDC_TOKEN;
-  if (process.env.VERCEL) return (await getVercelOidcToken()) ?? "";
+
+  if (process.env.VERCEL) {
+    const { getVercelOidcToken } = await import("@vercel/oidc");
+    return (await getVercelOidcToken()) ?? "";
+  }
+
   return "";
 }
 
@@ -211,16 +215,23 @@ export async function callJev(
 ): Promise<JevResponse> {
   const credential = options.credential ?? (await getGatewayCredential());
   if (!credential) {
-    throw new JevUnavailableError("AI_GATEWAY_API_KEY não configurada.");
+    throw new JevUnavailableError(
+      "configure AI_GATEWAY_API_KEY and JEV_BASE_URL outside Vercel.",
+    );
+  }
+
+  const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const configuredBaseUrl = options.baseUrl ?? process.env.JEV_BASE_URL;
+
+  if (!configuredBaseUrl?.trim() && !process.env.VERCEL && !options.fetchImpl) {
+    throw new JevUnavailableError("JEV_BASE_URL não configurada.");
   }
 
   const baseUrl = (
-    options.baseUrl ??
-    process.env.JEV_BASE_URL ??
-    DEFAULT_BASE_URL
+    configuredBaseUrl ??
+    (process.env.VERCEL ? DEFAULT_BASE_URL : "http://jev.local")
   ).replace(/\/$/, "");
-  const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
-  const fetchImpl = options.fetchImpl ?? fetch;
   const sleepImpl = options.sleepImpl ?? defaultSleep;
   const expectedModelVersion = process.env.JEV_MODEL_VERSION?.trim() || undefined;
 

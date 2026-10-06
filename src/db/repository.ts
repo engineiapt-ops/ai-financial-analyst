@@ -1,4 +1,5 @@
-import pg, { type Pool, type PoolClient, type QueryResultRow } from "pg";
+import type { PoolClient, QueryResultRow } from "pg";
+import { getDefaultPool as getSharedDefaultPool } from "./pool.js";
 import type { DecisionResult, Kline, Timeframe } from "../types.js";
 import type { ResearchSnapshot } from "../research/snapshot.js";
 import type { CalibrationObservation } from "../evaluation/calibration.js";
@@ -569,21 +570,9 @@ export interface MetricsByOrigem {
   avg_candles_held: number;
 }
 
-function requireDatabaseUrl(): string {
-  const value = process.env.DATABASE_URL?.trim();
-  if (!value) {
-    throw new Error("DATABASE_URL is required for repository operations");
-  }
-  return value;
-}
-
-let defaultPool: Pool | null = null;
-
-function getDefaultPool(): Pool {
-  if (!defaultPool) {
-    defaultPool = new pg.Pool({ connectionString: requireDatabaseUrl() });
-  }
-  return defaultPool;
+function getDefaultPool() {
+  // Keep the repository API lazy while sharing one centrally configured pool.
+  return getSharedDefaultPool();
 }
 
 function asFinite(value: number, field: string): number {
@@ -3351,8 +3340,19 @@ export function createRepository(db: RepositoryPool) {
     },
 
     async health(): Promise<boolean> {
-      await db.query("SELECT 1");
-      return true;
+      const client = await db.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SET LOCAL statement_timeout = '3000ms'");
+        await client.query("SELECT 1");
+        await client.query("COMMIT");
+        return true;
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
     },
   };
 }

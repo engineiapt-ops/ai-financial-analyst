@@ -14,7 +14,7 @@
     "start": "tsx server.ts",
     "test:indicators": "tsx src/features/indicators.test.ts",
     "test:sentiment": "tsx src/features/sentimentPipeline.test.ts",
-    "test": "npm run verify:test-manifest && npm run test:config && npm run test:api-fetch && npm run test:indicators && npm run test:sentiment && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:dataset && npm run test:repository && npm run test:server && npm run test:pit && npm run test:market-data-quality && npm run test:market-data-collector && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:gemini && npm run test:gemini-client && npm run test:evaluation-overview && npm run test:portfolio-governance-overview && npm run test:portfolio-stability && npm run test:operational-quality && npm run test:system-readiness && npm run test:rate-limit && npm run test:auth && npm run test:observability && npm run test:runtime-config && npm run test:api-integration && npm run test:portfolio-walk-forward && npm run test:pipeline-audit && npm run test:pipeline-audit-repository && npm run test:governance-dashboard && npm run test:continuous-governance && npm run test:research-intelligence && npm run test:pending-settlement && npm run test:outcome-settlement-audit && npm run test:system-validation && npm run test:paper-e2e && npm run test:jev-paper-cycle && npm run test:release-gate && npm run test:validation-history && npm run test:execution-levels && npm run test:risk && npm run test:research-snapshot-schema && npm run test:jev-client && npm run test:binance-client && npm run test:risk-regime && npm run test:risk-analysis && npm run test:portfolio-engine && npm run test:online-service && npm run test:analyze-risk-v2 && npm run test:thresholds && npm run test:stock-analyst-gate && npm run test:instrument-registry && npm run test:saxo-instrument-registry && npm run test:price-provider && npm run test:price-provider-registry && npm run test:market-data-normalization && npm run test:market-data-service && npm run test:execution-model-v3 && npm run test:executable-signal && npm run test:profitability && npm run test:promotion-gate && npm run test:ig-price-provider && npm run test:saxo-auth && npm run test:saxo-oauth && npm run test:saxo-price-provider && npm run test:saxo-broker && npm run test:market-data-consistency && npm run test:market-data-provenance && npm run test:market-data-pipeline && npm run test:market-data-integration && npm run test:market-data-observability && npm run test:quant-price-action && npm run test:quant-risk-reward && npm run test:quant-position-sizing && npm run test:paper-validation && npm run test:instrument-provider-mapping && npm run test:signal-confluence && npm run test:executable-signal-v2 && npm run test:paper-trading-cycle && npm run test:vanilla-options && npm run test:vanilla-option-selector && npm run test:volatility-analytics && npm run test:barrier-options && npm run test:binance-price-provider",
+    "test": "npm run verify:test-manifest && npm run test:config && npm run test:api-fetch && npm run test:indicators && npm run test:sentiment && npm run test:decision && npm run test:baseline && npm run test:paper && npm run test:dataset && npm run test:repository && npm run test:pool && npm run test:graceful-shutdown && npm run test:market-overview-provenance && npm run test:server && npm run test:create-app && npm run test:pit && npm run test:market-data-quality && npm run test:market-data-collector && npm run test:research && npm run test:snapshot && npm run test:evaluation && npm run test:kpis && npm run test:calibration && npm run test:oos-policy && npm run test:oos-report && npm run test:oos-robustness && npm run test:oos-gate && npm run test:oos-gate-repository && npm run test:online && npm run test:gemini && npm run test:gemini-client && npm run test:evaluation-overview && npm run test:portfolio-governance-overview && npm run test:portfolio-stability && npm run test:operational-quality && npm run test:system-readiness && npm run test:rate-limit && npm run test:auth && npm run test:observability && npm run test:runtime-config && npm run test:api-integration && npm run test:portfolio-walk-forward && npm run test:pipeline-audit && npm run test:pipeline-audit-repository && npm run test:governance-dashboard && npm run test:continuous-governance && npm run test:research-intelligence && npm run test:pending-settlement && npm run test:outcome-settlement-audit && npm run test:system-validation && npm run test:paper-e2e && npm run test:jev-paper-cycle && npm run test:release-gate && npm run test:validation-history && npm run test:execution-levels && npm run test:risk && npm run test:research-snapshot-schema && npm run test:jev-client && npm run test:binance-client && npm run test:risk-regime && npm run test:risk-analysis && npm run test:portfolio-engine && npm run test:online-service && npm run test:analyze-risk-v2 && npm run test:thresholds && npm run test:stock-analyst-gate && npm run test:instrument-registry && npm run test:saxo-instrument-registry && npm run test:price-provider && npm run test:price-provider-registry && npm run test:market-data-normalization && npm run test:market-data-service && npm run test:execution-model-v3 && npm run test:executable-signal && npm run test:profitability && npm run test:promotion-gate && npm run test:ig-price-provider && npm run test:saxo-auth && npm run test:saxo-oauth && npm run test:saxo-price-provider && npm run test:saxo-broker && npm run test:market-data-consistency && npm run test:market-data-provenance && npm run test:market-data-pipeline && npm run test:market-data-integration && npm run test:market-data-observability && npm run test:quant-price-action && npm run test:quant-risk-reward && npm run test:quant-position-sizing && npm run test:paper-validation && npm run test:instrument-provider-mapping && npm run test:signal-confluence && npm run test:executable-signal-v2 && npm run test:paper-trading-cycle && npm run test:vanilla-options && npm run test:vanilla-option-selector && npm run test:volatility-analytics && npm run test:barrier-options && npm run test:binance-price-provider",
     "test:decision": "tsx src/decision/decisionEngine.test.ts",
     "test:baseline": "tsx src/decision/baselineEngine.test.ts",
     "test:paper": "tsx src/papertrading/simulator.test.ts",
@@ -116,7 +116,11 @@
     "test:config": "tsx src/config/env.test.ts",
     "test:analyze-risk-v2": "tsx src/api/analyze.risk-v2.test.ts",
     "test:gemini-client": "tsx src/ai/geminiClient.test.ts",
-    "test:api-fetch": "tsx src/utils/apiFetch.test.ts"
+    "test:api-fetch": "tsx src/utils/apiFetch.test.ts",
+    "test:create-app": "tsx src/app/createApp.test.ts",
+    "test:pool": "tsx src/db/pool.test.ts",
+    "test:graceful-shutdown": "tsx src/app/gracefulShutdown.test.ts",
+    "test:market-overview-provenance": "tsx src/views/marketOverviewProvenance.test.ts"
   },
   "dependencies": {
     "express": "^5.2.1",
@@ -124,7 +128,6 @@
     "ws": "^8.18.0",
     "zod": "^3.23.8",
     "dotenv": "^18.0.4",
-    "@vercel/oidc": "^3.8.8",
     "@google/genai": "^2.24.0",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
@@ -134,7 +137,8 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "recharts": "^3.10.1",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "@vercel/oidc": "^3.8.8"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

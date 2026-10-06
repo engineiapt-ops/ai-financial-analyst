@@ -4,12 +4,18 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 
 interface TickerTapeProps {
   indices: MarketIndex[];
+  source?: string;
 }
 
-export const TickerTape: React.FC<TickerTapeProps> = ({ indices }) => {
+export const TickerTape: React.FC<TickerTapeProps> = ({ indices, source }) => {
   return (
     <div className="w-full bg-slate-950 border-b border-slate-900 py-1.5 px-4 overflow-hidden select-none">
       <div className="flex items-center space-x-8 animate-marquee whitespace-nowrap text-xs">
+        {source === 'static-demo' && (
+          <span className="inline-flex items-center rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+            Dados ilustrativos
+          </span>
+        )}
         {indices.concat(indices).map((item, idx) => {
           const isPos = item.change >= 0;
           return (

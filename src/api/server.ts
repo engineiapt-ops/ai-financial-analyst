@@ -1,8 +1,5 @@
 import "dotenv/config";
 import express from "express";
-import { createRateLimitMiddleware, getRequestClientKey, isHeavyApiRequest } from "./rateLimit.js";
-import { requestContextMiddleware } from "./requestContext.js";
-import { requestObservabilityMiddleware, requestErrorHandler } from "./observability.js";
 import { z } from "zod";
 import {
   fetchKlines,
@@ -43,7 +40,7 @@ import { buildOperationalQualityOverview } from "../product/operationalQuality.j
 import { comparePipelineAudits } from "../product/pipelineAudit.js";
 import { buildPipelineAuditForRun } from "../product/pipelineAuditService.js";
 import { listAiProviders } from "../ai/providers.js";
-import { hasValidCronSecret, isProtectedApiRequest, requireApiAuth } from "./auth.js";
+import { hasValidCronSecret } from "./auth.js";
 import { inspectRuntimeConfig } from "./runtimeConfig.js";
 import { buildGovernanceDashboardForScope } from "../product/governanceDashboardService.js";
 import { buildContinuousGovernanceForRun } from "../product/continuousGovernanceService.js";
@@ -69,52 +66,7 @@ function clientSafeApiError(status: number): string {
 }
 
 export const app = express();
-app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
-
-app.use(requestContextMiddleware);
-app.use(requestObservabilityMiddleware);
-app.use(express.json());
-
-const apiRateLimitWindowMs = 60_000;
-const apiRateLimitMax = Number(process.env.RATE_LIMIT_MAX ?? 120);
-const heavyRateLimitMax = Number(process.env.RATE_LIMIT_HEAVY_MAX ?? 20);
-
-const apiRateLimiter = createRateLimitMiddleware({
-  windowMs: apiRateLimitWindowMs,
-  max: apiRateLimitMax,
-  key: (req) => `api:${getRequestClientKey(req)}`,
-});
-
-const heavyRateLimiter = createRateLimitMiddleware({
-  windowMs: apiRateLimitWindowMs,
-  max: heavyRateLimitMax,
-  key: (req) => `heavy:${getRequestClientKey(req)}`,
-});
-
-app.use((req, res, next) => {
-  if (req.path.startsWith("/api/")) {
-    apiRateLimiter(req, res, next);
-    return;
-  }
-  next();
-});
-
-app.use((req, res, next) => {
-  if (isHeavyApiRequest(req)) {
-    heavyRateLimiter(req, res, next);
-    return;
-  }
-  next();
-});
-
-const apiAuthMiddleware = requireApiAuth();
-app.use((req, res, next) => {
-  if (isProtectedApiRequest(req)) {
-    apiAuthMiddleware(req, res, next);
-    return;
-  }
-  next();
-});
+// Shared middleware (CORS, body parsing, rate limiting and auth) is composed by createApp.ts.
 
 const HTML_DASHBOARD = `<!DOCTYPE html>
 <html lang="en">
@@ -1322,8 +1274,33 @@ app.get("/api/system/readiness/details", async (_req, res) => {
   res.status(200).json({ status: "ok", ...overview });
 });
 
+const SERVICE_VERSION = process.env.APP_VERSION?.trim() || "unknown";
+const SERVICE_COMMIT =
+  process.env.RENDER_GIT_COMMIT?.trim() ||
+  process.env.GIT_COMMIT?.trim() ||
+  "unknown";
+
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", service: "ai-financial-analyst-api" });
+  res.status(200).json({
+    status: "ok",
+    service: "ai-financial-analyst-api",
+  });
+});
+
+app.get("/health/ready", async (_req, res) => {
+  const database = await Promise.resolve()
+    .then(() => healthDatabase())
+    .then(() => "ok" as const)
+    .catch(() => "error" as const);
+
+  const ready = database === "ok";
+
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ok" : "error",
+    db: database,
+    version: SERVICE_VERSION,
+    commit: SERVICE_COMMIT,
+  });
 });
 
 app.get("/api/market/ping", async (_req, res) => {
@@ -2135,12 +2112,5 @@ app.get("/api/cron/paper-jev-cycle", async (req, res) => {
   }
 });
 
-app.use(requestErrorHandler);
-
-const port = Number(process.env.PORT ?? 3000);
-
-if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
-  app.listen(port, "0.0.0.0", () =>
-    console.log(`AI Financial Analyst API rodando na porta ${port}`),
-  );
-}
+// The root server.ts -> createApp.startServer() is the single production entrypoint.
+// This module is imported by createApp.ts and must never bind a port as a side effect.

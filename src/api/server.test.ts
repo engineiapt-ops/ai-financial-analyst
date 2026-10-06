@@ -76,6 +76,48 @@ assert(
 );
 
 assert(
+  !coreApiServerSource.includes("app.listen("),
+  "importing src/api/server.ts must never bind a network port",
+);
+
+assert(
+  coreApiServerSource.includes('app.get("/health"'),
+  "liveness endpoint must remain available",
+);
+assert(
+  coreApiServerSource.includes('app.get("/health/ready"'),
+  "readiness endpoint must be available",
+);
+assert(
+  coreApiServerSource.includes("healthDatabase()"),
+  "readiness must verify database availability",
+);
+assert(
+  coreApiServerSource.includes("res.status(ready ? 200 : 503)"),
+  "readiness must return 503 when the database is unavailable",
+);
+assert(
+  coreApiServerSource.includes("SERVICE_COMMIT"),
+  "readiness must expose the deployment commit",
+);
+assert(
+  coreApiServerSource.includes("SERVICE_VERSION"),
+  "readiness must expose the service version",
+);
+
+for (const forbiddenMiddleware of [
+  "requestContextMiddleware",
+  "requestObservabilityMiddleware",
+  "createRateLimitMiddleware",
+  "requireApiAuth()",
+]) {
+  assert(
+    !coreApiServerSource.includes(forbiddenMiddleware),
+    `core API routes must not compose shared middleware: ${forbiddenMiddleware}`,
+  );
+}
+
+assert(
   coreApiServerSource.includes("RISK_POSITION_SIZE_PCT"),
   "portfolio API should use the shared position-size risk constant",
 );

@@ -6,10 +6,10 @@ import {
   isHeavyApiRequest,
 } from "./rateLimit.js";
 
-function makeRequest(path = "/api/test"): Request {
+function makeRequest(path = "/api/test", ip = "127.0.0.1"): Request {
   return {
     path,
-    ip: "127.0.0.1",
+    ip,
     socket: { remoteAddress: "127.0.0.1" },
     header(name: string): string | undefined {
       if (name.toLowerCase() === "x-forwarded-for") return "203.0.113.10, 10.0.0.1";
@@ -85,8 +85,19 @@ assert.deepEqual(blocked.body, {
   retryAfterSeconds: Number(blocked.headers["Retry-After"]),
 });
 
+process.env.TRUST_PROXY = "false";
+assert.equal(
+  getRequestClientKey(makeRequest()),
+  "127.0.0.1",
+  "forged X-Forwarded-For must not change the key when proxy trust is disabled",
+);
 process.env.TRUST_PROXY = "true";
-assert.equal(getRequestClientKey(makeRequest()), "203.0.113.10");
+const trustedRequest = makeRequest("/api/test", "198.51.100.25");
+assert.equal(
+  getRequestClientKey(trustedRequest),
+  "198.51.100.25",
+  "when Express trusts the proxy, req.ip must represent the real client IP",
+);
 delete process.env.TRUST_PROXY;
 
 assert.equal(isHeavyApiRequest(makeRequest("/api/analyze")), true);

@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import type { Server } from 'node:http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -7,9 +8,12 @@ import { fileURLToPath } from 'url';
 import { createGeminiClient, type GeminiClient } from '../ai/geminiClient.js';
 import { app as coreApiApp } from '../api/server.js';
 import { isProtectedApiRequest, requireApiAuth } from '../api/auth.js';
+import { requestContextMiddleware } from '../api/requestContext.js';
+import { requestObservabilityMiddleware, requestErrorHandler } from '../api/observability.js';
 import { getGeminiModel, getGeminiTtsModel } from '../ai/geminiProvider.js';
-import { createRateLimitMiddleware, getRequestClientKey } from '../api/rateLimit.js';
+import { createRateLimitMiddleware, getRequestClientKey, isHeavyApiRequest } from '../api/rateLimit.js';
 import { isLegacyStockAnalystEnabled, isLegacyStockAnalystPath } from '../legacy/stockAnalystGate.js';
+import { healthDatabase } from '../db/repository.js';
 
 dotenv.config();
 
@@ -21,6 +25,10 @@ const PORT = process.env.PORT || 3000;
 
 const GEMINI_MODEL = getGeminiModel();
 const GEMINI_TTS_MODEL = getGeminiTtsModel();
+
+app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
+app.use(requestContextMiddleware);
+app.use(requestObservabilityMiddleware);
 
 const corsOrigins = (process.env.CORS_ORIGINS ?? "")
   .split(",")
@@ -42,6 +50,7 @@ const corsOptions = corsOrigins.length > 0
     };
 
 app.use(cors(corsOptions));
+
 app.use((req, res, next) => {
   if (req.path === "/api/analyze/ledger") {
     express.json({ limit: "5mb" })(req, res, next);
@@ -49,6 +58,7 @@ app.use((req, res, next) => {
   }
   express.json({ limit: "1mb" })(req, res, next);
 });
+
 app.use((req, res, next) => {
   if (req.path === "/api/analyze/ledger") {
     express.urlencoded({ extended: true, limit: "5mb" })(req, res, next);
@@ -57,25 +67,32 @@ app.use((req, res, next) => {
   express.urlencoded({ extended: true, limit: "1mb" })(req, res, next);
 });
 
-const extendedAiApiPaths = new Set([
-  '/api/analyze/ticker',
-  '/api/analyze/ledger',
-  '/api/valuation/dcf',
-  '/api/research/memo',
-  '/api/briefing/tts',
-  '/api/copilot/chat',
-]);
-
-const extendedAiRateLimiter = createRateLimitMiddleware({
+const apiRateLimiter = createRateLimitMiddleware({
   windowMs: 60_000,
   max: Number(process.env.RATE_LIMIT_MAX ?? 120),
-  key: (req) => `extended-api:${getRequestClientKey(req)}`,
+  key: (req) => `api:${getRequestClientKey(req)}`,
 });
 
-const extendedAiHeavyRateLimiter = createRateLimitMiddleware({
+const heavyRateLimiter = createRateLimitMiddleware({
   windowMs: 60_000,
   max: Number(process.env.RATE_LIMIT_HEAVY_MAX ?? 20),
-  key: (req) => `extended-heavy:${getRequestClientKey(req)}`,
+  key: (req) => `heavy:${getRequestClientKey(req)}`,
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    apiRateLimiter(req, res, next);
+    return;
+  }
+  next();
+});
+
+app.use((req, res, next) => {
+  if (isHeavyApiRequest(req)) {
+    heavyRateLimiter(req, res, next);
+    return;
+  }
+  next();
 });
 
 const rootApiAuthMiddleware = requireApiAuth();
@@ -98,20 +115,6 @@ app.use((req, res, next) => {
     return;
   }
   next();
-});
-
-app.use((req, res, next) => {
-  if (!extendedAiApiPaths.has(req.path) || req.method !== 'POST') {
-    return next();
-  }
-  extendedAiRateLimiter(req, res, next);
-});
-
-app.use((req, res, next) => {
-  if (!extendedAiApiPaths.has(req.path) || req.method !== 'POST') {
-    return next();
-  }
-  extendedAiHeavyRateLimiter(req, res, next);
 });
 
 // Helper to safely get initialized GoogleGenAI or null
@@ -152,7 +155,7 @@ function extractJSON(text: string | undefined): any {
   }
 }
 
-// 1. Live Market Overview API
+// 1. Market Overview API (static demo data; never present as live)
 app.get('/api/market/overview', async (_req: Request, res: Response) => {
   try {
     const marketData = {
@@ -171,7 +174,10 @@ app.get('/api/market/overview', async (_req: Request, res: Response) => {
         oilWTI: '$71.45/bbl',
         gold: '$2,658.20/oz'
       },
-      featuredTickers: ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'BRK.B']
+      featuredTickers: ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'BRK.B'],
+      source: 'static-demo',
+      asOf: new Date().toISOString(),
+      // TODO: replace this demo snapshot with a real market-data provider.
     };
     res.json(marketData);
   } catch (error: any) {
@@ -896,8 +902,50 @@ Be precise, structured, provide exact formulas where relevant, use bullet points
   }
 });
 
+const SERVICE_VERSION = process.env.APP_VERSION?.trim() || "unknown";
+const SERVICE_COMMIT =
+  process.env.RENDER_GIT_COMMIT?.trim() ||
+  process.env.GIT_COMMIT?.trim() ||
+  "unknown";
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "ai-financial-analyst-api",
+  });
+});
+
+app.get("/health/ready", async (_req, res) => {
+  const database = await Promise.resolve()
+    .then(() => healthDatabase())
+    .then(() => "ok" as const)
+    .catch(() => "error" as const);
+
+  const ready = database === "ok";
+
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ok" : "error",
+    db: database,
+    version: SERVICE_VERSION,
+    commit: SERVICE_COMMIT,
+  });
+});
+
+// Mount the core API once, after the root application's shared middleware.
+// This keeps /api and /health available to integration tests and production alike.
+app.use((req, res, next) => {
+  if (
+    req.path.startsWith('/api/') ||
+    req.path === '/health' ||
+    req.path === '/health/ready'
+  ) {
+    return coreApiApp(req, res, next);
+  }
+  next();
+});
+
 // Setup Vite middleware in dev or static files in production
-async function startServer() {
+async function startServer(): Promise<Server> {
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -918,24 +966,42 @@ async function startServer() {
         next(e);
       }
     });
+
   } else {
-    app.use(express.static(path.join(__dirname, '../../dist')));
-    app.use((_req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-    });
+    if (process.env.SERVE_STATIC === 'true') {
+      // Static serving is opt-in. Production normally serves the frontend from Cloudflare.
+      const distPath = path.join(__dirname, '../../dist');
+      app.use(express.static(distPath));
+      app.use((_req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      // With the frontend hosted separately, non-API routes return JSON 404s.
+      app.use((req, res) => {
+        res.status(404).json({ status: 'error', error: 'not found' });
+      });
+    }
   }
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
+  const server = app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 AI Financial Analyst Server running on http://0.0.0.0:${PORT}`);
   });
+
+  server.once('error', (error) => {
+    console.error('Failed to bind HTTP server:', error);
+    process.exitCode = 1;
+    server.close();
+  });
+
+  // Render's proxy can keep connections open beyond the default Node timeout.
+  // Keep the connection alive long enough to avoid deploy-time 502s.
+  server.keepAliveTimeout = 70_000;
+  server.headersTimeout = 75_000;
+
+  return server;
 }
 
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/') || req.path === '/health') {
-    return coreApiApp(req, res, next);
-  }
-  next();
-});
+app.use(requestErrorHandler);
 
 export { app, startServer };
 export default app;

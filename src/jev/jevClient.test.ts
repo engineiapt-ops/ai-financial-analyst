@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
 import type { MarketState } from "../types.js";
 import { callJev } from "./jevClient.js";
 
@@ -41,6 +42,20 @@ function validBody(modelVersion?: string): unknown {
 }
 
 process.env.JEV_MODEL_VERSION = "jev-2026-09";
+process.env.JEV_BASE_URL = "https://jev.example.test";
+
+
+let missingBaseUrlRejected = false;
+try {
+  await callJev(market, {
+    credential: "test-secret",
+    baseUrl: "",
+  });
+} catch (error) {
+  missingBaseUrlRejected =
+    error instanceof Error && error.message.includes("JEV_BASE_URL não configurada");
+}
+assert.equal(missingBaseUrlRejected, true);
 
 const success = await callJev(market, {
   credential: "test-secret",
@@ -165,6 +180,7 @@ try {
 assert.equal(unreportedRejected, true);
 
 delete process.env.JEV_MODEL_VERSION;
+process.env.JEV_BASE_URL = "https://jev.example.test";
 const unpinned = await callJev(market, {
   credential: "test-secret",
   fetchImpl: async () => response(validBody()),
@@ -172,3 +188,8 @@ const unpinned = await callJev(market, {
 assert.equal(unpinned.modelVersion, "unreported");
 
 console.log("jev client tests passed");
+
+const jevClientSource = readFileSync(new URL("./jevClient.ts", import.meta.url), "utf8");
+assert.equal(jevClientSource.includes('await import("@vercel/oidc")'), true);
+assert.equal(jevClientSource.includes('import { getVercelOidcToken } from "@vercel/oidc"'), false);
+assert.equal(jevClientSource.includes("ai-gateway.vercel.sh"), true);
