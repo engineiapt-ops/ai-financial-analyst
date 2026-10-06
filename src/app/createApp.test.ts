@@ -35,5 +35,21 @@ assert(
   !source.includes("path.join(__dirname, 'dist', 'index.html')"),
   "legacy src/app/dist fallback path must not remain",
 );
+assert(
+  source.includes("requestContextMiddleware"),
+  "request context must be composed by the root app",
+);
+assert(
+  source.includes("requestObservabilityMiddleware"),
+  "observability middleware must be composed by the root app",
+);
+assert(
+  source.includes('app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false)'),
+  "trust proxy must be configured centrally",
+);
+assert(
+  source.includes("isHeavyApiRequest"),
+  "heavy API rate limiting must be composed by the root app",
+);
 
 console.log("createApp static serving tests: OK");
