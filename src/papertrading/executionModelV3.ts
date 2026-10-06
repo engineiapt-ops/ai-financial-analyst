@@ -1,6 +1,7 @@
 import type { Kline } from "../types.js";
 
 export const EXECUTION_MODEL_V3_VERSION = "execution-model-v3";
+export const EXECUTION_MODEL_V3_1_VERSION = "execution-model-v3.1";
 
 export interface CfdQuoteCandle extends Kline {
   bidOpen: number;
@@ -22,8 +23,13 @@ export interface ExecutionModelV3Config {
   tradingHours?: (candle: CfdQuoteCandle) => boolean;
 }
 
+export interface ExecutionModelV3_1Config extends ExecutionModelV3Config {
+  longFinancingPctPerDay?: number;
+  shortFinancingPctPerDay?: number;
+}
+
 export interface ExecutionModelV3Trade {
-  version: typeof EXECUTION_MODEL_V3_VERSION;
+  version: typeof EXECUTION_MODEL_V3_VERSION | typeof EXECUTION_MODEL_V3_1_VERSION;
   side: "BUY" | "SELL";
   entryPrice: number;
   exitPrice: number | null;
@@ -94,6 +100,18 @@ function crossedOvernightDays(previous: Date, current: Date): number {
   return Math.max(0, Math.floor((end - start) / 86_400_000));
 }
 
+function spreadPercentForEntry(side: "BUY" | "SELL", candle: CfdQuoteCandle, signalEntry: number): number {
+  const spread = Math.abs(candle.askOpen - candle.bidOpen);
+  return (spread / signalEntry) * 100;
+}
+
+function financingRateForSide(side: "BUY" | "SELL", config: ExecutionModelV3_1Config): number {
+  if (side === "BUY") {
+    return config.longFinancingPctPerDay ?? config.overnightFinancingPctPerDay;
+  }
+  return config.shortFinancingPctPerDay ?? config.overnightFinancingPctPerDay;
+}
+
 export function simulateCfdTradeV3(input: {
   side: "BUY" | "SELL";
   signalCandle: CfdQuoteCandle;
@@ -153,7 +171,6 @@ export function simulateCfdTradeV3(input: {
       exitReason = "gap";
       rawExitPrice = quote.open;
     } else if (hitStop || hitTarget) {
-      // Conservative and deterministic: stop wins when both levels occur in one candle.
       exitReason = hitStop ? "stop" : "target";
       rawExitPrice = hitStop ? stopPrice : targetPrice;
     }
@@ -170,12 +187,9 @@ export function simulateCfdTradeV3(input: {
     totalSlippagePercent += Math.abs(exitPrice - rawExitPrice) / rawExitPrice * 100;
     const grossProfitPercent = ((exitPrice - entryPrice) / entryPrice) * direction * 100;
     const exitCommission = input.config.commissionPctPerSide;
-    const spreadPercent = Math.abs(
-      (side === "BUY" ? input.signalCandle.askOpen : input.signalCandle.bidOpen) -
-      (side === "BUY" ? input.signalCandle.bidOpen : input.signalCandle.askOpen),
-    ) / signalEntry * 100;
+    const spreadPercent = spreadPercentForEntry(side, input.signalCandle, signalEntry);
     const commissionPercent = entryCommission + exitCommission;
-    const netProfitPercent = grossProfitPercent - commissionPercent - totalSlippagePercent - spreadPercent - financingPercent;
+    const netProfitPercent = grossProfitPercent - commissionPercent - totalSlippagePercent - financingPercent;
 
     return {
       version: EXECUTION_MODEL_V3_VERSION, side, entryPrice, exitPrice, targetPrice, stopPrice,
@@ -189,7 +203,105 @@ export function simulateCfdTradeV3(input: {
     version: EXECUTION_MODEL_V3_VERSION, side, entryPrice, exitPrice: null, targetPrice, stopPrice,
     outcome: "open", exitReason: "end", grossProfitPercent: 0, netProfitPercent: 0,
     commissionPercent: entryCommission, slippagePercent: totalSlippagePercent,
-    spreadPercent: Math.abs(input.signalCandle.askOpen - input.signalCandle.bidOpen) / signalEntry * 100,
+    spreadPercent: spreadPercentForEntry(side, input.signalCandle, signalEntry),
     financingPercent, marginRequiredPercent, candlesHeld: input.futureCandles.length,
   };
 }
+
+export function simulateCfdTradeV3_1(input: {
+  side: "BUY" | "SELL";
+  signalCandle: CfdQuoteCandle;
+  futureCandles: CfdQuoteCandle[];
+  targetPct: number;
+  stopPct: number;
+  config: ExecutionModelV3_1Config;
+}): ExecutionModelV3Trade {
+  validateConfig(input.config);
+  validateCandle(input.signalCandle);
+  input.futureCandles.forEach(validateCandle);
+
+  finitePositive("targetPct", input.targetPct);
+  finitePositive("stopPct", input.stopPct);
+
+  const side = input.side;
+  const direction = side === "BUY" ? 1 : -1;
+  const signalEntry = entryRawPrice(side, input.signalCandle);
+  const entryPrice = adverseSlippage(side, signalEntry, input.config.slippagePctPerSide);
+  const targetPrice = entryPrice * (1 + direction * input.targetPct);
+  const stopPrice = entryPrice * (1 - direction * input.stopPct);
+  const marginRequiredPercent = 100 / input.config.leverage;
+  const entryCommission = input.config.commissionPctPerSide;
+  const spreadPercent = spreadPercentForEntry(side, input.signalCandle, signalEntry);
+  let financingPercent = 0;
+  let totalSlippagePercent = Math.abs(entryPrice - signalEntry) / signalEntry * 100;
+  let previousTime = input.signalCandle.closeTime ?? input.signalCandle.openTime;
+
+  if (input.config.tradingHours && !input.config.tradingHours(input.signalCandle)) {
+    return {
+      version: EXECUTION_MODEL_V3_1_VERSION, side, entryPrice, exitPrice: null, targetPrice, stopPrice,
+      outcome: "blocked", exitReason: "outside_hours", grossProfitPercent: 0, netProfitPercent: 0,
+      commissionPercent: 0, slippagePercent: 0, spreadPercent: 0, financingPercent: 0,
+      marginRequiredPercent, candlesHeld: 0,
+    };
+  }
+
+  for (let index = 0; index < input.futureCandles.length; index += 1) {
+    const candle = input.futureCandles[index];
+    const quote = exitRawPrice(side, candle);
+    financingPercent += crossedOvernightDays(previousTime, candle.openTime) * financingRateForSide(side, input.config);
+    previousTime = candle.closeTime ?? candle.openTime;
+
+    if (input.config.tradingHours && !input.config.tradingHours(candle)) continue;
+
+    const gapHitsStop = direction === 1 ? quote.open <= stopPrice : quote.open >= stopPrice;
+    const gapHitsTarget = direction === 1 ? quote.open >= targetPrice : quote.open <= targetPrice;
+    const hitStop = direction === 1 ? quote.low <= stopPrice : quote.high >= stopPrice;
+    const hitTarget = direction === 1 ? quote.high >= targetPrice : quote.low <= targetPrice;
+
+    let exitReason: ExecutionModelV3Trade["exitReason"] | null = null;
+    let rawExitPrice = quote.close;
+
+    if (gapHitsStop) {
+      exitReason = "gap";
+      rawExitPrice = quote.open;
+    } else if (gapHitsTarget) {
+      exitReason = "gap";
+      rawExitPrice = quote.open;
+    } else if (hitStop || hitTarget) {
+      exitReason = hitStop ? "stop" : "target";
+      rawExitPrice = hitStop ? stopPrice : targetPrice;
+    }
+
+    const equityMarginLevelPct = 100 * (1 + direction * ((quote.close - entryPrice) / entryPrice)) / marginRequiredPercent;
+    if (equityMarginLevelPct <= input.config.stopOutMarginLevelPct) {
+      exitReason = "stop_out";
+      rawExitPrice = quote.close;
+    }
+
+    if (!exitReason) continue;
+
+    const exitPrice = adverseSlippage(side, rawExitPrice, input.config.slippagePctPerSide);
+    totalSlippagePercent += Math.abs(exitPrice - rawExitPrice) / rawExitPrice * 100;
+    const grossProfitPercent = ((exitPrice - entryPrice) / entryPrice) * direction * 100;
+    const exitCommission = input.config.commissionPctPerSide;
+    const commissionPercent = entryCommission + exitCommission;
+    const netProfitPercent = grossProfitPercent - commissionPercent - totalSlippagePercent - financingPercent;
+    const outcome = netProfitPercent > 0 ? "win" : "loss";
+
+    return {
+      version: EXECUTION_MODEL_V3_1_VERSION, side, entryPrice, exitPrice, targetPrice, stopPrice,
+      outcome, exitReason,
+      grossProfitPercent, netProfitPercent, commissionPercent, slippagePercent: totalSlippagePercent,
+      spreadPercent, financingPercent, marginRequiredPercent, candlesHeld: index + 1,
+    };
+  }
+
+  return {
+    version: EXECUTION_MODEL_V3_1_VERSION, side, entryPrice, exitPrice: null, targetPrice, stopPrice,
+    outcome: "open", exitReason: "end", grossProfitPercent: 0, netProfitPercent: 0,
+    commissionPercent: entryCommission, slippagePercent: totalSlippagePercent,
+    spreadPercent, financingPercent, marginRequiredPercent, candlesHeld: input.futureCandles.length,
+  };
+}
+
+export const simulateCfdTradeV31 = simulateCfdTradeV3_1;
