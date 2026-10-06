@@ -116,7 +116,8 @@
     "test:config": "tsx src/config/env.test.ts",
     "test:analyze-risk-v2": "tsx src/api/analyze.risk-v2.test.ts",
     "test:gemini-client": "tsx src/ai/geminiClient.test.ts",
-    "test:api-fetch": "tsx src/utils/apiFetch.test.ts"
+    "test:api-fetch": "tsx src/utils/apiFetch.test.ts",
+    "test:create-app": "tsx src/app/createApp.test.ts"
   },
   "dependencies": {
     "express": "^5.2.1",
