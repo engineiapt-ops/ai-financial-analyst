@@ -10,30 +10,25 @@ export interface RuntimeConfigCheck {
   detail: string;
 }
 
+import { parseEnvNumber, parseEnvUrl, parseStrictBoolean, trimEnvValue } from "../config/env.js";
+
 function trimValue(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
+  return trimEnvValue(value);
 }
 
 function validPositiveNumber(value: string | undefined): boolean {
   if (!value) return true;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0;
+  return parseEnvNumber(value, { min: Number.MIN_VALUE }) !== undefined;
 }
 
 function validBoolean(value: string | undefined): boolean {
   if (!value) return true;
-  return value === "true" || value === "false";
+  return parseStrictBoolean(value) !== undefined;
 }
 
 function validUrl(value: string | undefined, protocols: string[]): boolean {
   if (!value) return true;
-  try {
-    const url = new URL(value);
-    return protocols.includes(url.protocol);
-  } catch {
-    return false;
-  }
+  return parseEnvUrl(value, protocols) !== undefined;
 }
 
 function validCorsOrigins(value: string | undefined): boolean {
