@@ -92,10 +92,12 @@ assert.equal(
   "forged X-Forwarded-For must not change the key when proxy trust is disabled",
 );
 process.env.TRUST_PROXY = "true";
+const trustedRequest = makeRequest();
+trustedRequest.ip = "198.51.100.25";
 assert.equal(
-  getRequestClientKey(makeRequest()),
-  "127.0.0.1",
-  "req.ip is the only client key source even when proxy trust is enabled",
+  getRequestClientKey(trustedRequest),
+  "198.51.100.25",
+  "when Express trusts the proxy, req.ip must represent the real client IP",
 );
 delete process.env.TRUST_PROXY;
 
