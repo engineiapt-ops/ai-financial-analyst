@@ -1275,7 +1275,42 @@ app.get("/api/system/readiness/details", async (_req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", service: "ai-financial-analyst-api" });
+  res.status(200).json({
+    status: "ok",
+    service: "ai-financial-analyst-api",
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+  });
+});
+
+app.get("/health/ready", async (_req, res) => {
+  const runtimeConfig = inspectRuntimeConfig();
+
+  const [database, marketData] = await Promise.all([
+    healthDatabase()
+      .then(() => ({ available: true }))
+      .catch(() => ({ available: false })),
+    pingBinance()
+      .then((available) => ({ available }))
+      .catch(() => ({ available: false })),
+  ]);
+
+  const ready =
+    runtimeConfig.state !== "blocked" &&
+    database.available &&
+    marketData.available;
+
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ok" : "degraded",
+    ready,
+    service: "ai-financial-analyst-api",
+    timestamp: new Date().toISOString(),
+    checks: {
+      database: database.available ? "ok" : "unavailable",
+      marketData: marketData.available ? "ok" : "unavailable",
+      runtimeConfig: runtimeConfig.state,
+    },
+  });
 });
 
 app.get("/api/market/ping", async (_req, res) => {
