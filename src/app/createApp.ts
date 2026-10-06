@@ -97,19 +97,19 @@ const rootApiAuthMiddleware = requireApiAuth();
 const legacyStockAnalystEnabled = isLegacyStockAnalystEnabled();
 
 app.use((req, res, next) => {
-  if (isProtectedApiRequest(req)) {
-    rootApiAuthMiddleware(req, res, next);
+  if (!legacyStockAnalystEnabled && isLegacyStockAnalystPath(req.path)) {
+    res.status(404).json({
+      error: "legacy stock analyst disabled",
+      code: "LEGACY_STOCK_ANALYST_DISABLED",
+    });
     return;
   }
   next();
 });
 
 app.use((req, res, next) => {
-  if (!legacyStockAnalystEnabled && isLegacyStockAnalystPath(req.path)) {
-    res.status(404).json({
-      error: "legacy stock analyst disabled",
-      code: "LEGACY_STOCK_ANALYST_DISABLED",
-    });
+  if (isProtectedApiRequest(req)) {
+    rootApiAuthMiddleware(req, res, next);
     return;
   }
   next();
