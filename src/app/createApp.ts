@@ -154,7 +154,7 @@ function extractJSON(text: string | undefined): any {
   }
 }
 
-// 1. Live Market Overview API
+// 1. Market Overview API (static demo data; never present as live)
 app.get('/api/market/overview', async (_req: Request, res: Response) => {
   try {
     const marketData = {
@@ -173,7 +173,10 @@ app.get('/api/market/overview', async (_req: Request, res: Response) => {
         oilWTI: '$71.45/bbl',
         gold: '$2,658.20/oz'
       },
-      featuredTickers: ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'BRK.B']
+      featuredTickers: ['NVDA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'BRK.B'],
+      source: 'static-demo',
+      asOf: new Date().toISOString(),
+      // TODO: replace this demo snapshot with a real market-data provider.
     };
     res.json(marketData);
   } catch (error: any) {
