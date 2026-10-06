@@ -1,4 +1,5 @@
-import pg, { type Pool, type PoolClient, type QueryResultRow } from "pg";
+import type { PoolClient, QueryResultRow } from "pg";
+import { getDefaultPool as getSharedDefaultPool } from "./pool.js";
 import type { DecisionResult, Kline, Timeframe } from "../types.js";
 import type { ResearchSnapshot } from "../research/snapshot.js";
 import type { CalibrationObservation } from "../evaluation/calibration.js";
@@ -577,13 +578,9 @@ function requireDatabaseUrl(): string {
   return value;
 }
 
-let defaultPool: Pool | null = null;
-
-function getDefaultPool(): Pool {
-  if (!defaultPool) {
-    defaultPool = new pg.Pool({ connectionString: requireDatabaseUrl() });
-  }
-  return defaultPool;
+function getDefaultPool() {
+  // Keep the repository API lazy while sharing one centrally configured pool.
+  return getSharedDefaultPool();
 }
 
 function asFinite(value: number, field: string): number {
