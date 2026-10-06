@@ -3,6 +3,7 @@ import { inspectRuntimeConfig } from "./runtimeConfig.js";
 
 const base = {
   NODE_ENV: "production",
+  RENDER: "true",
   DATABASE_URL: "postgres://example",
   API_AUTH_TOKEN: "secret",
   CRON_SECRET: "cron-secret",
@@ -12,7 +13,7 @@ const base = {
   GEMINI_API_KEY: "gemini-secret",
   GEMINI_MODEL: "gemini-3.8-flash",
   JEV_BASE_URL: "https://jev.example.test",
-  JEV_API_KEY: "jev-secret",
+  AI_GATEWAY_API_KEY: "gateway-secret",
   JEV_MODEL_VERSION: "jev-2026-09",
   GEMINI_API_BASE: "https://generativelanguage.googleapis.com/v1beta",
   GEMINI_TIMEOUT_MS: "30000",
@@ -71,6 +72,35 @@ const invalidPaperFlag = inspectRuntimeConfig({
 assert.equal(invalidPaperFlag.state, "blocked");
 assert.equal(invalidPaperFlag.invalid.includes("PAPER_JEV_AUTORUN"), true);
 
+const invalidRenderSettings = inspectRuntimeConfig({
+  ...base,
+  DATABASE_SSL: "maybe",
+  DB_POOL_MAX: "2.5",
+  SERVE_STATIC: "maybe",
+  DATABASE_MIGRATE_URL: "https://example.com",
+});
+assert.equal(invalidRenderSettings.state, "blocked");
+assert.equal(invalidRenderSettings.invalid.includes("DATABASE_SSL"), true);
+assert.equal(invalidRenderSettings.invalid.includes("DB_POOL_MAX"), true);
+assert.equal(invalidRenderSettings.invalid.includes("SERVE_STATIC"), true);
+assert.equal(invalidRenderSettings.invalid.includes("DATABASE_MIGRATE_URL"), true);
+
+const productionWithoutCors = inspectRuntimeConfig({
+  ...base,
+  CORS_ORIGINS: "",
+  SERVE_STATIC: "false",
+});
+assert.equal(productionWithoutCors.state, "blocked");
+assert.equal(productionWithoutCors.missing.includes("CORS_ORIGINS"), true);
+
+const productionStaticWithoutCors = inspectRuntimeConfig({
+  ...base,
+  CORS_ORIGINS: "",
+  SERVE_STATIC: "true",
+});
+assert.equal(productionStaticWithoutCors.state, "degraded");
+assert.equal(productionStaticWithoutCors.warnings.some((warning) => warning.includes("CORS_ORIGINS")), true);
+
 const missingCronSecret = inspectRuntimeConfig({
   ...base,
   CRON_SECRET: "",
@@ -80,12 +110,12 @@ assert.equal(missingCronSecret.missing.includes("CRON_SECRET"), true);
 
 const missingJevService = inspectRuntimeConfig({
   ...base,
+  AI_GATEWAY_API_KEY: "",
   JEV_BASE_URL: "",
-  JEV_API_KEY: "",
 });
 assert.equal(missingJevService.state, "blocked");
 assert.equal(missingJevService.missing.includes("JEV_BASE_URL"), true);
-assert.equal(missingJevService.missing.includes("JEV_API_KEY"), true);
+assert.equal(missingJevService.missing.includes("AI_GATEWAY_API_KEY"), true);
 
 const dev = inspectRuntimeConfig({ NODE_ENV: "development" });
 assert.equal(dev.state, "ready");
