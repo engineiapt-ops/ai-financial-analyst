@@ -78,6 +78,15 @@ const missingCronSecret = inspectRuntimeConfig({
 assert.equal(missingCronSecret.state, "blocked");
 assert.equal(missingCronSecret.missing.includes("CRON_SECRET"), true);
 
+const missingJevService = inspectRuntimeConfig({
+  ...base,
+  JEV_BASE_URL: "",
+  JEV_API_KEY: "",
+});
+assert.equal(missingJevService.state, "blocked");
+assert.equal(missingJevService.missing.includes("JEV_BASE_URL"), true);
+assert.equal(missingJevService.missing.includes("JEV_API_KEY"), true);
+
 const dev = inspectRuntimeConfig({ NODE_ENV: "development" });
 assert.equal(dev.state, "ready");
 assert.deepEqual(dev.missing, []);
