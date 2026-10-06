@@ -66,7 +66,7 @@ const paperJevWithoutPin = inspectRuntimeConfig({
   JEV_MODEL_VERSION: "",
   PAPER_JEV_AUTORUN: "true",
 });
-assert.equal(paperJevWithoutPin.state, "degraded");
+assert.equal(paperJevWithoutPin.state, "degraded", "Missing JEV_MODEL_VERSION is a warning-only degradation when the paper cycle remains configured");
 assert.equal(
   paperJevWithoutPin.warnings.some((warning) => warning.includes("JEV_MODEL_VERSION")),
   true,
