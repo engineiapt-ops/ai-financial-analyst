@@ -1,5 +1,5 @@
 import { FIXED_POSITION_PCT } from "../config/thresholds.js";
-import type { DecisionResult, Recomendacao } from "../types.js";
+import type { DecisionResult, Recomendacao } from "../domain/trading.js";
 import type { RegimeSnapshot } from "./regime.js";
 
 export const RISK_ENGINE_VERSION = "risk-engine-v2";
