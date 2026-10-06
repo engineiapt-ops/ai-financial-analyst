@@ -896,6 +896,15 @@ Be precise, structured, provide exact formulas where relevant, use bullet points
   }
 });
 
+// Mount the core API once, after the root application's shared middleware.
+// This keeps /api and /health available to integration tests and production alike.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/health') {
+    return coreApiApp(req, res, next);
+  }
+  next();
+});
+
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
@@ -919,21 +928,7 @@ async function startServer() {
       }
     });
 
-    app.use((req, res, next) => {
-      if (req.path.startsWith('/api/') || req.path === '/health') {
-        return coreApiApp(req, res, next);
-      }
-      next();
-    });
   } else {
-    // The API must be mounted before any static fallback so /api/* never receives index.html.
-    app.use((req, res, next) => {
-      if (req.path.startsWith('/api/') || req.path === '/health') {
-        return coreApiApp(req, res, next);
-      }
-      next();
-    });
-
     if (process.env.SERVE_STATIC === 'true') {
       // Static serving is opt-in. Production normally serves the frontend from Cloudflare.
       const distPath = path.join(__dirname, '../../dist');
