@@ -6,7 +6,7 @@ import type {
   Timeframe,
 } from "../domain/trading.js";
 import { computeIndicators } from "../features/indicators.js";
-import type { MarketDataService, MarketDataSnapshot } from "../marketdata/service.js";
+import type { MarketDataSnapshot } from "../marketdata/service.js";
 import { resolveProviderInstrument } from "../instruments/providerMapping.js";
 
 export interface SaxoDecisionInput {
@@ -16,6 +16,19 @@ export interface SaxoDecisionInput {
   limit?: number;
   checkedAt?: Date;
   noticiaSentimento?: number;
+}
+
+export interface SaxoDecisionMarketDataPort {
+  getSnapshot: (
+    request: {
+      provider: string;
+      instrument: string;
+      timeframe: Timeframe;
+      limit?: number;
+      endTime?: number;
+    },
+    checkedAt: Date,
+  ) => Promise<MarketDataSnapshot>;
 }
 
 export interface SaxoDecisionDependencies {
@@ -62,7 +75,7 @@ function buildMarketState(
 }
 
 export function createSaxoDecisionGateway(
-  marketDataService: MarketDataService,
+  marketDataService: SaxoDecisionMarketDataPort,
   evaluateBaseline: SaxoDecisionDependencies["evaluateBaseline"],
   decideWithJev: SaxoDecisionDependencies["decideWithJev"],
 ): (input: SaxoDecisionInput) => Promise<DecisionResult & { market: MarketState; snapshot: MarketDataSnapshot }> {
