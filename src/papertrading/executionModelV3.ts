@@ -105,6 +105,15 @@ function spreadPercentForEntry(side: "BUY" | "SELL", candle: CfdQuoteCandle, sig
   return (spread / signalEntry) * 100;
 }
 
+function classifyTradeOutcome(
+  exitReason: ExecutionModelV3Trade["exitReason"],
+  grossProfitPercent: number,
+): "win" | "loss" {
+  if (exitReason === "target") return "win";
+  if (exitReason === "stop" || exitReason === "stop_out") return "loss";
+  return grossProfitPercent > 0 ? "win" : "loss";
+}
+
 function financingRateForSide(side: "BUY" | "SELL", config: ExecutionModelV3_1Config): number {
   if (side === "BUY") {
     return config.longFinancingPctPerDay ?? config.overnightFinancingPctPerDay;
@@ -190,10 +199,11 @@ export function simulateCfdTradeV3(input: {
     const spreadPercent = spreadPercentForEntry(side, input.signalCandle, signalEntry);
     const commissionPercent = entryCommission + exitCommission;
     const netProfitPercent = grossProfitPercent - commissionPercent - totalSlippagePercent - financingPercent;
+    const outcome = classifyTradeOutcome(exitReason, grossProfitPercent);
 
     return {
       version: EXECUTION_MODEL_V3_VERSION, side, entryPrice, exitPrice, targetPrice, stopPrice,
-      outcome: exitReason === "target" ? "win" : "loss", exitReason,
+      outcome, exitReason,
       grossProfitPercent, netProfitPercent, commissionPercent, slippagePercent: totalSlippagePercent,
       spreadPercent, financingPercent, marginRequiredPercent, candlesHeld: index + 1,
     };
@@ -286,7 +296,7 @@ export function simulateCfdTradeV3_1(input: {
     const exitCommission = input.config.commissionPctPerSide;
     const commissionPercent = entryCommission + exitCommission;
     const netProfitPercent = grossProfitPercent - commissionPercent - totalSlippagePercent - financingPercent;
-    const outcome = netProfitPercent > 0 ? "win" : "loss";
+    const outcome = classifyTradeOutcome(exitReason, grossProfitPercent);
 
     return {
       version: EXECUTION_MODEL_V3_1_VERSION, side, entryPrice, exitPrice, targetPrice, stopPrice,
