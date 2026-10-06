@@ -190,6 +190,6 @@ assert.equal(unpinned.modelVersion, "unreported");
 console.log("jev client tests passed");
 
 const jevClientSource = readFileSync(new URL("./jevClient.ts", import.meta.url), "utf8");
-assert.equal(jevClientSource.includes("@vercel/oidc"), false);
-assert.equal(jevClientSource.includes("getVercelOidcToken"), false);
-assert.equal(jevClientSource.includes("ai-gateway.vercel.sh"), false);
+assert.equal(jevClientSource.includes('await import("@vercel/oidc")'), true);
+assert.equal(jevClientSource.includes('import { getVercelOidcToken } from "@vercel/oidc"'), false);
+assert.equal(jevClientSource.includes("ai-gateway.vercel.sh"), true);
