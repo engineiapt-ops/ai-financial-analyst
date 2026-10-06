@@ -1,12 +1,22 @@
 import type { MarketState } from "../types.js";
+
+const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/typesafe";
 const REQUEST_TIMEOUT_MS = 12_000;
 const MAX_RETRIES = 2;
 const RETRY_BASE_MS = 750;
-const STATIC_API_KEY = process.env.JEV_API_KEY ?? process.env.AI_GATEWAY_API_KEY ?? "";
+const STATIC_API_KEY = process.env.AI_GATEWAY_API_KEY ?? "";
 const JEV_MODEL = "typesafe-ai/jev";
 
-function getJevCredential(): string {
-  return STATIC_API_KEY;
+async function getGatewayCredential(): Promise<string> {
+  if (STATIC_API_KEY) return STATIC_API_KEY;
+  if (process.env.VERCEL_OIDC_TOKEN) return process.env.VERCEL_OIDC_TOKEN;
+
+  if (process.env.VERCEL) {
+    const { getVercelOidcToken } = await import("@vercel/oidc");
+    return (await getVercelOidcToken()) ?? "";
+  }
+
+  return "";
 }
 
 export interface JevAnswer<T> {
@@ -203,22 +213,25 @@ export async function callJev(
   market: MarketState,
   options: JevClientOptions = {},
 ): Promise<JevResponse> {
-  const credential = options.credential ?? getJevCredential();
+  const credential = options.credential ?? (await getGatewayCredential());
   if (!credential) {
-    throw new JevUnavailableError("AI_GATEWAY_API_KEY não configurada.");
+    throw new JevUnavailableError(
+      "configure AI_GATEWAY_API_KEY and JEV_BASE_URL outside Vercel.",
+    );
   }
 
   const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
   const fetchImpl = options.fetchImpl ?? fetch;
   const configuredBaseUrl = options.baseUrl ?? process.env.JEV_BASE_URL;
 
-  // Production transport must have an explicit external JEV endpoint.
-  // Tests may inject fetchImpl and use a harmless placeholder URL.
-  if (!configuredBaseUrl?.trim() && !options.fetchImpl) {
+  if (!configuredBaseUrl?.trim() && !process.env.VERCEL && !options.fetchImpl) {
     throw new JevUnavailableError("JEV_BASE_URL não configurada.");
   }
 
-  const baseUrl = (configuredBaseUrl ?? "http://jev.local").replace(/\/$/, "");
+  const baseUrl = (
+    configuredBaseUrl ??
+    (process.env.VERCEL ? DEFAULT_BASE_URL : "http://jev.local")
+  ).replace(/\/$/, "");
   const sleepImpl = options.sleepImpl ?? defaultSleep;
   const expectedModelVersion = process.env.JEV_MODEL_VERSION?.trim() || undefined;
 
