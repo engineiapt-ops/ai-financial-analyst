@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { computeDatasetHash } from "../marketdata/dataset.js";
 import { evaluateJevResponse } from "../decision/decisionEngine.js";
 import type { JevResponse } from "../jev/jevClient.js";
-import { evaluateRisk } from "../risk/riskEngine.js";
+import { evaluateRiskV2 } from "../risk/riskEngine.js";
 import { simulateTrade, DEFAULT_EXECUTION_COSTS, EXECUTION_MODEL_VERSION } from "../papertrading/simulator.js";
 import { evaluateDecisionLog } from "../evaluation/decisionEvaluator.js";
 import { buildOutcomeSettlementAudit } from "../evaluation/outcomeSettlementAudit.js";
@@ -60,9 +60,21 @@ assert.equal(decision.riscoElevado, false);
 assert.equal(decision.probabilidadeDirecional, 0.8);
 
 const regime = { key: "normal", volatility: "NORMAL" } as any;
-const risk = evaluateRisk(decision, regime);
+const risk = evaluateRiskV2({
+  decision,
+  regime,
+  state: {
+    equity: 1000,
+    dailyLossPct: 0,
+    tradesToday: 0,
+    openPositions: 0,
+    grossExposurePct: 0,
+    consecutiveLosses: 0,
+  },
+  stopDistancePct: 0.5,
+});
 assert.equal(risk.allowed, true);
-assert.equal(risk.positionSizePct, 1.5);
+assert.equal(risk.positionSizePct, 15);
 assert.equal(risk.maxGrossExposurePct, 15);
 
 const persistedDecision: DecisionLogRecord = {
