@@ -2137,10 +2137,5 @@ app.get("/api/cron/paper-jev-cycle", async (req, res) => {
 
 app.use(requestErrorHandler);
 
-const port = Number(process.env.PORT ?? 3000);
-
-if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
-  app.listen(port, "0.0.0.0", () =>
-    console.log(`AI Financial Analyst API rodando na porta ${port}`),
-  );
-}
+// The root server.ts -> createApp.startServer() is the single production entrypoint.
+// This module is imported by createApp.ts and must never bind a port as a side effect.
