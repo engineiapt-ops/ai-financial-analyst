@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
 import type { MarketState } from "../types.js";
 import { callJev } from "./jevClient.js";
 
