@@ -50,7 +50,6 @@ try {
   await callJev(market, {
     credential: "test-secret",
     baseUrl: "",
-    fetchImpl: async () => response(validBody("jev-2026-09")),
   });
 } catch (error) {
   missingBaseUrlRejected =
