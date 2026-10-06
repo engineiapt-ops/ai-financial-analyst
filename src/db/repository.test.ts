@@ -153,6 +153,15 @@ assert.match(
 const db = new FakeDb();
 const repo = createRepository(db);
 
+await repo.health();
+assert.deepEqual(db.client.queries.slice(-4), [
+  "BEGIN",
+  "SET LOCAL statement_timeout = '3000ms'",
+  "SELECT 1",
+  "COMMIT",
+]);
+assert.equal(db.client.queries.includes("ROLLBACK"), false);
+
 const decision: DecisionResult = {
   origem: "jev",
   recomendacao: "BUY",
