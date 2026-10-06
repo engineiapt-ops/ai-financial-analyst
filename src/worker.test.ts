@@ -7,7 +7,7 @@ try {
   let capturedApiKey = "";
 
   globalThis.fetch = async (input, init) => {
-    capturedUrl = String(input);
+    capturedUrl = input instanceof Request ? input.url : String(input);
     capturedApiKey = new Headers(init?.headers).get("X-API-Key") ?? "";
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
