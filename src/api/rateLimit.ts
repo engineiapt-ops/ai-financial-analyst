@@ -70,13 +70,8 @@ export function createRateLimitMiddleware(options: RateLimitOptions): RequestHan
 }
 
 export function getRequestClientKey(req: Request): string {
-  const trustProxy = process.env.TRUST_PROXY === "true";
-  if (trustProxy) {
-    const forwardedFor = req.header("x-forwarded-for");
-    const firstForwarded = forwardedFor?.split(",")[0]?.trim();
-    if (firstForwarded) return firstForwarded;
-  }
-
+  // Express computes req.ip according to app.set("trust proxy", ...).
+  // Never parse X-Forwarded-For manually: clients can forge that header.
   return req.ip || req.socket.remoteAddress || "unknown";
 }
 
