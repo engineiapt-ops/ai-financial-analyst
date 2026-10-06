@@ -5,7 +5,7 @@ import {
   type HistoricalKlineOptions,
   fetchKlinesHistory,
 } from "../binanceClient.js";
-import type { PriceProvider, PriceQuery, PriceProviderMetadata } from "./priceProvider.js";
+import type { HistoricalPriceQuery, PriceProvider, PriceQuery, PriceProviderMetadata } from "./priceProvider.js";
 
 export interface BinanceProviderConfig {
   fetchCandles?: typeof fetchKlines;
@@ -48,11 +48,12 @@ export class BinancePriceProvider implements PriceProvider {
     };
   }
 
-  async getHistory(
-    symbol: string,
-    timeframe: PriceQuery["timeframe"],
-    options: HistoricalKlineOptions,
-  ): Promise<Kline[]> {
-    return this.fetchHistory(symbol, timeframe, options);
+  async getHistory(query: HistoricalPriceQuery): Promise<Kline[]> {
+    return this.fetchHistory(query.instrument, query.timeframe, {
+      totalCandles: query.totalCandles,
+      endTime: query.endTime,
+      chunkSize: query.chunkSize,
+      delayMs: query.delayMs,
+    });
   }
 }
