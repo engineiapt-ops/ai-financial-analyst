@@ -904,7 +904,11 @@ Be precise, structured, provide exact formulas where relevant, use bullet points
 // Mount the core API once, after the root application's shared middleware.
 // This keeps /api and /health available to integration tests and production alike.
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/') || req.path === '/health') {
+  if (
+    req.path.startsWith('/api/') ||
+    req.path === '/health' ||
+    req.path === '/health/ready'
+  ) {
     return coreApiApp(req, res, next);
   }
   next();
