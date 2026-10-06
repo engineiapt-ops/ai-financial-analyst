@@ -11,7 +11,7 @@ assert.equal(
   "https://api.example.com/api/market/overview",
 );
 assert.equal(
-  resolveApiUrl(new URL("/api/health", "https://frontend.example.com"), "https://api.example.com"),
+  String(resolveApiUrl(new URL("/api/health", "https://frontend.example.com"), "https://api.example.com")),
   "https://frontend.example.com/api/health",
 );
 
