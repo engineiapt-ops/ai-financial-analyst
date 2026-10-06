@@ -13,6 +13,8 @@ assert.deepEqual(
   ["BTCUSDT"],
 );
 assert.equal(getInstrument("EURUSD").enabled, false);
+assert.equal(getInstrument("EURUSD").venue, "saxo");
+assert.equal(getInstrument("EURUSD").dataProvider, "saxo-sim");
 assert.equal(getInstrument("EURUSD").metadataStatus, "pending_broker_confirmation");
 assert.equal(getInstrument("EURUSD").spread, null);
 assert.equal(getInstrument("US500").leverage, null);
