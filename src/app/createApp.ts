@@ -918,24 +918,35 @@ async function startServer() {
         next(e);
       }
     });
-  } else {
-    app.use(express.static(path.join(__dirname, '../../dist')));
+  } else if (process.env.SERVE_STATIC === 'true') {
+    // Static hosting is opt-in. Production normally serves the frontend from Cloudflare.
+    const distPath = path.join(__dirname, '../../dist');
+    app.use(express.static(distPath));
     app.use((_req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  } else {
+    // With the frontend hosted separately, non-API routes must not accidentally
+    // return an HTML SPA fallback from the backend.
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path === '/health') {
+        return next();
+      }
+      res.status(404).json({ status: 'error', error: 'not found' });
     });
   }
+
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path === '/health') {
+      return coreApiApp(req, res, next);
+    }
+    next();
+  });
 
   app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 AI Financial Analyst Server running on http://0.0.0.0:${PORT}`);
   });
 }
-
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/') || req.path === '/health') {
-    return coreApiApp(req, res, next);
-  }
-  next();
-});
 
 export { app, startServer };
 export default app;
