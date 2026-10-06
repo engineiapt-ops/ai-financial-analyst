@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import type { Server } from 'node:http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -907,7 +908,7 @@ app.use((req, res, next) => {
 });
 
 // Setup Vite middleware in dev or static files in production
-async function startServer() {
+async function startServer(): Promise<Server> {
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -945,9 +946,11 @@ async function startServer() {
     }
   }
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
+  const server = app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 AI Financial Analyst Server running on http://0.0.0.0:${PORT}`);
   });
+
+  return server;
 }
 
 app.use(requestErrorHandler);
