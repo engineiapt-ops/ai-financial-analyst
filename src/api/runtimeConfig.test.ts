@@ -21,6 +21,8 @@ const base = {
   RATE_LIMIT_MAX: "120",
   RATE_LIMIT_HEAVY_MAX: "20",
   OBSERVABILITY_LOGS: "true",
+  CORS_ORIGINS: "https://example.pages.dev",
+  SERVE_STATIC: "false",
 };
 
 const ready = inspectRuntimeConfig(base);
