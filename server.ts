@@ -4,7 +4,7 @@ import { closePool } from './src/db/pool.js';
 export { app };
 export default app;
 
-const SHUTDOWN_TIMEOUT_MS = Number(process.env.SHUTDOWN_TIMEOUT_MS ?? 10_000);
+const SHUTDOWN_TIMEOUT_MS = Number(process.env.SHUTDOWN_TIMEOUT_MS ?? 25_000);
 
 async function shutdown(server: import('node:http').Server, signal: string): Promise<void> {
   console.log(`Received ${signal}; starting graceful shutdown`);
