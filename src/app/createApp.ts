@@ -953,6 +953,12 @@ async function startServer(): Promise<Server> {
     console.log(`🚀 AI Financial Analyst Server running on http://0.0.0.0:${PORT}`);
   });
 
+  server.once('error', (error) => {
+    console.error('Failed to bind HTTP server:', error);
+    process.exitCode = 1;
+    server.close();
+  });
+
   // Render's proxy can keep connections open beyond the default Node timeout.
   // Keep the connection alive long enough to avoid deploy-time 502s.
   server.keepAliveTimeout = 70_000;
