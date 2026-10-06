@@ -340,7 +340,7 @@ export async function runPortfolioEngine(
             grossExposurePct: equity > 0 ? (grossExposure / equity) * 100 : 0,
             consecutiveLosses: 0,
           },
-          stopDistancePct: sourceRun.stopPct * 100,
+          stopDistancePct: (sourceRun.stopPct ?? 0.005) * 100,
         });
         if (!risk.allowed) {
           riskGateBlocks += 1;
