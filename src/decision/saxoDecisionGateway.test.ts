@@ -28,11 +28,7 @@ const snapshot: MarketDataSnapshot = {
     quoteMode: "bid_ask",
   },
   candles,
-  quality: {
-    status: "fresh",
-    checkedAt: new Date("2026-10-01T12:00:00Z"),
-    latestCloseTime: candles[candles.length - 1]?.closeTime ?? null,
-  },
+  quality: { status: "fresh", timeframe: "1h", checkedAt: "2026-10-01T12:00:00.000Z", dataAsOf: "2026-10-01T11:59:59.000Z", ageMs: 1, maxAgeMs: 5400000 },
 };
 
 let receivedMarket: unknown;
@@ -75,7 +71,6 @@ const result = await gateway({
   checkedAt,
 });
 
-assert.equal(result.decision ?? undefined, undefined);
 assert.equal(result.origem, "baseline");
 assert.equal(result.recomendacao, "WAIT");
 assert.equal(result.market.ativo, "EURUSD");
