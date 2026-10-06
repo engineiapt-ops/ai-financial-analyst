@@ -19,7 +19,7 @@ export function resolveApiUrl(input: RequestInfo | URL, apiBaseUrl = readApiBase
     return input;
   }
 
-  return apiBaseUrl + input;
+  return apiBaseUrl.replace(/\/$/, "") + input;
 }
 
 let apiKeyInMemory: string | undefined;
