@@ -66,7 +66,7 @@ assert.deepEqual(resolved, {
   source: "Saxo OpenAPI Reference Data (account-scoped verification)",
 });
 assert.equal(calls.length, 2);
-assert.match(calls[0], /AccountKey=/) === false;
+assert.equal(calls[0].includes("AccountKey="), false);
 
 console.log("saxo instrument registry resolved exact tradable instrument");
 
