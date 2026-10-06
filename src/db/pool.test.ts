@@ -22,6 +22,14 @@ try {
   process.env.DATABASE_SSL = "require";
   assert.deepEqual(resolveSsl(), { rejectUnauthorized: false });
 
+  delete process.env.DATABASE_SSL;
+  process.env.RENDER = "true";
+  assert.deepEqual(
+    resolveSsl(),
+    { rejectUnauthorized: false },
+    "Render production must use PostgreSQL TLS by default",
+  );
+
   process.env.DATABASE_SSL = "disable";
   process.env.DB_POOL_MAX = "7";
   process.env.DB_STATEMENT_TIMEOUT_MS = "5000";
