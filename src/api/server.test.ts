@@ -76,6 +76,11 @@ assert(
 );
 
 assert(
+  !coreApiServerSource.includes("app.listen("),
+  "importing src/api/server.ts must never bind a network port",
+);
+
+assert(
   coreApiServerSource.includes("RISK_POSITION_SIZE_PCT"),
   "portfolio API should use the shared position-size risk constant",
 );
