@@ -93,16 +93,16 @@ assert(
   "readiness must verify database availability",
 );
 assert(
-  coreApiServerSource.includes("pingBinance()"),
-  "readiness must verify market-data availability",
-);
-assert(
   coreApiServerSource.includes("res.status(ready ? 200 : 503)"),
-  "readiness must return 503 when critical dependencies are unavailable",
+  "readiness must return 503 when the database is unavailable",
 );
 assert(
-  coreApiServerSource.includes("uptimeSeconds"),
-  "liveness must expose process uptime for operational diagnostics",
+  coreApiServerSource.includes("SERVICE_COMMIT"),
+  "readiness must expose the deployment commit",
+);
+assert(
+  coreApiServerSource.includes("SERVICE_VERSION"),
+  "readiness must expose the service version",
 );
 
 for (const forbiddenMiddleware of [
