@@ -208,13 +208,17 @@ export async function callJev(
     throw new JevUnavailableError("AI_GATEWAY_API_KEY não configurada.");
   }
 
-  const configuredBaseUrl = options.baseUrl ?? process.env.JEV_BASE_URL;
-  if (!configuredBaseUrl?.trim()) {
-    throw new JevUnavailableError("JEV_BASE_URL não configurada.");
-  }
-  const baseUrl = configuredBaseUrl.replace(/\/$/, "");
   const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
   const fetchImpl = options.fetchImpl ?? fetch;
+  const configuredBaseUrl = options.baseUrl ?? process.env.JEV_BASE_URL;
+
+  // Production transport must have an explicit external JEV endpoint.
+  // Tests may inject fetchImpl and use a harmless placeholder URL.
+  if (!configuredBaseUrl?.trim() && !options.fetchImpl) {
+    throw new JevUnavailableError("JEV_BASE_URL não configurada.");
+  }
+
+  const baseUrl = (configuredBaseUrl ?? "http://jev.local").replace(/\/$/, "");
   const sleepImpl = options.sleepImpl ?? defaultSleep;
   const expectedModelVersion = process.env.JEV_MODEL_VERSION?.trim() || undefined;
 
