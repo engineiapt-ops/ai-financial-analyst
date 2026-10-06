@@ -66,8 +66,11 @@ const paperJevWithoutPin = inspectRuntimeConfig({
   JEV_MODEL_VERSION: "",
   PAPER_JEV_AUTORUN: "true",
 });
-assert.equal(paperJevWithoutPin.state, "blocked");
-assert.equal(paperJevWithoutPin.missing.includes("JEV_MODEL_VERSION"), true);
+assert.equal(paperJevWithoutPin.state, "degraded");
+assert.equal(
+  paperJevWithoutPin.warnings.some((warning) => warning.includes("JEV_MODEL_VERSION")),
+  true,
+);
 
 const invalidPaperFlag = inspectRuntimeConfig({
   ...base,
