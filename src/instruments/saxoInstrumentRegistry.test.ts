@@ -29,7 +29,7 @@ const fetchImpl: SaxoFetch = async (input) => {
     });
   }
 
-  assert.match(url, /\/ref\/v1\/instruments\/details\/21\/FxSpot\?/);
+  assert.match(url, /\/ref\/v1\/instruments\/details\/21\/FxSpot(?:\?|$)/);
   return jsonResponse({
     Data: [
       {
