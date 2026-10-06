@@ -40,10 +40,11 @@ try {
   const health = await fetch(baseUrl + "/health");
   assert.equal(health.status, 200);
   assert.equal(Boolean(health.headers.get("x-request-id")), true);
-  assert.deepEqual(await health.json(), {
-    status: "ok",
-    service: "ai-financial-analyst-api",
-  });
+  const healthBody = await health.json();
+  assert.equal(healthBody.status, "ok");
+  assert.equal(healthBody.service, "ai-financial-analyst-api");
+  assert.equal(typeof healthBody.timestamp, "string");
+  assert.equal(typeof healthBody.uptimeSeconds, "number");
 
   const overviewUnauthorized = await fetch(baseUrl + "/api/market/overview");
   assert.equal(overviewUnauthorized.status, 404);
