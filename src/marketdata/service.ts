@@ -1,4 +1,4 @@
-import type { Kline, Timeframe } from "../types.js";
+import type { Kline, Timeframe } from "../domain/trading.js";
 import { normalizeMarketData } from "./normalization.js";
 import {
   assertMarketDataFresh,

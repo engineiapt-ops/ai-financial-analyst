@@ -1,6 +1,6 @@
 import { FEE_PCT, SLIPPAGE_PCT } from "../papertrading/simulator.js";
 import { resolvePriceLevels, type ExecutionLevels } from "../config/executionLevels.js";
-import type { DecisionResult, Timeframe } from "../types.js";
+import type { DecisionResult, Timeframe } from "../domain/trading.js";
 import { assessRiskReward, MIN_RISK_REWARD } from "../quant/riskReward.js";
 
 export const EXECUTABLE_SIGNAL_VERSION = "hourly-signal-v1";
