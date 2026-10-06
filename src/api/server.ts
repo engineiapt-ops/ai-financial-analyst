@@ -1274,42 +1274,31 @@ app.get("/api/system/readiness/details", async (_req, res) => {
   res.status(200).json({ status: "ok", ...overview });
 });
 
+const SERVICE_VERSION = process.env.APP_VERSION?.trim() || "unknown";
+const SERVICE_COMMIT =
+  process.env.RENDER_GIT_COMMIT?.trim() ||
+  process.env.GIT_COMMIT?.trim() ||
+  "unknown";
+
 app.get("/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
     service: "ai-financial-analyst-api",
-    timestamp: new Date().toISOString(),
-    uptimeSeconds: Math.floor(process.uptime()),
   });
 });
 
 app.get("/health/ready", async (_req, res) => {
-  const runtimeConfig = inspectRuntimeConfig();
+  const database = await healthDatabase()
+    .then(() => "ok" as const)
+    .catch(() => "error" as const);
 
-  const [database, marketData] = await Promise.all([
-    healthDatabase()
-      .then(() => ({ available: true }))
-      .catch(() => ({ available: false })),
-    pingBinance()
-      .then((available) => ({ available }))
-      .catch(() => ({ available: false })),
-  ]);
-
-  const ready =
-    runtimeConfig.state !== "blocked" &&
-    database.available &&
-    marketData.available;
+  const ready = database === "ok";
 
   res.status(ready ? 200 : 503).json({
-    status: ready ? "ok" : "degraded",
-    ready,
-    service: "ai-financial-analyst-api",
-    timestamp: new Date().toISOString(),
-    checks: {
-      database: database.available ? "ok" : "unavailable",
-      marketData: marketData.available ? "ok" : "unavailable",
-      runtimeConfig: runtimeConfig.state,
-    },
+    status: ready ? "ok" : "error",
+    db: database,
+    version: SERVICE_VERSION,
+    commit: SERVICE_COMMIT,
   });
 });
 
