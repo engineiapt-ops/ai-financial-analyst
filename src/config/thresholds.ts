@@ -1,3 +1,5 @@
+import { parseEnvBoolean, parseEnvNumber } from "./env.js";
+
 export const JEV_MODEL_VERSION = process.env.JEV_MODEL_VERSION?.trim() || undefined;
 
 export function envNumber(
@@ -8,8 +10,8 @@ export function envNumber(
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === "") return fallback;
 
-  const n = Number(raw);
-  if (!Number.isFinite(n)) {
+  const n = parseEnvNumber(raw);
+  if (n === undefined) {
     throw new Error(`${name} must be a finite number`);
   }
   if (range?.min !== undefined && n < range.min) {
@@ -23,11 +25,8 @@ export function envNumber(
 }
 
 function envBool(name: string, fallback: boolean): boolean {
-  const raw = process.env[name]?.trim().toLowerCase();
-  if (raw === undefined || raw === "") return fallback;
-  if (["1", "true", "yes", "on"].includes(raw)) return true;
-  if (["0", "false", "no", "off"].includes(raw)) return false;
-  return fallback;
+  const parsed = parseEnvBoolean(process.env[name]);
+  return parsed ?? fallback;
 }
 
 export interface DecisionThresholds {
