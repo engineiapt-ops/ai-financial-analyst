@@ -75,7 +75,7 @@ await assert.rejects(
   /Saxo refresh token is required/,
 );
 
-await assert.rejects(
+assert.throws(
   () =>
     new SaxoOAuthClient({
       environment: "live",
@@ -88,7 +88,7 @@ await assert.rejects(
   /SAXO_ENABLE_LIVE_READ_ONLY=true/,
 );
 
-await assert.rejects(
+assert.throws(
   () =>
     new SaxoOAuthClient({
       environment: "sim",
