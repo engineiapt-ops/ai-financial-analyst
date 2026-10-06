@@ -85,8 +85,18 @@ assert.deepEqual(blocked.body, {
   retryAfterSeconds: Number(blocked.headers["Retry-After"]),
 });
 
+process.env.TRUST_PROXY = "false";
+assert.equal(
+  getRequestClientKey(makeRequest()),
+  "127.0.0.1",
+  "forged X-Forwarded-For must not change the key when proxy trust is disabled",
+);
 process.env.TRUST_PROXY = "true";
-assert.equal(getRequestClientKey(makeRequest()), "203.0.113.10");
+assert.equal(
+  getRequestClientKey(makeRequest()),
+  "127.0.0.1",
+  "req.ip is the only client key source even when proxy trust is enabled",
+);
 delete process.env.TRUST_PROXY;
 
 assert.equal(isHeavyApiRequest(makeRequest("/api/analyze")), true);
