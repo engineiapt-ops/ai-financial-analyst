@@ -11,6 +11,8 @@ const base = {
   BINANCE_WS_BASE: "wss://stream.binance.com:9443/ws",
   GEMINI_API_KEY: "gemini-secret",
   GEMINI_MODEL: "gemini-3.8-flash",
+  JEV_BASE_URL: "https://jev.example.test",
+  JEV_API_KEY: "jev-secret",
   JEV_MODEL_VERSION: "jev-2026-09",
   GEMINI_API_BASE: "https://generativelanguage.googleapis.com/v1beta",
   GEMINI_TIMEOUT_MS: "30000",
