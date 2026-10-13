@@ -190,13 +190,13 @@ export async function buildApp(deps: BuildAppDependencies): Promise<FastifyInsta
     max: routeRateLimits.standard.max,
     timeWindow: routeRateLimits.standard.timeWindow,
     keyGenerator: (request) => request.ip,
-    errorResponseBuilder: () => {
+    errorResponseBuilder: (_request, context) => {
       const error = new Error("Rate limit exceeded") as Error & {
         statusCode: number;
         code: string;
       };
-      error.statusCode = 429;
-      error.code = "RATE_LIMIT_EXCEEDED";
+      error.statusCode = context.statusCode;
+      error.code = context.statusCode === 429 ? "RATE_LIMIT_EXCEEDED" : "RATE_LIMIT_BANNED";
       return error;
     },
   });
