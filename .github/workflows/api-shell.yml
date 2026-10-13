@@ -1,0 +1,43 @@
+name: API shell
+
+on:
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/api-shell.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/api-shell.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: npm install --no-audit --no-fund
+
+      - name: Test API contracts
+        working-directory: apps/api
+        run: npm test
+
+      - name: Build API
+        working-directory: apps/api
+        run: npm run build
+
+      - name: Build API Docker image
+        run: docker build -f apps/api/Dockerfile -t ai-financial-analyst-api:pr-007 .
