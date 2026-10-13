@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
+import Fastify, { LogController, type FastifyInstance, type FastifyReply } from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import type { ReadinessDatabase } from "./database.js";
@@ -120,10 +120,10 @@ export async function buildApp(deps: BuildAppDependencies): Promise<FastifyInsta
       },
     },
     requestIdHeader: false,
-    requestIdLogLabel: "requestId",
     genReqId: () => randomUUID(),
     trustProxy: env.TRUST_PROXY === "true",
-    ignoreTrailingSlash: true,
+    logController: new LogController({ requestIdLogLabel: "requestId" }),
+    routerOptions: { ignoreTrailingSlash: true },
   });
 
   app.addHook("onRequest", async (request, reply) => {
@@ -145,12 +145,13 @@ export async function buildApp(deps: BuildAppDependencies): Promise<FastifyInsta
     const status = (error as Error & { statusCode?: number }).statusCode;
     if (typeof status === "number" && status >= 400 && status < 500) {
       const notFound = status === 404;
+      const rateLimited = status === 429;
       sendApiError(
         reply,
         request.id,
         status,
-        notFound ? "NOT_FOUND" : "INVALID_REQUEST",
-        notFound ? "Route not found" : "Request could not be processed",
+        notFound ? "NOT_FOUND" : rateLimited ? "RATE_LIMIT_EXCEEDED" : "INVALID_REQUEST",
+        notFound ? "Route not found" : rateLimited ? "Rate limit exceeded" : "Request could not be processed",
       );
       return;
     }
@@ -189,13 +190,15 @@ export async function buildApp(deps: BuildAppDependencies): Promise<FastifyInsta
     max: routeRateLimits.standard.max,
     timeWindow: routeRateLimits.standard.timeWindow,
     keyGenerator: (request) => request.ip,
-    errorResponseBuilder: (request) => ({
-      error: {
-        code: "RATE_LIMIT_EXCEEDED",
-        message: "Rate limit exceeded",
-        requestId: request.id,
-      },
-    }),
+    errorResponseBuilder: () => {
+      const error = new Error("Rate limit exceeded") as Error & {
+        statusCode: number;
+        code: string;
+      };
+      error.statusCode = 429;
+      error.code = "RATE_LIMIT_EXCEEDED";
+      return error;
+    },
   });
 
   app.get("/health", { config: { rateLimit: false } }, async () => ({
