@@ -175,7 +175,7 @@ export async function buildApp(deps: BuildAppDependencies): Promise<FastifyInsta
       }
 
       if (!allowedOrigins.has(origin)) {
-        callback(new ApiHttpError(403, "CORS_ORIGIN_DENIED", "Origin is not allowed"));
+        callback(new ApiHttpError(403, "CORS_ORIGIN_DENIED", "Origin is not allowed"), false);
         return;
       }
 
